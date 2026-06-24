@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+  :root{
+    --bg:#0B0D10; --surface:#13161B; --surface-2:#191D24;
+    --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.13);
+    --text:#F2F0E9; --muted:#969CA6; --dim:#666C75;
+    --disp:'Space Grotesk',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif;
+    --ease:cubic-bezier(.22,.61,.36,1);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:transparent;color:var(--text);font-family:var(--body);font-size:14px}
+  body{padding:2px}
+  .banner{font-size:12px;color:#FFB454;background:rgba(242,145,30,.13);border:1px solid rgba(242,145,30,.3);
+    border-radius:9px;padding:8px 12px;margin-bottom:11px}
+  .fallback{font-size:13px;color:var(--muted);background:var(--surface);border:1px solid var(--line);
+    border-radius:12px;padding:16px 18px;line-height:1.6}
+  .kan{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;align-items:start}
+  .kcol{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .kcol-h{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;
+    border-bottom:1px solid var(--line);font-size:12.5px;font-weight:700;font-family:var(--disp)}
+  .kcol-h .ct{font-family:var(--disp);font-size:11px;color:var(--muted);background:var(--surface-2);
+    padding:2px 8px;border-radius:999px}
+  .kcol-h .accent{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:8px;vertical-align:middle}
+  .kbody{padding:10px;display:flex;flex-direction:column;gap:9px;min-height:120px;max-height:430px;
+    overflow-y:auto;transition:background .18s var(--ease),box-shadow .18s var(--ease)}
+  .kbody::-webkit-scrollbar{width:8px}
+  .kbody::-webkit-scrollbar-thumb{background:#262B33;border-radius:6px;border:2px solid var(--surface)}
+  .kbody.dragover{box-shadow:inset 0 0 0 2px var(--accent), inset 0 0 28px rgba(255,255,255,.05);
+    background:rgba(255,255,255,.03)}
+  .kcard{background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:10px 11px;
+    cursor:grab;transition:transform .16s var(--ease),border-color .16s var(--ease),box-shadow .16s var(--ease),opacity .16s var(--ease)}
+  .kcard:hover{transform:translateY(-2px);border-color:var(--line-2);box-shadow:0 8px 20px rgba(0,0,0,.4)}
+  .kcard:active{cursor:grabbing}
+  .kcard.dragging{opacity:.35;cursor:grabbing}
+  .kcard .kn{font-size:12.5px;font-weight:600;line-height:1.3}
+  .kcard .ks{font-size:11px;color:var(--dim);margin-top:2px}
+  .kcard .kf{display:flex;align-items:center;justify-content:space-between;margin-top:9px}
+  .kchip{font-family:var(--disp);font-weight:700;font-size:11px;padding:2px 8px;border-radius:7px}
+  .kval{font-size:11px;color:var(--muted)}
+  .empty{font-size:11.5px;color:var(--dim);text-align:center;padding:8px;border:1px dashed var(--line-2);border-radius:9px}
+  @media (max-width:900px){.kan{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+(function () {
+  "use strict";
+  // ---- protocolo do componente Streamlit (sem libs externas) ----
+  function send(type, data) {
+    window.parent.postMessage(
+      Object.assign({ isStreamlitMessage: true, type: type }, data || {}), "*");
+  }
+  function setHeight() {
+    var h = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight, 160);
+    send("streamlit:setFrameHeight", { height: h });
+  }
+  function esc(s) {
+    s = (s == null ? "" : String(s));
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  var supportsDnD = ("draggable" in document.createElement("div"));
+  var dragId = null, dragFrom = null;
+
+  function cardHTML(c) {
+    return '<div class="kcard" draggable="true" data-id="' + esc(c.id) + '" data-status="' + esc(c.status) + '">' +
+      '<div class="kn">' + esc(c.nome) + '</div>' +
+      '<div class="ks">' + esc(c.setor) + '</div>' +
+      '<div class="kf"><span class="kchip" style="' + esc(c.chip) + '">' + esc(c.score) + '</span>' +
+      '<span class="kval">' + esc(c.valor) + '</span></div></div>';
+  }
+
+  function render(args) {
+    var root = document.getElementById("root");
+    if (!supportsDnD) {
+      root.innerHTML = '<div class="fallback">⚠️ Arrastar-e-soltar não é suportado neste navegador. ' +
+        'Use o <b>dossiê</b> (clique no card no Ranking) para mudar o status.</div>';
+      setHeight();
+      return;
+    }
+    var colunas = (args && args.colunas) || [];
+    var editable = !args || args.editable !== false;
+    var html = "";
+    if (!editable) {
+      html += '<div class="banner">🟠 Modo local (CSV): você pode arrastar, mas a mudança não é gravada — apenas demonstra o aviso.</div>';
+    }
+    html += '<div class="kan">';
+    colunas.forEach(function (col) {
+      html += '<div class="kcol"><div class="kcol-h"><span><span class="accent" style="background:' +
+        esc(col.cor) + '"></span>' + esc(col.status) + '</span>' +
+        '<span class="ct" id="ct_' + esc(col.status) + '">' + col.cards.length + '</span></div>';
+      html += '<div class="kbody" data-status="' + esc(col.status) + '" style="--accent:' + esc(col.cor) + '">';
+      col.cards.forEach(function (c) { html += cardHTML(c); });
+      if (col.cards.length === 0) { html += '<div class="empty">solte aqui</div>'; }
+      html += '</div></div>';
+    });
+    html += '</div>';
+    root.innerHTML = html;
+    wire();
+    setHeight();
+  }
+
+  function refreshCounts() {
+    document.querySelectorAll(".kbody").forEach(function (b) {
+      var n = b.querySelectorAll(".kcard").length;
+      var ct = document.getElementById("ct_" + b.dataset.status);
+      if (ct) ct.textContent = n;
+      var empty = b.querySelector(".empty");
+      if (n > 0 && empty) empty.remove();
+      else if (n === 0 && !empty) {
+        var d = document.createElement("div"); d.className = "empty"; d.textContent = "solte aqui"; b.appendChild(d);
+      }
+    });
+  }
+
+  function wire() {
+    document.querySelectorAll(".kcard").forEach(function (card) {
+      card.addEventListener("dragstart", function (e) {
+        dragId = card.dataset.id; dragFrom = card.dataset.status;
+        card.classList.add("dragging");
+        if (e.dataTransfer) { e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", dragId); } catch (_) {} }
+      });
+      card.addEventListener("dragend", function () {
+        card.classList.remove("dragging");
+        document.querySelectorAll(".kbody").forEach(function (b) { b.classList.remove("dragover"); });
+      });
+    });
+    document.querySelectorAll(".kbody").forEach(function (body) {
+      body.addEventListener("dragover", function (e) {
+        e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = "move"; body.classList.add("dragover");
+      });
+      body.addEventListener("dragleave", function (e) {
+        if (!body.contains(e.relatedTarget)) body.classList.remove("dragover");
+      });
+      body.addEventListener("drop", function (e) {
+        e.preventDefault(); body.classList.remove("dragover");
+        var novo = body.dataset.status;
+        if (dragId && novo && novo !== dragFrom) {
+          // move otimista no DOM
+          var el = null;
+          document.querySelectorAll(".kcard").forEach(function (c) { if (c.dataset.id === dragId) el = c; });
+          if (el) {
+            var empty = body.querySelector(".empty"); if (empty) empty.remove();
+            el.dataset.status = novo; body.appendChild(el); refreshCounts();
+          }
+          // devolve a mudança para o Python (sem reload -> sessão preservada)
+          send("streamlit:setComponentValue", {
+            value: { org_id: dragId, novo_status: novo, de: dragFrom, nonce: Date.now() },
+            dataType: "json"
+          });
+          setHeight();
+        }
+        dragId = null; dragFrom = null;
+      });
+    });
+  }
+
+  window.addEventListener("message", function (e) {
+    if (e.data && e.data.type === "streamlit:render") { render(e.data.args || {}); }
+  });
+  window.addEventListener("resize", setHeight);
+
+  // anuncia que o componente está pronto -> Streamlit envia o primeiro render
+  send("streamlit:componentReady", { apiVersion: 1 });
+  setHeight();
+})();
+</script>
+</body>
+</html>

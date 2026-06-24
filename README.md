@@ -12,7 +12,7 @@ Um selo no topo mostra o modo atual: **🟢 Conectado ao Google Sheets** ou
 - **Visão geral** — KPIs (organizações, em prospecção, valor-alvo total, oportunidades hoje), funil por status e cobertura regional.
 - **Ranking** — tabela por Score PFC com busca e filtro; cada organização abre um **dossiê** completo, onde você **salva observações** e **muda o status** (grava na planilha).
 - **Radar** — fila de oportunidades; **Aprovar** grava na aba `Novidades_pendentes` (criada automaticamente).
-- **Funil** — kanban de 5 colunas (Mapear, Prospectar, Monitorar, Edital, Ativo).
+- **Funil** — kanban de 5 colunas (Mapear, Prospectar, Monitorar, Edital, Ativo) com **arrastar-e-soltar**: mover um card entre colunas chama `atualizar_status()` e grava na planilha.
 - **Metodologia** — explica o Score PFC (Aderência 35% · Valor 25% · Região 20% · Acionabilidade 20%).
 
 ---
@@ -94,9 +94,11 @@ universe_domain = "googleapis.com"
 ## Estrutura do projeto
 ```
 PROJETO_PFC/
-├── app.py                     # interface (5 abas, tema escuro, dossiê)
+├── app.py                     # interface (login, 5 páginas, modais, gráficos)
 ├── src/
 │   └── dados.py               # leitura/escrita: Google Sheets ↔ CSV
+├── kanban_component/
+│   └── index.html             # componente de drag-and-drop (HTML5 nativo, sem libs)
 ├── data/
 │   └── empresas.csv           # base de fallback (123 organizações)
 ├── .streamlit/
