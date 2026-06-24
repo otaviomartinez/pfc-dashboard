@@ -1,0 +1,17 @@
+# Tema escuro do Dashboard de Inteligência de Captação (PFC)
+# Paleta derivada da logo oficial do PFC.
+[theme]
+base = "dark"
+primaryColor = "#F2911E"            # laranja (destaque)
+backgroundColor = "#0B0D10"         # fundo
+secondaryBackgroundColor = "#13161B" # superfície
+textColor = "#F2F0E9"               # texto
+font = "sans serif"
+
+[server]
+headless = true
+# Sobe sem abrir navegador automaticamente; mude para false se preferir.
+runOnSave = true
+
+[browser]
+gatherUsageStats = false

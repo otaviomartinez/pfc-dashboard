@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pip --version)",
+      "Bash(cd \"C:\\\\Users\\\\otavi\\\\OneDrive\\\\Desktop\\\\PROJETO_PFC\" && mkdir -p data src .streamlit && cp \"C:\\\\Users\\\\otavi\\\\OneDrive\\\\Desktop\\\\AULA 2\\\\empresas.csv\" data/empresas.csv && echo \"copied\" && ls -R)",
+      "Bash(python -m pip install --upgrade pip)",
+      "Bash(python -m pip install \"streamlit>=1.40\" \"pandas>=2.2\" \"gspread>=6.0\" \"google-auth>=2.30\")",
+      "Bash(python -m pip show streamlit pandas gspread google-auth)",
+      "Bash(python -m py_compile app.py src/dados.py src/__init__.py)",
+      "Bash(python -c ' *)",
+      "Bash(grep -v \"ScriptRunContext\\\\|missing\\\\|Session state\\\\|streamlit run\\\\|^\\\\s*$\\\\|Warning\")",
+      "Bash(python -m streamlit run app.py --server.headless true --server.port 8533 --server.runOnSave false)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(powershell -NoProfile -Command 'Get-CimInstance Win32_Process -Filter \"Name='\\\\''python.exe'\\\\''\" | Where-Object { $_.CommandLine -like '\\\\''*streamlit*8533*'\\\\'' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force; '\\\\''killed '\\\\'' + $_.ProcessId }')",
+      "Bash(cd \"C:\\\\Users\\\\otavi\\\\OneDrive\\\\Desktop\\\\PROJETO_PFC\" && rm -rf __pycache__ src/__pycache__ && echo \"--- final tree ---\" && find . -type f -not -path '*/\\\\.git/*' | sort)",
+      "Bash(python -m py_compile app.py src/dados.py)",
+      "Bash(grep -vE \"ScriptRunContext|No runtime found|MemoryCacheStorageManager|^\\\\s*$\")",
+      "Bash(python -m py_compile app.py)"
+    ]
+  }
+}
