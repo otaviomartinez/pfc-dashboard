@@ -1,11 +1,11 @@
-# Tema escuro do Dashboard de Inteligência de Captação (PFC)
-# Paleta derivada da logo oficial do PFC.
+# Tema escuro minimalista do Dashboard de Captação (PFC)
+# Cinza neutro como base; cor só para destaques semânticos.
 [theme]
 base = "dark"
-primaryColor = "#F2911E"            # laranja (destaque)
-backgroundColor = "#0B0D10"         # fundo
-secondaryBackgroundColor = "#13161B" # superfície
-textColor = "#F2F0E9"               # texto
+primaryColor = "#5B9BD5"             # azul discreto (foco/seleção)
+backgroundColor = "#0A0C0F"          # fundo bem escuro
+secondaryBackgroundColor = "#141820" # superfície (1-2 tons acima)
+textColor = "#E9EBEE"                # texto cinza claro
 font = "sans serif"
 
 [server]

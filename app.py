@@ -57,14 +57,14 @@ st.set_page_config(
 # --------------------------------------------------------------------------- #
 USERS = {
     "fabio@pfc.org": {
-        "senha": "pfc2026", "nome": "Fábio Lima", "inicial": "FL",
+        "senha": "pfc2026", "nome": "Fábio Leite", "inicial": "FL",
         "perfil": "Coordenador de Captação",
-        "bg": "rgba(242,145,30,.16)", "bd": "rgba(242,145,30,.45)", "tx": "#FFB454",
+        "bg": "rgba(255,255,255,.06)", "bd": "rgba(255,255,255,.16)", "tx": "#E9EBEE",
     },
     "otavio@pfc.org": {
-        "senha": "pfc2026", "nome": "Otávio Costa", "inicial": "OC",
+        "senha": "pfc2026", "nome": "Otávio Martinez", "inicial": "OM",
         "perfil": "Analista de Dados",
-        "bg": "rgba(59,139,208,.16)", "bd": "rgba(59,139,208,.45)", "tx": "#86C0EC",
+        "bg": "rgba(255,255,255,.06)", "bd": "rgba(255,255,255,.16)", "tx": "#E9EBEE",
     },
 }
 
@@ -79,24 +79,25 @@ CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 :root{
-  --bg:#0B0D10; --surface:#13161B; --surface-2:#191D24; --raise:#1F242C;
-  --glass:rgba(25,29,36,.72);
-  --line:rgba(255,255,255,.07); --line-2:rgba(255,255,255,.13);
-  --text:#F2F0E9; --muted:#969CA6; --dim:#666C75;
-  --orange:#F2911E; --orange-2:#FFB454; --orange-soft:rgba(242,145,30,.13);
-  --green:#5FB137; --green-2:#A6DD86; --green-soft:rgba(95,177,55,.14);
-  --blue:#3B8BD0; --blue-2:#86C0EC; --blue-soft:rgba(59,139,208,.14);
-  --red:#E25640; --red-soft:rgba(226,86,64,.14);
-  --r:12px; --r-lg:16px;
-  --sh-1:0 2px 10px rgba(0,0,0,.25); --sh-2:0 20px 60px rgba(0,0,0,.55);
+  /* superfícies neutras — o contraste vem do espaço, não da cor */
+  --bg:#0A0C0F; --surface:#141820; --surface-2:#1B202A; --surface-3:#232A35; --raise:#1B202A;
+  --glass:rgba(20,24,32,.60);
+  --line:rgba(255,255,255,.05); --line-2:rgba(255,255,255,.10); --line-3:rgba(255,255,255,.20);
+  --text:#E9EBEE; --text-2:#C2C7CE; --muted:#828A94; --dim:#565E68; --white:#FFFFFF;
+  /* cores reservadas só para destaques semânticos (status, ações, alertas) */
+  --orange:#E89A3C; --orange-2:#F0B264; --orange-soft:rgba(232,154,60,.12);
+  --green:#5FB137; --green-2:#9FD27F; --green-soft:rgba(95,177,55,.12);
+  --blue:#5B9BD5; --blue-2:#8FBDE6; --blue-soft:rgba(91,155,213,.12);
+  --red:#E2574A; --red-2:#EE8076; --red-soft:rgba(226,87,74,.12);
+  --r:10px; --r-lg:14px;
+  --sh-1:0 1px 2px rgba(0,0,0,.16); --sh-2:0 24px 70px rgba(0,0,0,.50);
   --ease:cubic-bezier(.22,.61,.36,1);
   --disp:'Space Grotesk',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif;
 }
 html, body, [class*="css"]{font-family:var(--body);line-height:1.6;}
 .stApp{
   background:var(--bg);
-  background-image:radial-gradient(1100px 600px at 82% -12%, rgba(59,139,208,.08), transparent 60%),
-                   radial-gradient(820px 480px at 2% 0%, rgba(242,145,30,.06), transparent 55%);
+  background-image:radial-gradient(900px 520px at 85% -15%, rgba(255,255,255,.022), transparent 62%);
 }
 /* Neutraliza a barra fixa do Streamlit (que sobrepunha/cortava a logo) */
 [data-testid="stHeader"]{display:none;height:0;}
@@ -110,7 +111,7 @@ h1,h2,h3,h4{font-family:var(--disp);letter-spacing:-.01em;color:var(--text);}
 .brand{display:flex;align-items:center;gap:14px;overflow:visible;min-width:0;flex-wrap:nowrap}
 .brand svg{flex:none;display:block}
 .brand>div{min-width:0}
-.brand .wm{font-family:var(--disp);font-weight:700;font-size:15.5px;letter-spacing:.04em;color:var(--orange);line-height:1.2;text-transform:uppercase;white-space:nowrap}
+.brand .wm{font-family:var(--disp);font-weight:600;font-size:15px;letter-spacing:.05em;color:var(--text);line-height:1.2;text-transform:uppercase;white-space:nowrap}
 .brand .sub{font-size:12.5px;color:var(--muted)}
 .brand:hover svg .orbit{animation:spin 9s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -127,8 +128,8 @@ h1,h2,h3,h4{font-family:var(--disp);letter-spacing:-.01em;color:var(--text);}
 .avatar{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-family:var(--disp);font-weight:700;font-size:14px;flex:none;transition:transform .2s var(--ease)}
 .avatar:hover{transform:scale(1.08)}
 .hr-line{height:1px;background:var(--line);margin:14px 0 6px}
-.bcrumb{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.07em;margin:2px 0 14px}
-.bcrumb b{color:var(--orange-2);font-weight:600}
+.bcrumb{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.07em;margin:4px 0 18px}
+.bcrumb b{color:var(--text-2);font-weight:600}
 
 /* ---------- phead ---------- */
 .phead h1{font-family:var(--disp);font-weight:600;font-size:25px;margin-bottom:3px}
@@ -137,19 +138,23 @@ h1,h2,h3,h4{font-family:var(--disp);letter-spacing:-.01em;color:var(--text);}
 /* ---------- cards (glass + depth) ---------- */
 .card{background:var(--glass);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
   border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;margin-bottom:18px;box-shadow:var(--sh-1)}
-.card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:17px 20px 14px;border-bottom:1px solid var(--line)}
-.card-h h2{font-family:var(--disp);font-weight:600;font-size:16px;margin:0}
-.card-h .cap{font-size:12px;color:var(--dim);margin-top:2px}
-.pad{padding:18px 20px}
+.card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 24px 15px;border-bottom:1px solid var(--line)}
+.card-h h2{font-family:var(--disp);font-weight:600;font-size:15.5px;margin:0;letter-spacing:.01em}
+.card-h .cap{font-size:12px;color:var(--dim);margin-top:3px}
+.pad{padding:22px 24px}
 
 /* ---------- KPIs clicáveis ---------- */
-.kpi{background:var(--glass);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
-  border:1px solid var(--line);border-radius:var(--r-lg) var(--r-lg) 0 0;padding:18px 19px 16px;
-  position:relative;overflow:hidden;box-shadow:var(--sh-1);transition:transform .26s var(--ease),border-color .26s var(--ease)}
-.kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent,var(--blue));transition:width .26s var(--ease)}
-.kpi .lab{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);font-weight:500}
-.kpi .val{font-family:var(--disp);font-weight:700;font-size:34px;letter-spacing:-.02em;margin:11px 0 3px;line-height:1}
-.kpi .foot{font-size:12px;color:var(--dim)} .kpi .foot b{color:var(--muted);font-weight:600}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg) var(--r-lg) 0 0;
+  padding:22px 22px 20px;position:relative;overflow:hidden;box-shadow:var(--sh-1);
+  transition:transform .26s var(--ease),border-color .26s var(--ease),background .26s var(--ease)}
+.kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--accent,rgba(255,255,255,.16));transition:width .26s var(--ease),background .26s var(--ease)}
+.kpi .lab{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);font-weight:500}
+.kpi .lab .ic{display:inline-block;transition:transform .24s var(--ease)}
+.kpi .val{font-family:var(--disp);font-weight:600;font-size:34px;letter-spacing:-.02em;margin:14px 0 4px;line-height:1;color:var(--text)}
+.kpi .foot{font-size:12px;color:var(--dim)} .kpi .foot b{color:var(--text-2);font-weight:600}
+.kpi:hover{border-color:var(--line-2);transform:translateY(-2px)}
+.kpi:hover::before{width:3px;background:rgba(255,255,255,.32)}
+.kpi:hover .ic{transform:scale(1.18)}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 @media (max-width:900px){.g2{grid-template-columns:1fr}}
 
@@ -161,24 +166,27 @@ h1,h2,h3,h4{font-family:var(--disp);letter-spacing:-.01em;color:var(--text);}
 .fleg .sw{width:9px;height:9px;border-radius:3px} .fleg b{color:var(--text);font-family:var(--disp);font-weight:600}
 
 /* ---------- ranking rows ---------- */
-.org{display:flex;align-items:center;gap:11px}
-.sem{width:9px;height:9px;border-radius:50%;flex:none;box-shadow:0 0 8px currentColor}
-.org .nm{font-weight:600;color:var(--text);font-size:14px}
-.org .st{font-size:11.5px;color:var(--dim)}
-.scorecell{display:flex;align-items:center;gap:11px}
-.scoreN{font-family:var(--disp);font-weight:700;font-size:18px;width:28px}
-.segbar{flex:1;max-width:120px;height:7px;border-radius:4px;background:var(--line-2);display:flex;overflow:hidden;gap:1.5px}
+.org{display:flex;align-items:center;gap:13px;padding:8px 22px 8px 4px;min-width:0}
+.org>div{min-width:0;flex:1}
+.sem{width:8px;height:8px;border-radius:50%;flex:none;opacity:.9}
+.org .nm{font-weight:600;color:var(--text);font-size:14px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.org .st{font-size:11.5px;color:var(--dim);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scorecell{display:flex;align-items:center;gap:12px;padding-left:8px}
+.scoreN{font-family:var(--disp);font-weight:600;font-size:18px;width:28px;color:var(--text)}
+.segbar{flex:1;max-width:116px;height:6px;border-radius:4px;background:var(--line-2);display:flex;overflow:hidden;gap:1.5px}
 .segbar i{display:block;height:100%}
-.stat{font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:7px;white-space:nowrap}
-.s-pros{background:var(--orange-soft);color:var(--orange-2)}
-.s-moni{background:var(--blue-soft);color:var(--blue-2)}
-.s-edit{background:var(--green-soft);color:var(--green-2)}
-.s-map{background:rgba(255,255,255,.05);color:var(--muted)}
+.stat{font-size:11.5px;font-weight:600;padding:3px 11px;border-radius:7px;white-space:nowrap;border:1px solid transparent}
+.s-pros{background:var(--blue-soft);color:var(--blue-2);border-color:rgba(91,155,213,.22)}
+.s-moni{background:rgba(255,255,255,.05);color:var(--text-2)}
+.s-edit{background:var(--orange-soft);color:var(--orange-2);border-color:rgba(232,154,60,.22)}
+.s-ativo{background:var(--green-soft);color:var(--green-2);border-color:rgba(95,177,55,.22)}
+.s-map{background:rgba(255,255,255,.035);color:var(--muted)}
 .alvo{font-family:var(--disp);font-weight:600;text-align:right;color:var(--text);white-space:nowrap;font-size:13.5px}
 .rkhead{display:grid;grid-template-columns:2.4fr 1.5fr 1fr 1fr;gap:8px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);font-weight:600;padding:8px 4px 2px}
 .rkhead .r{text-align:right}
-[data-testid="stHorizontalBlock"]:has(.org){border-bottom:1px solid var(--line);padding:3px 0;align-items:center;transition:background .15s var(--ease)}
-[data-testid="stHorizontalBlock"]:has(.org):hover{background:rgba(255,255,255,.02)}
+[data-testid="stHorizontalBlock"]:has(.org){border-bottom:1px solid var(--line);padding:6px 6px;align-items:center;min-height:64px;border-radius:8px;transition:background .22s var(--ease)}
+[data-testid="stHorizontalBlock"]:has(.org.odd){background:rgba(255,255,255,.013)}
+[data-testid="stHorizontalBlock"]:has(.org):hover{background:rgba(255,255,255,.05)}
 
 /* ---------- list rows (modais) ---------- */
 .lrow2{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border:1px solid var(--line);
@@ -199,7 +207,7 @@ h1,h2,h3,h4{font-family:var(--disp);letter-spacing:-.01em;color:var(--text);}
 .kcol-h .accent{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:8px;vertical-align:middle}
 .kbody{padding:11px;display:flex;flex-direction:column;gap:10px;min-height:60px}
 .kcard{background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:11px 12px;transition:transform .2s var(--ease),border-color .2s var(--ease),box-shadow .2s var(--ease)}
-.kcard:hover{transform:translateY(-3px);border-color:var(--line-2);box-shadow:0 10px 26px rgba(0,0,0,.4)}
+.kcard:hover{transform:translateY(-2px);border-color:var(--line-2);box-shadow:0 6px 16px rgba(0,0,0,.25)}
 .kcard .kn{font-size:12.5px;font-weight:600;line-height:1.3}
 .kcard .ks{font-size:11px;color:var(--dim);margin-top:2px}
 .kcard .kf{display:flex;align-items:center;justify-content:space-between;margin-top:9px}
@@ -246,16 +254,16 @@ h1,h2,h3,h4{font-family:var(--disp);letter-spacing:-.01em;color:var(--text);}
 .caso .cw{font-size:12px;color:var(--muted);line-height:1.5}
 
 /* ---------- dialog (modal premium) ---------- */
-[data-testid="stDialog"] > div{backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);background:rgba(6,8,11,.55)!important;}
+[data-testid="stDialog"] > div{backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);background:rgba(8,10,13,.5)!important;}
 [data-testid="stDialog"] [role="dialog"]{border:1px solid var(--line-2)!important;border-radius:var(--r-lg)!important;
-  box-shadow:var(--sh-2)!important;background:var(--surface)!important;}
+  box-shadow:var(--sh-2)!important;background:rgba(20,24,32,.92)!important;backdrop-filter:blur(12px)!important;-webkit-backdrop-filter:blur(12px)!important;padding-top:6px!important;}
 .dr-eyebrow{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--dim);margin-bottom:6px}
 .dr-sub{font-size:12.5px;color:var(--muted);margin:2px 0 6px}
 .dr-score{font-family:var(--disp);font-weight:700;font-size:30px;line-height:1}
 .dr-score small{font-size:13px;color:var(--muted);font-weight:400}
 .dr-seg{height:8px;border-radius:5px;background:var(--line-2);display:flex;overflow:hidden;gap:2px;margin-top:8px}
 .dr-seg i{display:block;height:100%}
-.dr-sec h3{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--orange-2);font-weight:700;margin:15px 0 9px}
+.dr-sec h3{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-2);font-weight:600;margin:20px 0 11px}
 .frow{display:grid;grid-template-columns:130px 1fr;gap:10px;padding:5px 0;font-size:13px}
 .frow .fl{color:var(--muted);font-size:12.5px}
 .frow .fv{color:var(--text)}
@@ -267,21 +275,33 @@ h1,h2,h3,h4{font-family:var(--disp);letter-spacing:-.01em;color:var(--text);}
 
 /* ---------- login ---------- */
 .login-logo{display:flex;flex-direction:column;align-items:center;gap:10px;margin:6px 0 4px}
-.login-logo .wm{font-family:var(--disp);font-weight:700;font-size:17px;letter-spacing:.05em;color:var(--orange);text-transform:uppercase}
+.login-logo .wm{font-family:var(--disp);font-weight:600;font-size:16px;letter-spacing:.06em;color:var(--text);text-transform:uppercase}
 .login-logo .sub{font-size:13px;color:var(--muted)}
 .login-h{font-family:var(--disp);font-weight:600;font-size:19px;text-align:center;margin:12px 0 2px}
 .login-p{font-size:12.5px;color:var(--muted);text-align:center;margin-bottom:6px}
 
 /* ---------- streamlit widget polish ---------- */
-.stButton>button{border-radius:10px;border:1px solid var(--line-2);background:var(--surface-2);color:var(--text);font-size:13px;font-weight:500;padding:8px 14px;transition:.16s var(--ease);}
-.stButton>button:hover{border-color:var(--orange);color:var(--orange-2);transform:translateY(-1px);}
-.stButton>button[kind="primary"]{background:var(--orange);border-color:var(--orange);color:#1a1205;font-weight:700;}
-.stButton>button[kind="primary"]:hover{background:var(--orange-2);color:#1a1205;}
-div[data-testid="stExpander"]{border:1px solid var(--line);border-radius:12px;background:var(--surface-2);margin-bottom:11px;overflow:hidden;box-shadow:var(--sh-1);}
-div[data-testid="stExpander"] summary{font-family:var(--disp);font-weight:600;font-size:13.5px;padding:13px 16px;}
-div[data-testid="stExpander"] summary:hover{color:var(--orange-2);}
-div[data-testid="stTextInput"] input{font-size:13px;border-radius:10px;}
-div[data-testid="stTextInput"] input:focus{border-color:var(--orange)!important;}
+/* botões: neutros, quase transparentes; hover clareia (branco) */
+.stButton>button{border-radius:9px;border:1px solid var(--line-2);background:transparent;color:var(--text-2);
+  font-size:13px;font-weight:500;padding:9px 16px;transition:all .24s var(--ease);}
+.stButton>button:hover{border-color:var(--line-3);color:var(--white);background:rgba(255,255,255,.035);transform:translateY(-1px);}
+.stButton>button:active{transform:translateY(0) scale(.99);}
+.stButton>button[kind="primary"]{background:rgba(255,255,255,.06);border-color:var(--line-3);color:var(--white);font-weight:600;}
+.stButton>button[kind="primary"]:hover{background:rgba(255,255,255,.11);border-color:rgba(255,255,255,.30);}
+/* link button (fonte oficial) — âncora nativa, estilo neutro */
+[data-testid="stLinkButton"] a{border-radius:9px!important;border:1px solid var(--line-2)!important;background:transparent!important;color:var(--blue-2)!important;font-size:13px!important;font-weight:500!important;transition:all .24s var(--ease)!important;}
+[data-testid="stLinkButton"] a:hover{border-color:rgba(91,155,213,.5)!important;color:var(--white)!important;background:rgba(91,155,213,.08)!important;transform:translateY(-1px);}
+/* expanders: minimalistas */
+div[data-testid="stExpander"]{border:1px solid var(--line);border-radius:12px;background:var(--surface);margin-bottom:12px;overflow:hidden;box-shadow:none;transition:border-color .24s var(--ease);}
+div[data-testid="stExpander"]:hover{border-color:var(--line-2);}
+div[data-testid="stExpander"] summary{font-family:var(--disp);font-weight:600;font-size:13.5px;padding:15px 18px;transition:color .2s var(--ease);}
+div[data-testid="stExpander"] summary:hover{color:var(--white);}
+/* inputs: cinza escuro, foco em azul (só na borda) */
+div[data-baseweb="input"], div[data-baseweb="textarea"]{background:var(--surface-2)!important;border:1px solid var(--line-2)!important;border-radius:9px!important;transition:border-color .22s var(--ease),box-shadow .22s var(--ease)!important;}
+div[data-baseweb="input"]:focus-within, div[data-baseweb="textarea"]:focus-within{border-color:var(--blue)!important;box-shadow:0 0 0 1px rgba(91,155,213,.35)!important;}
+div[data-baseweb="input"] input, div[data-baseweb="textarea"] textarea{background:transparent!important;color:var(--text)!important;font-size:13px;}
+div[data-baseweb="select"]>div{background:var(--surface-2)!important;border-color:var(--line-2)!important;border-radius:9px!important;transition:border-color .22s var(--ease)!important;}
+div[data-baseweb="select"]>div:focus-within{border-color:var(--blue)!important;}
 .stTextInput label, .stSelectbox label{color:var(--muted)!important;font-size:12.5px!important;}
 </style>
 """
@@ -352,7 +372,7 @@ def sem_cor(sem: str) -> str:
 
 def status_classe(status: str) -> str:
     return {"Prospectar": "s-pros", "Monitorar": "s-moni", "Edital": "s-edit",
-            "Ativo": "s-edit", "Mapear": "s-map"}.get(str(status).strip(), "s-map")
+            "Ativo": "s-ativo", "Mapear": "s-map"}.get(str(status).strip(), "s-map")
 
 
 def status_badge(status: str) -> str:
@@ -391,10 +411,10 @@ def score_chip_hex(score: float) -> str:
     except (TypeError, ValueError):
         s = 0
     if s >= 85:
-        return "background:rgba(95,177,55,.18);color:#A6DD86"
+        return "background:rgba(95,177,55,.15);color:#9FD27F"
     if s >= 70:
-        return "background:rgba(242,145,30,.16);color:#FFB454"
-    return "background:rgba(255,255,255,.06);color:#969CA6"
+        return "background:rgba(232,154,60,.14);color:#F0B264"
+    return "background:rgba(255,255,255,.05);color:#9098A2"
 
 
 def verificada_ok(valor: str) -> bool:
@@ -421,8 +441,8 @@ def estilo_plotly(fig, altura=300, legenda=False):
     return fig
 
 
-CORES_STATUS = {"Mapear": "#666C75", "Prospectar": "#F2911E", "Monitorar": "#3B8BD0",
-                "Edital": "#5FB137", "Ativo": "#A6DD86"}
+CORES_STATUS = {"Mapear": "#4A515A", "Prospectar": "#6E7681", "Monitorar": "#939BA5",
+                "Edital": "#E89A3C", "Ativo": "#5FB137"}
 
 
 # --------------------------------------------------------------------------- #
@@ -747,8 +767,9 @@ def mostrar_dossie(org: dict):
         unsafe_allow_html=True,
     )
     if url_ok:
-        st.markdown(f'<a class="srclink" href="{esc(url)}" target="_blank" rel="noopener">↗ {esc(url)}</a>',
-                    unsafe_allow_html=True)
+        # st.link_button = âncora nativa garantidamente clicável (abre em nova aba).
+        st.link_button("↗ Abrir fonte oficial", url, use_container_width=True)
+        st.caption(url)
     else:
         st.markdown('<div style="font-size:12.5px;color:var(--orange-2)">Site oficial ainda a confirmar.</div>',
                     unsafe_allow_html=True)
@@ -806,22 +827,21 @@ def page_visao():
     n_verif = int(df[COL_VERIF].apply(verificada_ok).sum()) if TOTAL else 0
 
     kpis = [
-        ("var(--blue)", "📚 Organizações mapeadas", str(TOTAL),
-         f"<b>{n_verif}</b> de {TOTAL} fontes verificadas", "📊 Ver breakdown", "breakdown"),
-        ("var(--orange)", "📈 Em prospecção ativa", str(n_prospectar),
-         f"<b>{n_monitorar}</b> monitorando · <b>{n_edital}</b> em edital", "🔎 Listar prospecção", "prospeccao"),
-        ("var(--green)", "💰 Valor-alvo potencial", brl_curto(valor_total),
-         "soma do pipeline de captação", "💰 Top 10 por valor", "valor"),
-        ("var(--orange)", "⚡ Oportunidades hoje", "4",
-         "novas · aguardando revisão", "📡 Abrir Radar", "radar"),
+        ("📚", "Organizações mapeadas", str(TOTAL),
+         f"<b>{n_verif}</b> de {TOTAL} fontes verificadas", "Ver breakdown", "breakdown"),
+        ("📈", "Em prospecção ativa", str(n_prospectar),
+         f"<b>{n_monitorar}</b> monitorando · <b>{n_edital}</b> em edital", "Listar prospecção", "prospeccao"),
+        ("💰", "Valor-alvo potencial", brl_curto(valor_total),
+         "soma do pipeline de captação", "Top 10 por valor", "valor"),
+        ("⚡", "Oportunidades hoje", "4",
+         "novas · aguardando revisão", "Abrir Radar", "radar"),
     ]
     cols = st.columns(4)
-    for col, (acc, lab, val, foot, btn_lab, acao) in zip(cols, kpis):
+    for col, (icon, name, val, foot, btn_lab, acao) in zip(cols, kpis):
         with col:
-            val_cor = ' style="color:var(--orange-2)"' if acao == "radar" else ""
             st.markdown(
-                f'<div class="kpi" style="--accent:{acc}"><div class="lab">{lab}</div>'
-                f'<div class="val"{val_cor}>{val}</div><div class="foot">{foot}</div></div>',
+                f'<div class="kpi"><div class="lab"><span class="ic">{icon}</span> {name}</div>'
+                f'<div class="val">{val}</div><div class="foot">{foot}</div></div>',
                 unsafe_allow_html=True,
             )
             if st.button(btn_lab, key=f"kpi_{acao}", use_container_width=True):
@@ -840,9 +860,7 @@ def page_visao():
 
     # ---- Funil clicável + distribuição em gráfico ----
     with esq:
-        cores_funil = {"Mapear": "var(--dim)", "Prospectar": "var(--orange)",
-                       "Monitorar": "var(--blue)", "Edital": "var(--green)",
-                       "Ativo": "var(--green-2)"}
+        cores_funil = {s: CORES_STATUS[s] for s in STATUS_FUNIL}
         segs, legs = "", ""
         for s in STATUS_FUNIL:
             n = int(cont.get(s, 0))
@@ -875,7 +893,7 @@ def page_visao():
             fig = go.Figure(go.Pie(
                 labels=labels, values=values, hole=0.58, sort=False,
                 marker=dict(colors=[CORES_STATUS[s] for s in labels],
-                            line=dict(color="#0B0D10", width=2)),
+                            line=dict(color="#0A0C0F", width=2)),
                 textinfo="label+value",
                 hovertemplate="<b>%{label}</b><br>%{value} orgs · %{percent}<extra></extra>",
             ))
@@ -955,10 +973,11 @@ def page_ranking():
                 unsafe_allow_html=True)
 
     for i, (_, row) in enumerate(rank.head(30).iterrows()):
-        cA, cB, cC, cD, cE = st.columns([2.4, 1.5, 1, 1, 0.9])
+        cA, cB, cC, cD, cE = st.columns([2.7, 1.45, 1, 1, 0.95], gap="medium")
+        paridade = "odd" if i % 2 else "even"
         with cA:
             st.markdown(
-                f'<div class="org"><span class="sem" style="background:{sem_cor(row[COL_SEMAFORO])}"></span>'
+                f'<div class="org {paridade}"><span class="sem" style="background:{sem_cor(row[COL_SEMAFORO])}"></span>'
                 f'<div><div class="nm">{texto_ou(row[COL_EMPRESA])}</div>'
                 f'<div class="st">{texto_ou(row[COL_SETOR])}</div></div></div>',
                 unsafe_allow_html=True)
@@ -1101,8 +1120,8 @@ def page_radar():
 # =========================================================================== #
 # PÁGINA · FUNIL
 # =========================================================================== #
-ACENTOS_HEX = {"Mapear": "#666C75", "Prospectar": "#F2911E", "Monitorar": "#3B8BD0",
-               "Edital": "#5FB137", "Ativo": "#A6DD86"}
+ACENTOS_HEX = {"Mapear": "#4A515A", "Prospectar": "#6E7681", "Monitorar": "#939BA5",
+               "Edital": "#E89A3C", "Ativo": "#5FB137"}
 
 
 def _kanban_estatico():
@@ -1241,12 +1260,12 @@ def page_metodo():
         if PLOTLY_OK:
             comp_nomes = ["Aderência (35%)", "Valor (25%)", "Região (20%)", "Acionabilidade (20%)"]
             comp_pesos = [35, 25, 20, 20]
-            comp_cores = ["#F2911E", "#5FB137", "#3B8BD0", "#969CA6"]
+            comp_cores = ["#E89A3C", "#5FB137", "#5B9BD5", "#828A94"]
             comp_expl = ["aderência ao DNA do PFC", "capacidade e fit de valor",
                          "proximidade dos municípios PFC", "facilidade de agir agora"]
             fig = go.Figure(go.Pie(
                 labels=comp_nomes, values=comp_pesos, hole=0.62, sort=False, direction="clockwise",
-                marker=dict(colors=comp_cores, line=dict(color="#0B0D10", width=2)),
+                marker=dict(colors=comp_cores, line=dict(color="#0A0C0F", width=2)),
                 customdata=comp_expl, textinfo="percent",
                 hovertemplate="<b>%{label}</b><br>%{customdata}<extra></extra>",
             ))
