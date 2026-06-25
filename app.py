@@ -11,6 +11,7 @@ Login demo:  fabio@pfc.org / pfc2026   ·   otavio@pfc.org / pfc2026
 from __future__ import annotations
 
 import html
+import json
 import os
 
 import pandas as pd
@@ -303,9 +304,121 @@ div[data-baseweb="input"] input, div[data-baseweb="textarea"] textarea{backgroun
 div[data-baseweb="select"]>div{background:var(--surface-2)!important;border-color:var(--line-2)!important;border-radius:9px!important;transition:border-color .22s var(--ease)!important;}
 div[data-baseweb="select"]>div:focus-within{border-color:var(--blue)!important;}
 .stTextInput label, .stSelectbox label{color:var(--muted)!important;font-size:12.5px!important;}
+
+/* ============ fundo cósmico + superfícies táteis ============ */
+.stApp,[data-testid="stAppViewContainer"],[data-testid="stMain"],section.main,[data-testid="stHeader"]{background:transparent!important}
+body{background:#0A0C0F}
+#pfc-cosmos-layer{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+#pfc-stars{position:absolute;inset:0}
+.pfc-nebula{position:absolute;inset:-12%;
+  background:radial-gradient(60% 52% at 78% 12%, rgba(91,155,213,.07), transparent 60%),
+             radial-gradient(54% 46% at 10% 88%, rgba(232,154,60,.05), transparent 62%),
+             radial-gradient(60% 60% at 48% 50%, rgba(255,255,255,.018), transparent 72%);
+  animation:pfc-breathe 8s ease-in-out infinite}
+@keyframes pfc-breathe{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.05);opacity:1}}
+.pfc-spotlight{position:absolute;left:0;top:0;width:400px;height:400px;border-radius:50%;opacity:0;will-change:transform;
+  background:radial-gradient(circle,rgba(255,255,255,.06),transparent 60%);transition:opacity .5s ease}
+.block-container{position:relative;z-index:1}
+.pfc-ink{position:absolute;border-radius:50%;background:rgba(255,255,255,.26);pointer-events:none;z-index:4}
+.kpi,.card,.lead,.caso{transform-style:preserve-3d;will-change:transform}
+.kpi::after,.card::after,.lead::after,.caso::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:radial-gradient(240px circle at var(--mx,50%) var(--my,50%),rgba(255,255,255,.09),transparent 55%);
+  opacity:0;transition:opacity .35s var(--ease)}
+.kpi:hover::after,.card:hover::after,.lead:hover::after,.caso:hover::after{opacity:1}
+.card,.kcol,.lead,.caso,.kpi{box-shadow:var(--sh-1),inset 0 0 0 1px rgba(255,255,255,.018)}
+.card:hover,.lead:hover,.caso:hover{box-shadow:0 18px 48px rgba(0,0,0,.5),inset 0 0 0 1px rgba(255,255,255,.06)}
+.brand svg,.avatar{will-change:transform}
+.login-logo svg{transition:transform .4s var(--ease)}
+.login-logo:hover svg .orbit, .brand:hover svg .orbit{animation:spin 9s linear infinite}
+@media (prefers-reduced-motion:reduce){
+  .pfc-nebula{animation:none}.pfc-spotlight{display:none}
+  .kpi,.card,.lead,.caso{transform:none!important}
+}
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
+
+# --------------------------------------------------------------------------- #
+# Fundo cósmico + micro-interações (canvas de estrelas, nebulosa, estrela
+# cadente, spotlight do cursor, ripple, tilt 3D, magnetismo).
+# st.markdown remove <script>, então injetamos UM script no documento-pai via
+# components.html (mesma origem). Persiste entre reruns e degrada sem erro.
+# --------------------------------------------------------------------------- #
+_COSMOS_JS = r"""
+(function(){
+  if(window.__pfcCosmos){return;} window.__pfcCosmos=true;
+  var reduce=false; try{reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
+  var body=document.body;
+  var layer=document.createElement('div'); layer.id='pfc-cosmos-layer';
+  var neb=document.createElement('div'); neb.className='pfc-nebula'; layer.appendChild(neb);
+  var cv=document.createElement('canvas'); cv.id='pfc-stars'; layer.appendChild(cv);
+  var spot=document.createElement('div'); spot.className='pfc-spotlight'; layer.appendChild(spot);
+  body.insertBefore(layer, body.firstChild);
+  var ctx=cv.getContext('2d'); var W=0,H=0; var DPR=Math.min(window.devicePixelRatio||1,2);
+  function resize(){W=cv.width=Math.floor(innerWidth*DPR);H=cv.height=Math.floor(innerHeight*DPR);cv.style.width=innerWidth+'px';cv.style.height=innerHeight+'px';}
+  resize(); window.addEventListener('resize',resize);
+  var N=innerWidth<700?180:380, stars=[], seed=987654321;
+  function rnd(){seed=(seed*1664525+1013904223)>>>0; return seed/4294967296;}
+  for(var i=0;i<N;i++){stars.push({x:rnd(),y:rnd(),r:rnd()*1.2+0.25,ph:rnd()*6.28,sp:0.4+rnd()*1.1,base:0.22+rnd()*0.5});}
+  var shoot=null,lastShoot=0;
+  function draw(t){
+    ctx.clearRect(0,0,W,H);
+    for(var i=0;i<stars.length;i++){var s=stars[i];var op=s.base;if(!reduce){op+=Math.sin(t/1000*s.sp+s.ph)*0.35;}if(op<0.04){op=0.04;}if(op>1){op=1;}ctx.globalAlpha=op;ctx.beginPath();ctx.arc(s.x*W,s.y*H,s.r*DPR,0,6.2832);ctx.fillStyle=(i%23===0?'#9FBEDF':'#ffffff');ctx.fill();}
+    ctx.globalAlpha=1;
+    if(!reduce){
+      if(!shoot && t-lastShoot>(15000+rnd()*6000)){lastShoot=t;var fl=rnd()>0.5;shoot={x:rnd()*W*0.7,y:rnd()*H*0.35,vx:(fl?1:-1)*(7+rnd()*5)*DPR,vy:(3+rnd()*2)*DPR,life:0};}
+      if(shoot){var x2=shoot.x-shoot.vx*9,y2=shoot.y-shoot.vy*9;var g=ctx.createLinearGradient(shoot.x,shoot.y,x2,y2);g.addColorStop(0,'rgba(255,255,255,.95)');g.addColorStop(1,'rgba(255,255,255,0)');ctx.strokeStyle=g;ctx.lineWidth=1.8*DPR;ctx.beginPath();ctx.moveTo(shoot.x,shoot.y);ctx.lineTo(x2,y2);ctx.stroke();shoot.x+=shoot.vx*2.4;shoot.y+=shoot.vy*2.4;shoot.life++;if(shoot.life>46||shoot.x<-60||shoot.x>W+60||shoot.y>H+60){shoot=null;}}
+    }
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+  if(!reduce){
+    var sx=innerWidth/2,sy=innerHeight/2,tx=sx,ty=sy;
+    window.addEventListener('mousemove',function(e){tx=e.clientX;ty=e.clientY;spot.style.opacity='1';},{passive:true});
+    (function loop(){sx+=(tx-sx)*0.12;sy+=(ty-sy)*0.12;spot.style.transform='translate('+(sx-200)+'px,'+(sy-200)+'px)';requestAnimationFrame(loop);})();
+  }
+  // ripple
+  if(!reduce){document.addEventListener('pointerdown',function(e){
+    var el=e.target.closest('button,[role="tab"],.stat,.src-tag,.mtag,[data-testid="stLinkButton"] a'); if(!el){return;}
+    var r=el.getBoundingClientRect();var sz=Math.max(r.width,r.height)*1.15;
+    var ink=document.createElement('span');ink.className='pfc-ink';
+    ink.style.width=ink.style.height=sz+'px';ink.style.left=(e.clientX-r.left-sz/2)+'px';ink.style.top=(e.clientY-r.top-sz/2)+'px';
+    ink.style.transform='scale(0)';ink.style.opacity='.5';ink.style.transition='transform .55s cubic-bezier(.22,.61,.36,1),opacity .6s ease';
+    var cs=getComputedStyle(el);if(cs.position==='static'){el.style.position='relative';}el.style.overflow='hidden';
+    el.appendChild(ink);requestAnimationFrame(function(){ink.style.transform='scale(2.4)';ink.style.opacity='0';});
+    setTimeout(function(){if(ink.parentNode){ink.parentNode.removeChild(ink);}},660);
+  },true);}
+  // tilt 3D + brilho que segue o mouse
+  var tiltEl=null;
+  if(!reduce){
+    document.addEventListener('mousemove',function(e){
+      var el=e.target.closest('.kpi,.card,.lead,.caso');
+      if(el!==tiltEl){if(tiltEl){tiltEl.style.transform='';}tiltEl=el;}
+      if(!el){return;}
+      var r=el.getBoundingClientRect();var px=(e.clientX-r.left)/r.width-0.5;var py=(e.clientY-r.top)/r.height-0.5;
+      el.style.transform='perspective(820px) rotateX('+(-py*5).toFixed(2)+'deg) rotateY('+(px*5).toFixed(2)+'deg) translateY(-3px)';
+      el.style.setProperty('--mx',((px+0.5)*100).toFixed(1)+'%');el.style.setProperty('--my',((py+0.5)*100).toFixed(1)+'%');
+    },{passive:true});
+    document.addEventListener('mouseout',function(e){if(tiltEl && !tiltEl.contains(e.relatedTarget)){tiltEl.style.transform='';tiltEl=null;}},true);
+  }
+  // magnetismo na logo e avatar
+  if(!reduce){window.addEventListener('mousemove',function(e){
+    var els=document.querySelectorAll('.brand svg, .avatar');
+    for(var i=0;i<els.length;i++){var el=els[i];var r=el.getBoundingClientRect();var cx=r.left+r.width/2,cy=r.top+r.height/2;
+      var dx=e.clientX-cx,dy=e.clientY-cy,d=Math.sqrt(dx*dx+dy*dy);
+      if(d<130){var f=(1-d/130)*0.4;el.style.transform='translate('+(dx*f).toFixed(1)+'px,'+(dy*f).toFixed(1)+'px)';}
+      else if(el.style.transform){el.style.transform='';}}
+  },{passive:true});}
+})();
+"""
+_COSMOS_BOOT = (
+    "<script>(function(){try{var P=window.parent;if(!P||!P.document){return;}"
+    "if(P.document.getElementById('pfc-cosmos-js')){return;}"
+    "var s=P.document.createElement('script');s.id='pfc-cosmos-js';"
+    "s.textContent=" + json.dumps(_COSMOS_JS) + ";"
+    "P.document.head.appendChild(s);}catch(e){}})();</script>"
+)
+components.html(_COSMOS_BOOT, height=0)
 
 LOGO_SVG = """
 <svg width="{size}" height="{size}" viewBox="0 0 42 42" aria-hidden="true">
@@ -1203,6 +1316,75 @@ def page_funil():
         st.caption(HINT_ESCRITA + " — ao arrastar em modo CSV o app mostra um aviso e o card volta.")
 
 
+# Gráfico de Score orbital interativo (SVG + JS autocontido, instantâneo).
+ORBITAL_TEMPLATE = r"""<!doctype html><html><head><meta charset="utf-8"><style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:transparent;font-family:'Inter',system-ui,sans-serif;color:#E9EBEE}
+.wrap{background:rgba(20,24,32,.6);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.06);border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.16),inset 0 0 0 1px rgba(255,255,255,.02)}
+.h{padding:18px 20px 13px;border-bottom:1px solid rgba(255,255,255,.06)}
+.h h2{font-family:'Space Grotesk';font-weight:600;font-size:15.5px;margin:0}
+.h .cap{font-size:12px;color:#565E68;margin-top:3px}
+.body{padding:12px 18px 16px}
+.orbit-wrap{display:grid;place-items:center}
+.arc{cursor:pointer;transition:stroke-width .3s cubic-bezier(.22,.61,.36,1),opacity .3s ease,filter .3s ease}
+.dim{opacity:.26}
+.cn{font-family:'Space Grotesk';font-weight:700;cursor:pointer;transition:fill .3s ease}
+.legend{display:flex;flex-direction:column;gap:7px;margin-top:6px}
+.lrow{display:grid;grid-template-columns:12px 1fr auto;align-items:center;gap:9px;padding:7px 10px;border:1px solid rgba(255,255,255,.05);border-radius:9px;cursor:pointer;transition:background .2s ease,border-color .2s ease,transform .15s ease}
+.lrow:hover{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.12);transform:translateX(2px)}
+.lrow.sel{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.18)}
+.sw{width:10px;height:10px;border-radius:3px}
+.ln{font-size:12.5px;color:#C2C7CE}
+.lv{font-family:'Space Grotesk';font-weight:600;font-size:13px}
+.tip{position:fixed;pointer-events:none;background:#1F242C;border:1px solid rgba(255,255,255,.14);color:#E9EBEE;font-size:12px;padding:6px 9px;border-radius:7px;opacity:0;transition:opacity .15s ease;z-index:9;white-space:nowrap}
+.hint{font-size:11px;color:#565E68;text-align:center;margin-top:9px}
+</style></head><body>
+<div class="wrap"><div class="h"><h2>Anatomia do Score</h2><div class="cap">anéis clicáveis · exemplo: __NOME__ = __TOTAL__</div></div>
+<div class="body">
+<div class="orbit-wrap"><svg id="svg" width="208" height="208" viewBox="0 0 200 200" aria-label="Score orbital"></svg></div>
+<div class="legend" id="legend"></div>
+<div class="hint">clique num anel ou critério para destacar · clique no centro para o total</div>
+</div></div><div class="tip" id="tip"></div>
+<script>
+(function(){
+  var DATA=__DATA__, TOTAL=__TOTAL__, RADII=[76,62,48,34], SW=9, NS='http://www.w3.org/2000/svg';
+  var svg=document.getElementById('svg'), legend=document.getElementById('legend'), tip=document.getElementById('tip'), sel=-1, arcs=[];
+  function el(t,a){var e=document.createElementNS(NS,t);for(var k in a){e.setAttribute(k,a[k]);}return e;}
+  var g=el('g',{transform:'rotate(-90 100 100)'}); svg.appendChild(g);
+  DATA.forEach(function(d,i){
+    var r=RADII[i], C=2*Math.PI*r, len=d.v/100*C;
+    g.appendChild(el('circle',{cx:100,cy:100,r:r,fill:'none',stroke:'rgba(255,255,255,.06)','stroke-width':SW}));
+    var a=el('circle',{cx:100,cy:100,r:r,fill:'none',stroke:d.c,'stroke-width':SW,'stroke-linecap':'round','stroke-dasharray':len+' '+(C-len)});
+    a.setAttribute('class','arc'); a.setAttribute('data-i',i); g.appendChild(a); arcs.push(a);
+  });
+  var cn=el('text',{x:100,y:99,'text-anchor':'middle','font-size':46,fill:'#9FD27F'}); cn.setAttribute('class','cn'); cn.textContent=TOTAL; svg.appendChild(cn);
+  var cl=el('text',{x:100,y:120,'text-anchor':'middle','font-size':12,fill:'#828A94','font-family':'Inter'}); cl.textContent='de 100'; svg.appendChild(cl);
+  DATA.forEach(function(d,i){
+    var row=document.createElement('div'); row.className='lrow'; row.setAttribute('data-i',i);
+    row.innerHTML='<span class="sw" style="background:'+d.c+'"></span><span class="ln">'+d.n+' <span style="color:#565E68">('+d.w+'%)</span></span><span class="lv" style="color:'+d.c+'">'+d.v+'</span>';
+    legend.appendChild(row);
+  });
+  function apply(){
+    if(sel<0){ cn.textContent=TOTAL; cn.setAttribute('fill','#9FD27F');
+      arcs.forEach(function(a){a.classList.remove('dim');a.setAttribute('stroke-width',SW);a.style.filter='';});
+      [].forEach.call(legend.children,function(r){r.classList.remove('sel');});
+    } else { var d=DATA[sel]; cn.textContent=d.v; cn.setAttribute('fill',d.c);
+      arcs.forEach(function(a,i){ if(i===sel){a.classList.remove('dim');a.setAttribute('stroke-width',SW+3);a.style.filter='drop-shadow(0 0 6px '+d.c+')';} else {a.classList.add('dim');a.setAttribute('stroke-width',SW);a.style.filter='';} });
+      [].forEach.call(legend.children,function(r,i){if(i===sel){r.classList.add('sel');}else{r.classList.remove('sel');}});
+    }
+  }
+  function pick(i){ sel=(sel===i?-1:i); apply(); }
+  arcs.forEach(function(a){ a.addEventListener('click',function(){pick(+a.getAttribute('data-i'));});
+    a.addEventListener('mousemove',function(e){var d=DATA[+a.getAttribute('data-i')];tip.textContent=d.n+' '+d.v;tip.style.opacity='1';tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+12)+'px';});
+    a.addEventListener('mouseleave',function(){tip.style.opacity='0';}); });
+  [].forEach.call(legend.children,function(r){ r.addEventListener('click',function(){pick(+r.getAttribute('data-i'));}); });
+  cn.addEventListener('click',function(){sel=-1;apply();});
+  apply();
+})();
+</script></body></html>"""
+
+
 # =========================================================================== #
 # PÁGINA · METODOLOGIA
 # =========================================================================== #
@@ -1248,32 +1430,22 @@ def page_metodo():
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
     g1, g2 = st.columns([1, 1])
     with g1:
-        st.markdown(
-            '<div class="card"><div class="card-h"><div><h2>Anatomia do Score</h2>'
-            '<div class="cap">anéis = aderência · valor · região · acionabilidade · passe o mouse</div>'
-            '</div></div><div class="pad" id="orb"></div></div>',
-            unsafe_allow_html=True,
-        )
         topo = df.sort_values(COL_SCORE, ascending=False).iloc[0] if TOTAL else None
         score_topo = int(topo[COL_SCORE]) if topo is not None else 0
         nome_topo = str(topo[COL_EMPRESA]) if topo is not None else "—"
-        if PLOTLY_OK:
-            comp_nomes = ["Aderência (35%)", "Valor (25%)", "Região (20%)", "Acionabilidade (20%)"]
-            comp_pesos = [35, 25, 20, 20]
-            comp_cores = ["#E89A3C", "#5FB137", "#5B9BD5", "#828A94"]
-            comp_expl = ["aderência ao DNA do PFC", "capacidade e fit de valor",
-                         "proximidade dos municípios PFC", "facilidade de agir agora"]
-            fig = go.Figure(go.Pie(
-                labels=comp_nomes, values=comp_pesos, hole=0.62, sort=False, direction="clockwise",
-                marker=dict(colors=comp_cores, line=dict(color="#0A0C0F", width=2)),
-                customdata=comp_expl, textinfo="percent",
-                hovertemplate="<b>%{label}</b><br>%{customdata}<extra></extra>",
-            ))
-            fig.add_annotation(text=f"<b>{score_topo}</b><br><span style='font-size:11px'>de 100</span>",
-                               showarrow=False, font=dict(size=26, color="#5FB137", family="Space Grotesk"))
-            st.plotly_chart(estilo_plotly(fig, altura=300), use_container_width=True,
-                            config={"displayModeBar": False})
-            st.caption(f"Exemplo: **{nome_topo}** = {score_topo} (decomposição ilustrativa pelos pesos fixos).")
+        # Valores por componente: ilustrativos (o MVP usa o Score PFC da planilha).
+        comps = [
+            {"n": "Aderência", "v": min(99, score_topo + 1), "c": "#E89A3C", "w": 35},
+            {"n": "Valor", "v": score_topo, "c": "#5FB137", "w": 25},
+            {"n": "Região", "v": max(60, score_topo - 3), "c": "#5B9BD5", "w": 20},
+            {"n": "Acionabilidade", "v": max(60, score_topo - 1), "c": "#9AA2AC", "w": 20},
+        ]
+        orb = (ORBITAL_TEMPLATE
+               .replace("__DATA__", json.dumps(comps))
+               .replace("__TOTAL__", str(score_topo))
+               .replace("__NOME__", html.escape(nome_topo)))
+        components.html(orb, height=448)
+        st.caption(f"Decomposição ilustrativa de **{nome_topo}** pelos pesos fixos.")
     with g2:
         st.markdown(
             '<div class="card"><div class="card-h"><div><h2>Fórmula</h2>'
