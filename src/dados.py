@@ -37,6 +37,8 @@ CSV_PATH = Path(__file__).resolve().parent.parent / "data" / "empresas.csv"
 ABA_DADOS = "empresas"
 # Aba onde o Radar grava as oportunidades aprovadas.
 ABA_PENDENTES = "Novidades_pendentes"
+# Aba opcional de editais privados (prazos).
+ABA_EDITAIS = "Editais_Privados"
 # Cabeçalho EXATO da aba de novidades.
 HEADERS_NOVIDADES = [
     "Data", "Fonte", "Título", "Descrição", "Score Aderência",
@@ -155,6 +157,10 @@ def limpar_caches() -> None:
     except Exception:
         pass
     try:
+        carregar_editais_privados.clear()
+    except Exception:
+        pass
+    try:
         _conectar.clear()
     except Exception:
         pass
@@ -216,6 +222,22 @@ def carregar_empresas() -> tuple[pd.DataFrame, bool]:
 def _ler_base() -> pd.DataFrame:
     """Atalho interno para obter apenas o DataFrame."""
     return carregar_empresas()[0]
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def carregar_editais_privados() -> pd.DataFrame:
+    """Lê a aba opcional 'Editais_Privados' (prazos). Vazio se não existir/CSV."""
+    sh = _conectar()
+    if sh is None:
+        return pd.DataFrame()
+    try:
+        titulos = [w.title for w in sh.worksheets()]
+        if ABA_EDITAIS not in titulos:
+            return pd.DataFrame()
+        registros = sh.worksheet(ABA_EDITAIS).get_all_records()
+        return pd.DataFrame(registros)
+    except Exception:
+        return pd.DataFrame()
 
 
 # --------------------------------------------------------------------------- #

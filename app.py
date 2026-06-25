@@ -10,9 +10,11 @@ Login demo:  fabio@pfc.org / pfc2026   ·   otavio@pfc.org / pfc2026
 """
 from __future__ import annotations
 
+import datetime
 import html
 import json
 import os
+import re
 
 import pandas as pd
 import streamlit as st
@@ -316,8 +318,8 @@ body{background:#0A0C0F}
              radial-gradient(60% 60% at 48% 50%, rgba(255,255,255,.018), transparent 72%);
   animation:pfc-breathe 8s ease-in-out infinite}
 @keyframes pfc-breathe{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.05);opacity:1}}
-.pfc-spotlight{position:absolute;left:0;top:0;width:400px;height:400px;border-radius:50%;opacity:0;will-change:transform;
-  background:radial-gradient(circle,rgba(255,255,255,.06),transparent 60%);transition:opacity .5s ease}
+.pfc-spotlight{position:absolute;left:0;top:0;width:560px;height:560px;border-radius:50%;opacity:0;will-change:transform;
+  background:radial-gradient(circle,rgba(255,255,255,.03),rgba(255,255,255,.012) 42%,transparent 72%);transition:opacity .6s ease}
 .block-container{position:relative;z-index:1}
 .pfc-ink{position:absolute;border-radius:50%;background:rgba(255,255,255,.26);pointer-events:none;z-index:4}
 .kpi,.card,.lead,.caso{transform-style:preserve-3d;will-change:transform}
@@ -375,7 +377,7 @@ _COSMOS_JS = r"""
   if(!reduce){
     var sx=innerWidth/2,sy=innerHeight/2,tx=sx,ty=sy;
     window.addEventListener('mousemove',function(e){tx=e.clientX;ty=e.clientY;spot.style.opacity='1';},{passive:true});
-    (function loop(){sx+=(tx-sx)*0.12;sy+=(ty-sy)*0.12;spot.style.transform='translate('+(sx-200)+'px,'+(sy-200)+'px)';requestAnimationFrame(loop);})();
+    (function loop(){sx+=(tx-sx)*0.12;sy+=(ty-sy)*0.12;spot.style.transform='translate('+(sx-280)+'px,'+(sy-280)+'px)';requestAnimationFrame(loop);})();
   }
   // ripple
   if(!reduce){document.addEventListener('pointerdown',function(e){
@@ -533,6 +535,82 @@ def score_chip_hex(score: float) -> str:
 def verificada_ok(valor: str) -> bool:
     v = str(valor).lower()
     return "verificada" in v and "não" not in v and "nao" not in v
+
+
+_MESES_PT = {"jan": 1, "fev": 2, "mar": 3, "abr": 4, "mai": 5, "jun": 6,
+             "jul": 7, "ago": 8, "set": 9, "out": 10, "nov": 11, "dez": 12}
+
+
+def _parse_data(s):
+    """Extrai uma data de textos variados (dd/mm/aaaa, 'set/2026', '30 ago 2026')."""
+    s = str(s or "").strip().lower()
+    if not s:
+        return None
+    m = re.search(r"(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})", s)
+    if m:
+        d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if y < 100:
+            y += 2000
+        try:
+            return datetime.date(y, mo, d)
+        except ValueError:
+            return None
+    m = re.search(r"(?:(\d{1,2})\s+)?([a-zç]{3})[a-zç]*[/\s.-]+(\d{4})", s)
+    if m:
+        mo = _MESES_PT.get(m.group(2))
+        if mo:
+            d = int(m.group(1)) if m.group(1) else 1
+            try:
+                return datetime.date(int(m.group(3)), mo, d)
+            except ValueError:
+                return None
+    return None
+
+
+def _coletar_editais():
+    """Editais candidatos: organizações em status 'Edital' + aba Editais_Privados."""
+    itens = []
+    try:
+        for _, r in df[df[COL_STATUS] == "Edital"].iterrows():
+            dt = _parse_data(r.get(COL_JANELA)) or _parse_data(r.get(COL_EDITAL))
+            itens.append({"nome": str(r[COL_EMPRESA]), "data": dt, "valor": r[COL_VALVO],
+                          "link": str(r.get(COL_URL, "")), "raw": str(r.get(COL_JANELA, ""))})
+    except Exception:
+        pass
+    try:
+        ed = dados.carregar_editais_privados()
+        if not ed.empty:
+            low = {c.lower(): c for c in ed.columns}
+
+            def get(row, *keys):
+                for k in keys:
+                    if k in low and str(row.get(low[k], "")).strip():
+                        return row.get(low[k])
+                return ""
+            for _, r in ed.iterrows():
+                praw = get(r, "prazo", "data", "data-limite", "data limite", "janela")
+                itens.append({"nome": str(get(r, "nome", "edital", "organização", "organizacao") or "Edital"),
+                              "data": _parse_data(praw), "valor": get(r, "valor", "valor estimado") or 0,
+                              "link": str(get(r, "link", "url", "fonte") or ""), "raw": str(praw)})
+    except Exception:
+        pass
+    return itens
+
+
+def _editais_proximos(dias_max=15):
+    """Editais com data-limite entre hoje e dias_max, ordenados por urgência."""
+    hoje = datetime.date.today()
+    out = []
+    for e in _coletar_editais():
+        if e["data"] is None:
+            continue
+        d = (e["data"] - hoje).days
+        if 0 <= d <= dias_max:
+            e = dict(e)
+            e["dias"] = d
+            out.append(e)
+    out.sort(key=lambda x: x["dias"])
+    return out
 
 
 def breadcrumb(*partes):
@@ -720,6 +798,36 @@ def _mostrar_resultado(res):
 # =========================================================================== #
 # MODAIS (st.dialog)
 # =========================================================================== #
+@st.dialog("Editais fechando em breve", width="large")
+def dlg_prazos(prox):
+    breadcrumb("Visão geral", "Prazos de editais")
+    if not prox:
+        st.caption("Nenhum edital com data-limite nos próximos 15 dias.")
+        return
+    st.markdown(f"#### ⏰ {len(prox)} edital(is) fechando em até 15 dias")
+    for e in prox:
+        dias = e["dias"]
+        cor = "var(--red)" if dias < 7 else "var(--orange-2)" if dias < 15 else "var(--muted)"
+        if dias == 0:
+            quando = "fecha hoje"
+        elif dias == 1:
+            quando = "fecha amanhã"
+        else:
+            quando = f"fecha em {dias} dias"
+        link = ""
+        if str(e.get("link", "")).startswith("http"):
+            link = (f'<a href="{esc(e["link"])}" target="_blank" rel="noopener" '
+                    f'style="color:var(--blue-2);text-decoration:none">abrir ›</a>')
+        st.markdown(
+            f'<div class="lrow2"><div class="l"><div>'
+            f'<div class="nm">{esc(e["nome"])}</div>'
+            f'<div class="sx" style="color:{cor};font-weight:600">{quando}</div></div></div>'
+            f'<div class="rt"><span class="alvo">{brl_curto(e.get("valor"))}</span>{link}</div></div>',
+            unsafe_allow_html=True,
+        )
+    st.caption("ℹ️ Datas lidas das organizações em status “Edital” e da aba Editais_Privados.")
+
+
 @st.dialog("Breakdown do pipeline", width="large")
 def dlg_breakdown():
     breadcrumb("Visão geral", "Organizações mapeadas")
@@ -921,6 +1029,39 @@ def mostrar_dossie(org: dict):
     if not modo_conectado:
         st.caption(HINT_ESCRITA)
 
+    # ----- E-mail de abordagem (template local em Python, sem IA) -----
+    st.markdown('<div class="dr-sec"><h3>✉️ E-mail de abordagem</h3></div>', unsafe_allow_html=True)
+    gen_key = f"email_show_{org_id}"
+    if st.button("✉️ Gerar e-mail de abordagem", key=f"genmail_{org_id}", use_container_width=True):
+        st.session_state[gen_key] = True
+    if st.session_state.get(gen_key):
+        setor_e = str(org.get(COL_SETOR, "")).strip() or "seu setor"
+        encaixe_e = str(org.get(COL_ENCAIXE, "")).strip()
+        if not encaixe_e or encaixe_e == "—":
+            encaixe_e = "promover ciência, educação e projeto de vida para jovens da rede pública"
+        assunto = f"Parceria {nome} × Programa Futuro Cientista (PFC/UFSCar)"
+        corpo = (
+            f"Prezados(as) da {nome},\n\n"
+            "Meu nome é [Seu nome] e represento o Programa Futuro Cientista (PFC), "
+            "tecnologia social certificada pela Fundação Banco do Brasil. O PFC adota "
+            "cientificamente jovens da escola pública — acompanhando-os do 6º ano até a "
+            "universidade — por meio de mentoria, ciência e projeto de vida.\n\n"
+            f"Acompanhamos o trabalho da {nome} no setor de {setor_e} e enxergamos uma "
+            f"conexão natural com a nossa missão: {encaixe_e}. Acreditamos que uma parceria "
+            "pode ampliar o impacto de ambos junto a esses estudantes.\n\n"
+            "Gostaríamos de propor uma breve conversa para apresentar o programa e explorar "
+            "formas de colaboração. Teria disponibilidade nas próximas semanas?\n\n"
+            "Desde já agradeço a atenção.\n\n"
+            "Atenciosamente,\n[Seu nome]\nPrograma Futuro Cientista (PFC) · UFSCar"
+        )
+        st.text_input("Assunto sugerido", value=assunto, key=f"email_subj_{org_id}")
+        lbl = "Rascunho do e-mail (edite a vontade)"
+        st.text_area(lbl, value=corpo, key=f"email_body_{org_id}", height=300)
+        copy_html = (EMAIL_COPY_TEMPLATE
+                     .replace("__FALLBACK__", json.dumps(corpo))
+                     .replace("__LABEL__", json.dumps(lbl)))
+        components.html(copy_html, height=46)
+
 
 # =========================================================================== #
 # PÁGINA · VISÃO GERAL
@@ -931,6 +1072,23 @@ def page_visao():
         f'<p>{TOTAL} organizações monitoradas · clique nos cartões e segmentos para explorar</p></div>',
         unsafe_allow_html=True,
     )
+
+    # ---- Alerta de prazos de editais (próximos 15 dias) ----
+    prox = _editais_proximos(15)
+    if prox:
+        urgentes = sum(1 for e in prox if e["dias"] < 7)
+        rotulo = (f"⏰ {len(prox)} edital(is) fecham nos próximos 15 dias"
+                  + (f"  ·  {urgentes} em menos de 7 dias" if urgentes else "")
+                  + "  —  ver lista")
+        if st.button(rotulo, key="alerta_prazos", use_container_width=True):
+            dlg_prazos(prox)
+    else:
+        st.markdown(
+            '<div style="border:1px solid var(--line);border-radius:12px;background:var(--surface);'
+            'padding:11px 16px;font-size:13px;color:var(--muted);margin-bottom:6px">'
+            '⏰ Nenhum edital fechando em breve · pipeline sob controle</div>',
+            unsafe_allow_html=True,
+        )
 
     cont = df[COL_STATUS].value_counts() if TOTAL else pd.Series(dtype=int)
     n_prospectar = int(cont.get("Prospectar", 0))
@@ -1316,7 +1474,7 @@ def page_funil():
         st.caption(HINT_ESCRITA + " — ao arrastar em modo CSV o app mostra um aviso e o card volta.")
 
 
-# Gráfico de Score orbital interativo (SVG + JS autocontido, instantâneo).
+# Gráfico de Score: donut único elegante + chips clicáveis (SVG/JS autocontido).
 ORBITAL_TEMPLATE = r"""<!doctype html><html><head><meta charset="utf-8"><style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
@@ -1325,62 +1483,77 @@ html,body{background:transparent;font-family:'Inter',system-ui,sans-serif;color:
 .h{padding:18px 20px 13px;border-bottom:1px solid rgba(255,255,255,.06)}
 .h h2{font-family:'Space Grotesk';font-weight:600;font-size:15.5px;margin:0}
 .h .cap{font-size:12px;color:#565E68;margin-top:3px}
-.body{padding:12px 18px 16px}
+.body{padding:14px 18px 18px}
 .orbit-wrap{display:grid;place-items:center}
-.arc{cursor:pointer;transition:stroke-width .3s cubic-bezier(.22,.61,.36,1),opacity .3s ease,filter .3s ease}
-.dim{opacity:.26}
-.cn{font-family:'Space Grotesk';font-weight:700;cursor:pointer;transition:fill .3s ease}
-.legend{display:flex;flex-direction:column;gap:7px;margin-top:6px}
-.lrow{display:grid;grid-template-columns:12px 1fr auto;align-items:center;gap:9px;padding:7px 10px;border:1px solid rgba(255,255,255,.05);border-radius:9px;cursor:pointer;transition:background .2s ease,border-color .2s ease,transform .15s ease}
-.lrow:hover{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.12);transform:translateX(2px)}
-.lrow.sel{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.18)}
-.sw{width:10px;height:10px;border-radius:3px}
-.ln{font-size:12.5px;color:#C2C7CE}
-.lv{font-family:'Space Grotesk';font-weight:600;font-size:13px}
-.tip{position:fixed;pointer-events:none;background:#1F242C;border:1px solid rgba(255,255,255,.14);color:#E9EBEE;font-size:12px;padding:6px 9px;border-radius:7px;opacity:0;transition:opacity .15s ease;z-index:9;white-space:nowrap}
-.hint{font-size:11px;color:#565E68;text-align:center;margin-top:9px}
+#arc{transition:stroke .35s ease;cursor:default}
+.cn{font-family:'Space Grotesk';font-weight:600;transition:fill .35s ease}
+.chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:14px}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid rgba(255,255,255,.07);border-radius:999px;cursor:pointer;font-size:12.5px;color:#C2C7CE;background:rgba(255,255,255,.015);transition:background .22s ease,border-color .22s ease,transform .15s ease,color .22s ease}
+.chip:hover{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.16);transform:translateY(-2px);color:#fff}
+.chip.sel{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.24);color:#fff}
+.chip .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.chip b{font-family:'Space Grotesk';font-weight:600}
+.hint{font-size:11px;color:#565E68;text-align:center;margin-top:11px}
 </style></head><body>
-<div class="wrap"><div class="h"><h2>Anatomia do Score</h2><div class="cap">anéis clicáveis · exemplo: __NOME__ = __TOTAL__</div></div>
+<div class="wrap"><div class="h"><h2>Anatomia do Score</h2><div class="cap" id="cap">__NOME__</div></div>
 <div class="body">
-<div class="orbit-wrap"><svg id="svg" width="208" height="208" viewBox="0 0 200 200" aria-label="Score orbital"></svg></div>
-<div class="legend" id="legend"></div>
-<div class="hint">clique num anel ou critério para destacar · clique no centro para o total</div>
-</div></div><div class="tip" id="tip"></div>
+<div class="orbit-wrap"><svg id="svg" width="206" height="206" viewBox="0 0 200 200" aria-label="Score">
+  <defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#E89A3C"/><stop offset="1" stop-color="#5FB137"/></linearGradient></defs>
+  <circle cx="100" cy="100" r="80" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="10"/>
+  <circle id="arc" cx="100" cy="100" r="80" fill="none" stroke="url(#grad)" stroke-width="10" stroke-linecap="round"
+          transform="rotate(-90 100 100)"/>
+  <text id="cn" class="cn" x="100" y="100" text-anchor="middle" dominant-baseline="central" font-size="52" fill="#E9EBEE">__TOTAL__</text>
+  <text x="100" y="130" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#828A94" font-family="Inter">de 100</text>
+</svg></div>
+<div class="chips" id="chips"></div>
+<div class="hint">clique num critério para destacar · clique de novo para o total</div>
+</div></div>
 <script>
 (function(){
-  var DATA=__DATA__, TOTAL=__TOTAL__, RADII=[76,62,48,34], SW=9, NS='http://www.w3.org/2000/svg';
-  var svg=document.getElementById('svg'), legend=document.getElementById('legend'), tip=document.getElementById('tip'), sel=-1, arcs=[];
-  function el(t,a){var e=document.createElementNS(NS,t);for(var k in a){e.setAttribute(k,a[k]);}return e;}
-  var g=el('g',{transform:'rotate(-90 100 100)'}); svg.appendChild(g);
+  var DATA=__DATA__, TOTAL=__TOTAL__, NS='http://www.w3.org/2000/svg';
+  var arc=document.getElementById('arc'), cn=document.getElementById('cn'), chipsEl=document.getElementById('chips');
+  var R=80, C=2*Math.PI*R, sel=-1, curShown=0;
+  function setArc(v){ var len=Math.max(0,Math.min(100,v))/100*C; arc.setAttribute('stroke-dasharray', len+' '+(C-len)); }
+  function tween(to){ var from=curShown, t0=performance.now(), dur=520;
+    function step(t){ var p=Math.min(1,(t-t0)/dur), e=1-Math.pow(1-p,3); var val=from+(to-from)*e; cn.textContent=Math.round(val); setArc(val); if(p<1){requestAnimationFrame(step);} else {curShown=to;} }
+    requestAnimationFrame(step); }
   DATA.forEach(function(d,i){
-    var r=RADII[i], C=2*Math.PI*r, len=d.v/100*C;
-    g.appendChild(el('circle',{cx:100,cy:100,r:r,fill:'none',stroke:'rgba(255,255,255,.06)','stroke-width':SW}));
-    var a=el('circle',{cx:100,cy:100,r:r,fill:'none',stroke:d.c,'stroke-width':SW,'stroke-linecap':'round','stroke-dasharray':len+' '+(C-len)});
-    a.setAttribute('class','arc'); a.setAttribute('data-i',i); g.appendChild(a); arcs.push(a);
-  });
-  var cn=el('text',{x:100,y:99,'text-anchor':'middle','font-size':46,fill:'#9FD27F'}); cn.setAttribute('class','cn'); cn.textContent=TOTAL; svg.appendChild(cn);
-  var cl=el('text',{x:100,y:120,'text-anchor':'middle','font-size':12,fill:'#828A94','font-family':'Inter'}); cl.textContent='de 100'; svg.appendChild(cl);
-  DATA.forEach(function(d,i){
-    var row=document.createElement('div'); row.className='lrow'; row.setAttribute('data-i',i);
-    row.innerHTML='<span class="sw" style="background:'+d.c+'"></span><span class="ln">'+d.n+' <span style="color:#565E68">('+d.w+'%)</span></span><span class="lv" style="color:'+d.c+'">'+d.v+'</span>';
-    legend.appendChild(row);
+    var c=document.createElement('div'); c.className='chip'; c.setAttribute('data-i',i);
+    c.innerHTML='<span class="dot" style="background:'+d.c+'"></span>'+d.n+' <b>'+d.v+'</b>';
+    chipsEl.appendChild(c);
   });
   function apply(){
-    if(sel<0){ cn.textContent=TOTAL; cn.setAttribute('fill','#9FD27F');
-      arcs.forEach(function(a){a.classList.remove('dim');a.setAttribute('stroke-width',SW);a.style.filter='';});
-      [].forEach.call(legend.children,function(r){r.classList.remove('sel');});
-    } else { var d=DATA[sel]; cn.textContent=d.v; cn.setAttribute('fill',d.c);
-      arcs.forEach(function(a,i){ if(i===sel){a.classList.remove('dim');a.setAttribute('stroke-width',SW+3);a.style.filter='drop-shadow(0 0 6px '+d.c+')';} else {a.classList.add('dim');a.setAttribute('stroke-width',SW);a.style.filter='';} });
-      [].forEach.call(legend.children,function(r,i){if(i===sel){r.classList.add('sel');}else{r.classList.remove('sel');}});
-    }
+    [].forEach.call(chipsEl.children,function(c,i){if(i===sel){c.classList.add('sel');}else{c.classList.remove('sel');}});
+    if(sel<0){ cn.setAttribute('fill','#E9EBEE'); arc.setAttribute('stroke','url(#grad)'); tween(TOTAL); }
+    else { var d=DATA[sel]; cn.setAttribute('fill',d.c); arc.setAttribute('stroke',d.c); tween(d.v); }
   }
   function pick(i){ sel=(sel===i?-1:i); apply(); }
-  arcs.forEach(function(a){ a.addEventListener('click',function(){pick(+a.getAttribute('data-i'));});
-    a.addEventListener('mousemove',function(e){var d=DATA[+a.getAttribute('data-i')];tip.textContent=d.n+' '+d.v;tip.style.opacity='1';tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+12)+'px';});
-    a.addEventListener('mouseleave',function(){tip.style.opacity='0';}); });
-  [].forEach.call(legend.children,function(r){ r.addEventListener('click',function(){pick(+r.getAttribute('data-i'));}); });
-  cn.addEventListener('click',function(){sel=-1;apply();});
-  apply();
+  [].forEach.call(chipsEl.children,function(c){ c.addEventListener('click',function(){pick(+c.getAttribute('data-i'));}); });
+  setArc(0); tween(TOTAL);
+})();
+</script></body></html>"""
+
+
+# Botão "Copiar" do e-mail (copia o texto editado do text_area; fallback = rascunho).
+EMAIL_COPY_TEMPLATE = r"""<!doctype html><html><head><meta charset="utf-8"><style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@500&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}html,body{background:transparent}
+#cp{font-family:'Inter',system-ui,sans-serif;font-size:13px;font-weight:500;color:#C2C7CE;background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.12);border-radius:9px;padding:8px 14px;cursor:pointer;transition:all .2s ease}
+#cp:hover{color:#fff;border-color:rgba(255,255,255,.28);background:rgba(255,255,255,.08)}
+</style></head><body>
+<button id="cp">📋 Copiar e-mail</button>
+<script>
+(function(){
+  var b=document.getElementById('cp'), FALLBACK=__FALLBACK__, LABEL=__LABEL__;
+  function legacy(t){var x=document.createElement('textarea');x.value=t;x.style.position='fixed';x.style.opacity='0';document.body.appendChild(x);x.focus();x.select();try{document.execCommand('copy');}catch(e){}document.body.removeChild(x);}
+  b.addEventListener('click',function(){
+    var txt=FALLBACK;
+    try{var ta=window.parent.document.querySelector('textarea[aria-label="'+LABEL+'"]');if(ta&&ta.value){txt=ta.value;}}catch(e){}
+    try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt)['catch'](function(){legacy(txt);});}else{legacy(txt);}}catch(e){legacy(txt);}
+    b.textContent='✓ Copiado!';setTimeout(function(){b.textContent='📋 Copiar e-mail';},1500);
+  });
 })();
 </script></body></html>"""
 
@@ -1430,22 +1603,26 @@ def page_metodo():
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
     g1, g2 = st.columns([1, 1])
     with g1:
-        topo = df.sort_values(COL_SCORE, ascending=False).iloc[0] if TOTAL else None
-        score_topo = int(topo[COL_SCORE]) if topo is not None else 0
-        nome_topo = str(topo[COL_EMPRESA]) if topo is not None else "—"
-        # Valores por componente: ilustrativos (o MVP usa o Score PFC da planilha).
+        nomes = df.sort_values(COL_SCORE, ascending=False)[COL_EMPRESA].tolist() if TOTAL else ["—"]
+        escolha = st.selectbox("Ver score de:", nomes, index=0, key="score_org")
+        sel = df[df[COL_EMPRESA] == escolha]
+        score_sel = int(sel.iloc[0][COL_SCORE]) if not sel.empty else 0
+        nome_sel = escolha
+        # Sub-componentes ILUSTRATIVOS derivados do Score PFC real da empresa.
+        # TODO: trocar pela leitura de colunas reais (ex.: "Score Aderência",
+        # "Score Fit", ...) na planilha quando esses dados existirem.
         comps = [
-            {"n": "Aderência", "v": min(99, score_topo + 1), "c": "#E89A3C", "w": 35},
-            {"n": "Valor", "v": score_topo, "c": "#5FB137", "w": 25},
-            {"n": "Região", "v": max(60, score_topo - 3), "c": "#5B9BD5", "w": 20},
-            {"n": "Acionabilidade", "v": max(60, score_topo - 1), "c": "#9AA2AC", "w": 20},
+            {"n": "Aderência", "v": min(100, score_sel), "c": "#E89A3C"},
+            {"n": "Fit", "v": max(0, score_sel - 2), "c": "#5FB137"},
+            {"n": "Região", "v": max(0, score_sel - 4), "c": "#5B9BD5"},
+            {"n": "Ação", "v": max(0, score_sel - 3), "c": "#9AA2AC"},
         ]
         orb = (ORBITAL_TEMPLATE
                .replace("__DATA__", json.dumps(comps))
-               .replace("__TOTAL__", str(score_topo))
-               .replace("__NOME__", html.escape(nome_topo)))
-        components.html(orb, height=448)
-        st.caption(f"Decomposição ilustrativa de **{nome_topo}** pelos pesos fixos.")
+               .replace("__TOTAL__", str(score_sel))
+               .replace("__NOME__", html.escape(nome_sel)))
+        components.html(orb, height=470)
+        st.caption("Sub-componentes ilustrativos derivados do Score PFC da planilha.")
     with g2:
         st.markdown(
             '<div class="card"><div class="card-h"><div><h2>Fórmula</h2>'
