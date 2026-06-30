@@ -15,6 +15,7 @@ import html
 import json
 import os
 import re
+from urllib.parse import quote_plus
 
 import pandas as pd
 import streamlit as st
@@ -71,9 +72,9 @@ USERS = {
     },
 }
 
-PAGES = ["Visão geral", "Ranking", "Radar", "Funil", "Metodologia"]
+PAGES = ["Visão geral", "Ranking", "Radar", "Funil", "Metodologia", "Verificação"]
 PAGE_ICONS = {"Visão geral": "📊", "Ranking": "📋", "Radar": "📡",
-              "Funil": "🗂️", "Metodologia": "🧮"}
+              "Funil": "🗂️", "Metodologia": "🧮", "Verificação": "🔍"}
 
 # --------------------------------------------------------------------------- #
 # Tema escuro premium + CSS custom
@@ -336,6 +337,20 @@ body{background:#0A0C0F}
   .pfc-nebula{animation:none}.pfc-spotlight{display:none}
   .kpi,.card,.lead,.caso{transform:none!important}
 }
+
+/* ---------- aba Verificação ---------- */
+.vbar{height:10px;border-radius:6px;background:var(--line-2);overflow:hidden;margin:8px 0 2px}
+.vbar i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#E89A3C,#5FB137);transition:width .7s var(--ease)}
+.vprog-lab{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.vprog-lab .big{font-family:var(--disp);font-weight:600;font-size:22px;color:var(--text)}
+.vprog-lab .pct{font-family:var(--disp);font-weight:600;font-size:14px;color:var(--green-2)}
+.vhead{display:flex;align-items:center;gap:11px;min-width:0}
+.vhead .nm{font-weight:600;font-size:14px;color:var(--text)}
+.vhead .st{font-size:11.5px;color:var(--dim)}
+.vcur{font-size:11.5px;color:var(--dim);word-break:break-all;margin-top:2px}
+.vbadge2{font-size:11px;font-weight:600;padding:2px 9px;border-radius:7px;border:1px solid transparent;white-space:nowrap}
+.vb-nao{background:var(--red-soft);color:var(--red-2);border-color:rgba(226,87,74,.25)}
+.vb-pend{background:var(--orange-soft);color:var(--orange-2);border-color:rgba(232,154,60,.25)}
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -757,9 +772,14 @@ render_header()
 # --------------------------------------------------------------------------- #
 # Barra de navegação (páginas) + breadcrumb
 # --------------------------------------------------------------------------- #
+_n_naoverif = int((~df[COL_VERIF].apply(verificada_ok)).sum()) if TOTAL else 0
 nav_cols = st.columns(len(PAGES))
 for i, p in enumerate(PAGES):
-    rotulo = f"{PAGE_ICONS[p]} {p}" + (f" ({TOTAL})" if p == "Ranking" else "")
+    rotulo = f"{PAGE_ICONS[p]} {p}"
+    if p == "Ranking":
+        rotulo += f" ({TOTAL})"
+    elif p == "Verificação" and _n_naoverif:
+        rotulo += f" ({_n_naoverif})"
     nav_cols[i].button(
         rotulo, key=f"nav_{p}", use_container_width=True,
         type="primary" if st.session_state["page"] == p else "secondary",
@@ -1686,10 +1706,91 @@ def page_metodo():
 
 
 # =========================================================================== #
+# PÁGINA · VERIFICAÇÃO (saneamento da base)
+# =========================================================================== #
+def page_verificacao():
+    st.markdown(
+        '<div class="phead"><h1>Verificação de fontes</h1>'
+        '<p>saneie a base: confirme o site oficial de cada organização e marque como verificada</p></div>',
+        unsafe_allow_html=True,
+    )
+
+    n_verif = int(df[COL_VERIF].apply(verificada_ok).sum()) if TOTAL else 0
+    pct = (n_verif / TOTAL * 100) if TOTAL else 0
+    st.markdown(
+        f'<div class="card"><div class="pad">'
+        f'<div class="vprog-lab"><span class="big">{n_verif}/{TOTAL} verificadas</span>'
+        f'<span class="pct">{pct:.0f}%</span></div>'
+        f'<div class="vbar"><i style="width:{pct:.1f}%"></i></div></div></div>',
+        unsafe_allow_html=True,
+    )
+    if not modo_conectado:
+        st.caption(HINT_ESCRITA + " — marcar verificada/pendente grava na coluna Fonte verificada.")
+
+    nao = (df[~df[COL_VERIF].apply(verificada_ok)].sort_values(COL_SCORE, ascending=False)
+           if TOTAL else df.iloc[0:0])
+    if nao.empty:
+        st.success("🎉 Todas as fontes da base estão verificadas. Nada a sanear!")
+        return
+
+    st.session_state.setdefault("verif_n", 10)
+    mostrados = nao.head(st.session_state["verif_n"])
+    st.caption(f"{len(nao)} organização(ões) a verificar (por Score PFC) · mostrando {len(mostrados)}")
+
+    for _, row in mostrados.iterrows():
+        oid = row[COL_ID]
+        nome = str(row[COL_EMPRESA])
+        url_atual = str(row[COL_URL]).strip()
+        pend = "pendente" in str(row[COL_VERIF]).lower()
+        badge = ('<span class="vbadge2 vb-pend">verificação pendente</span>' if pend
+                 else '<span class="vbadge2 vb-nao">não verificada</span>')
+        google = f"https://www.google.com/search?q={quote_plus(nome)}+site+oficial"
+        with st.container(border=True):
+            st.markdown(
+                f'<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">'
+                f'<div class="vhead"><span class="sem" style="background:{sem_cor(row[COL_SEMAFORO])}"></span>'
+                f'<div><div class="nm">{texto_ou(nome)}</div>'
+                f'<div class="st">{texto_ou(row[COL_SETOR])} · Score {int(row[COL_SCORE])}</div></div></div>'
+                f'{badge}</div>'
+                + (f'<div class="vcur">URL atual sugerido: {esc(url_atual)}</div>'
+                   if url_atual.startswith("http") else '<div class="vcur">Sem URL sugerido.</div>'),
+                unsafe_allow_html=True,
+            )
+            c1, c2 = st.columns([1, 2])
+            with c1:
+                st.link_button("🔍 Buscar fonte oficial", google, use_container_width=True)
+            with c2:
+                url_val = st.text_input(
+                    "URL real", key=f"vurl_{oid}", placeholder="https://site-oficial.org.br/…",
+                    label_visibility="collapsed", disabled=not modo_conectado)
+            b1, b2 = st.columns(2)
+            with b1:
+                if st.button("✓ Marcar como verificada", key=f"vok_{oid}",
+                             use_container_width=True, disabled=not modo_conectado):
+                    res = dados.marcar_fonte(oid, "Verificada", url_val)
+                    st.toast(res["mensagem"], icon="✅" if res["sucesso"] else "⚠️")
+                    if res["sucesso"]:
+                        st.rerun()
+            with b2:
+                if st.button("✗ Não encontrei", key=f"vno_{oid}",
+                             use_container_width=True, disabled=not modo_conectado):
+                    res = dados.marcar_fonte(oid, "Verificação pendente")
+                    st.toast(res["mensagem"], icon="✅" if res["sucesso"] else "⚠️")
+                    if res["sucesso"]:
+                        st.rerun()
+
+    if len(nao) > len(mostrados):
+        if st.button(f"▾ Mostrar mais ({len(nao) - len(mostrados)} restantes)",
+                     key="verif_more", use_container_width=True):
+            st.session_state["verif_n"] += 10
+            st.rerun()
+
+
+# =========================================================================== #
 # ROTEAMENTO
 # =========================================================================== #
 ROTAS = {"Visão geral": page_visao, "Ranking": page_ranking, "Radar": page_radar,
-         "Funil": page_funil, "Metodologia": page_metodo}
+         "Funil": page_funil, "Metodologia": page_metodo, "Verificação": page_verificacao}
 ROTAS.get(PAGINA, page_visao)()
 
 # --------------------------------------------------------------------------- #

@@ -375,3 +375,18 @@ def atualizar_status(id_org, novo_status: str) -> dict:
                 "mensagem": f"Status inválido. Use um de: {', '.join(STATUS_FUNIL)}."}
     # (b)(c) grava na coluna Status
     return _atualizar_celula(id_org, COL_STATUS, novo_status)
+
+
+def marcar_fonte(id_org, status: str, url: str | None = None) -> dict:
+    """Saneamento da base: grava o URL oficial (se informado) na coluna Fonte/URL
+    e atualiza a coluna 'Fonte verificada' (ex.: 'Verificada' / 'Verificação
+    pendente'). Mesmo padrão de escrita de salvar_observacao. Retorna {sucesso, mensagem}.
+    """
+    status = (status or "").strip()
+    if not status:
+        return {"sucesso": False, "mensagem": "Status de verificação inválido."}
+    if url is not None and str(url).strip():
+        res_url = _atualizar_celula(id_org, COL_URL, str(url).strip())
+        if not res_url["sucesso"]:
+            return res_url
+    return _atualizar_celula(id_org, COL_VERIF, status)

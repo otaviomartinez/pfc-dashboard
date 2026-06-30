@@ -18,7 +18,8 @@
       "Bash(python -m py_compile app.py)",
       "Bash(python -m pip install \"plotly>=5.24\")",
       "Bash(python -m pip show plotly)",
-      "Bash(find \"/c/Users/otavi/OneDrive/Desktop\" \"/c/Users/otavi/Downloads\" -iname \"*pfc*dashboard*\" -o -iname \"*pfc*v4*\" 2>/dev/null | head -20)"
+      "Bash(find \"/c/Users/otavi/OneDrive/Desktop\" \"/c/Users/otavi/Downloads\" -iname \"*pfc*dashboard*\" -o -iname \"*pfc*v4*\" 2>/dev/null | head -20)",
+      "Bash(grep -vE \"ScriptRunContext|No runtime|MemoryCache|^\\\\s*$\")"
     ]
   }
 }
