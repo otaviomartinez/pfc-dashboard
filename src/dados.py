@@ -35,6 +35,7 @@ CSV_PATH = Path(__file__).resolve().parent.parent / "data" / "empresas.csv"
 
 # Aba (worksheet) com a base de organizações dentro da planilha Google.
 ABA_DADOS = "empresas"
+ABA_BASE = "Base_Empresas"  # nome alternativo da base (usado ao aprovar do Radar)
 # Aba onde o Radar grava as oportunidades aprovadas.
 ABA_PENDENTES = "Novidades_pendentes"
 # Aba opcional de editais privados (prazos).
@@ -138,11 +139,13 @@ def _conectar():
 
 
 def _aba_dados(sh):
-    """Worksheet principal: tenta o nome configurado e cai para a 1ª aba."""
-    try:
-        return sh.worksheet(ABA_DADOS)
-    except Exception:
-        return sh.sheet1
+    """Worksheet da base: tenta 'empresas', depois 'Base_Empresas', senão 1ª aba."""
+    for nome in (ABA_DADOS, ABA_BASE):
+        try:
+            return sh.worksheet(nome)
+        except Exception:
+            continue
+    return sh.sheet1
 
 
 def modo_conexao() -> str:
@@ -158,6 +161,10 @@ def limpar_caches() -> None:
         pass
     try:
         carregar_editais_privados.clear()
+    except Exception:
+        pass
+    try:
+        carregar_novidades_pendentes.clear()
     except Exception:
         pass
     try:
@@ -238,6 +245,24 @@ def carregar_editais_privados() -> pd.DataFrame:
         return pd.DataFrame(registros)
     except Exception:
         return pd.DataFrame()
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def carregar_novidades_pendentes() -> list[dict]:
+    """Lê a aba 'Novidades_pendentes' e devolve as linhas 'Pendente de revisão'.
+
+    Cada item é um dict com as colunas: Data, Fonte, Título, Descrição,
+    Score Aderência, Prazo, Valor estimado, Link da fonte, Status aprovação.
+    """
+    sh = _conectar()
+    if sh is None:
+        return []
+    try:
+        registros = sh.worksheet(ABA_PENDENTES).get_all_records()
+    except Exception:
+        return []
+    return [r for r in registros
+            if str(r.get("Status aprovação", "")).strip().lower() == "pendente de revisão"]
 
 
 # --------------------------------------------------------------------------- #
@@ -390,3 +415,116 @@ def marcar_fonte(id_org, status: str, url: str | None = None) -> dict:
         if not res_url["sucesso"]:
             return res_url
     return _atualizar_celula(id_org, COL_VERIF, status)
+
+
+# --------------------------------------------------------------------------- #
+# Fila do Radar (aba Novidades_pendentes) -> aprovar/descartar
+# --------------------------------------------------------------------------- #
+def _semaforo_por_score(score) -> str:
+    try:
+        s = float(str(score).replace(",", "."))
+    except (TypeError, ValueError):
+        return "🟡"
+    return "🟢" if s >= 70 else ("🟡" if s >= 45 else "🔴")
+
+
+def _valor_para_reais(texto) -> int:
+    """Extrai o MAIOR valor em reais de um texto ('R$ 80 mil – R$ 200 mil' -> 200000)."""
+    import re
+    maior = 0
+    for m in re.finditer(r"([\d\.]+(?:,\d+)?)\s*(mil|milh|mi|k)?", str(texto or "").lower()):
+        try:
+            base = float(m.group(1).replace(".", "").replace(",", "."))
+        except ValueError:
+            continue
+        unid = m.group(2) or ""
+        if unid in ("mil", "k"):
+            base *= 1_000
+        elif unid.startswith("milh") or unid == "mi":
+            base *= 1_000_000
+        if base >= 1_000:
+            maior = max(maior, int(base))
+    return maior
+
+
+def _atualizar_status_novidade(novidade: dict, novo_status: str) -> dict:
+    """Muda 'Status aprovação' da linha da novidade (casa por Link ou Título)."""
+    sh = _conectar()
+    if sh is None:
+        return {"sucesso": False, "mensagem": _MSG_CSV}
+    try:
+        ws = sh.worksheet(ABA_PENDENTES)
+        cab = [str(c).strip() for c in ws.row_values(1)]
+        c_status = cab.index("Status aprovação") + 1
+        alvo_link = str(novidade.get("Link da fonte", "")).strip()
+        alvo_tit = str(novidade.get("Título", "")).strip()
+        col_link = ws.col_values(cab.index("Link da fonte") + 1) if "Link da fonte" in cab else []
+        col_tit = ws.col_values(cab.index("Título") + 1) if "Título" in cab else []
+
+        linha = None
+        for i in range(2, max(len(col_link), len(col_tit)) + 1):
+            link_i = col_link[i - 1].strip() if i - 1 < len(col_link) else ""
+            tit_i = col_tit[i - 1].strip() if i - 1 < len(col_tit) else ""
+            if (alvo_link and link_i == alvo_link) or (alvo_tit and tit_i == alvo_tit):
+                linha = i
+                break
+        if linha is None:
+            return {"sucesso": False, "mensagem": "Novidade não encontrada na aba (talvez já resolvida)."}
+        ws.update_cell(linha, c_status, novo_status)
+        carregar_novidades_pendentes.clear()
+        return {"sucesso": True, "mensagem": f"Status atualizado para '{novo_status}'."}
+    except Exception as e:
+        return {"sucesso": False, "mensagem": f"Erro ao atualizar a novidade: {e}"}
+
+
+def descartar_novidade(novidade: dict) -> dict:
+    """Marca a novidade como 'Descartada'. Retorna {sucesso, mensagem}."""
+    return _atualizar_status_novidade(novidade, "Descartada")
+
+
+def aprovar_novidade(novidade: dict) -> dict:
+    """Aprova a novidade: status -> 'Aprovada' E cria uma linha na base (Status 'Edital')."""
+    sh = _conectar()
+    if sh is None:
+        return {"sucesso": False, "mensagem": _MSG_CSV}
+    try:
+        base_ws = _aba_dados(sh)
+        cab = [str(c).strip() for c in base_ws.row_values(1)]
+        # próximo ID numérico
+        if COL_ID in cab:
+            ids = [int(x) for x in base_ws.col_values(cab.index(COL_ID) + 1)[1:]
+                   if str(x).strip().isdigit()]
+            novo_id = (max(ids) + 1) if ids else 1
+        else:
+            novo_id = ""
+
+        score = novidade.get("Score Aderência", "")
+        titulo = str(novidade.get("Título", "")).strip()
+        valores = {
+            COL_ID: novo_id,
+            COL_EMPRESA: str(novidade.get("Fonte", "")).strip() or titulo or "Oportunidade",
+            COL_INSTITUTO: titulo,
+            COL_SCORE: score,
+            COL_SEMAFORO: _semaforo_por_score(score),
+            COL_STATUS: "Edital",
+            COL_EDITAL: titulo,
+            COL_JANELA: str(novidade.get("Prazo", "")).strip(),
+            COL_VALVO: _valor_para_reais(novidade.get("Valor estimado", "")) or "",
+            COL_URL: str(novidade.get("Link da fonte", "")).strip(),
+            COL_OBS: f"[Radar] {str(novidade.get('Descrição', '')).strip()}".strip(),
+            COL_PROX_ACAO: "Analisar edital e avaliar aderência",
+            COL_RESP: "Radar",
+            COL_VERIF: "Não verificada",
+        }
+        linha = [str(valores.get(h, "")) for h in cab] if cab else list(valores.values())
+        base_ws.append_row(linha, value_input_option="USER_ENTERED")
+
+        # marca a novidade como Aprovada
+        res = _atualizar_status_novidade(novidade, "Aprovada")
+        carregar_empresas.clear()
+        if not res["sucesso"]:
+            return {"sucesso": True,
+                    "mensagem": "Adicionada à base (Edital), mas o status da fila não pôde ser atualizado."}
+        return {"sucesso": True, "mensagem": "Aprovada e adicionada à base como Edital."}
+    except Exception as e:
+        return {"sucesso": False, "mensagem": f"Erro ao aprovar: {e}"}

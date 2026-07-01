@@ -26,7 +26,9 @@
       "Bash(RADAR_TIMEOUT=8 python -m radar.main)",
       "Bash(python -m py_compile app.py src/dados.py radar/*.py)",
       "Bash(python \"C:\\\\Users\\\\otavi\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-otavi-OneDrive-Desktop-PROJETO-PFC\\\\625e14b1-9898-4f6b-b450-d151c90ac00b\\\\scratchpad\\\\listar_fila.py\")",
-      "Bash(rm -rf radar/__pycache__)"
+      "Bash(rm -rf radar/__pycache__)",
+      "Bash(python \"C:\\\\Users\\\\otavi\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-otavi-OneDrive-Desktop-PROJETO-PFC\\\\625e14b1-9898-4f6b-b450-d151c90ac00b\\\\scratchpad\\\\limpar_junk.py\")",
+      "Bash(python \"C:\\\\Users\\\\otavi\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-otavi-OneDrive-Desktop-PROJETO-PFC\\\\625e14b1-9898-4f6b-b450-d151c90ac00b\\\\scratchpad\\\\limpar_demo_fila.py\")"
     ]
   }
 }

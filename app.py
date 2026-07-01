@@ -1294,114 +1294,108 @@ def page_ranking():
 # =========================================================================== #
 # PÁGINA · RADAR
 # =========================================================================== #
+def _score_novidade(nv) -> float:
+    try:
+        return float(str(nv.get("Score Aderência", "")).replace(",", ".") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def page_radar():
     st.markdown(
         '<div class="phead"><h1>Radar de oportunidades</h1>'
-        '<p>varredura diária às 06:00 · aprove para enviar à aba “Novidades_pendentes”</p></div>',
+        '<p>fila real gravada pelo radar automático · aprove para virar Edital na base</p></div>',
         unsafe_allow_html=True,
     )
-    LEADS = [
-        {"id": "fapesp", "fonte": "FAPESP", "fit": 91, "cls": "hi",
-         "titulo": "Difusão e Popularização da Ciência 2026",
-         "why": "Foco em ensino básico e divulgação científica — encaixe direto no Clube de Ciências.",
-         "descricao": "Apoio a projetos que aproximem ciência e escola pública, com bolsas e recursos.",
-         "prazo": "31/08/2026", "valor_estimado": "R$ 80 mil – R$ 200 mil", "link": "https://fapesp.br/"},
-        {"id": "itau", "fonte": "Itaú Social", "fit": 88, "cls": "mid",
-         "titulo": "Chamada — Equidade na Educação Pública",
-         "why": "Público e território aderentes; atua em municípios da região PFC.",
-         "descricao": "Apoio a iniciativas que reduzam desigualdades de aprendizagem na rede pública.",
-         "prazo": "Fluxo contínuo", "valor_estimado": "R$ 100 mil – R$ 250 mil", "link": "https://www.itausocial.org.br/"},
-        {"id": "prosas", "fonte": "Prosas", "fit": 73, "cls": "mid",
-         "titulo": "Edital Juventude & Futuro",
-         "why": "Aderente à missão, mas valor abaixo do alvo — vale checar contrapartidas.",
-         "descricao": "Plataforma agrega editais; esta chamada apoia projetos de juventude e protagonismo.",
-         "prazo": "15/07/2026", "valor_estimado": "R$ 30 mil – R$ 60 mil", "link": "https://prosas.com.br/"},
-    ]
-    LEAD_FILTRADO = {"fonte": "Filtrado", "fit": 22,
-                     "titulo": "Cupom de cursos online — plataforma EAD",
-                     "why": "produto comercial, não fomento. O radar descartou automaticamente."}
-    st.session_state.setdefault("radar_resolvidos", {})
+
+    fila = sorted(dados.carregar_novidades_pendentes(), key=_score_novidade, reverse=True)
+    total = len(fila)
 
     col_fila, col_lado = st.columns([1.6, 1])
     with col_fila:
+        cap = f"{total} nova(s) · aprove ou descarte" if total else "sem novidades pendentes"
         st.markdown(
             '<div class="card-h" style="border:1px solid var(--line);border-bottom:none;'
             'border-radius:16px 16px 0 0;background:var(--surface)"><div><h2>Fila de revisão</h2>'
-            '<div class="cap">3 novas hoje · aprove ou descarte</div></div></div>',
+            f'<div class="cap">{esc(cap)}</div></div></div>',
             unsafe_allow_html=True,
         )
         _mostrar_resultado(st.session_state.pop("radar_msg", None))
         if not modo_conectado:
-            st.caption(HINT_ESCRITA + " (aprovar grava na aba Novidades_pendentes)")
+            st.caption(HINT_ESCRITA + " — aprovar/descartar grava na aba Novidades_pendentes.")
 
-        for lead in LEADS:
-            resolvido = st.session_state.radar_resolvidos.get(lead["id"])
-            if resolvido:
-                cor = "var(--green)" if resolvido == "ok" else "var(--red)"
-                txt = "✓ Aprovado — enviado à base" if resolvido == "ok" else "✕ Descartado da fila"
-                st.markdown(f'<div class="lead" style="opacity:.55"><div class="ttl">{esc(lead["titulo"])}</div>'
-                            f'<div class="why" style="color:{cor}">{txt}</div></div>', unsafe_allow_html=True)
-                continue
+        if not fila:
             st.markdown(
-                f"""
-                <div class="lead">
-                  <div class="lead-top"><span class="src">{esc(lead["fonte"])}</span>
-                    <span class="fit {lead["cls"]}">fit {lead["fit"]}</span></div>
-                  <div class="ttl">{esc(lead["titulo"])}</div>
-                  <div class="why">{esc(lead["why"])}</div>
-                  <div class="meta"><b>Fonte:</b> {esc(lead["fonte"])}</div>
-                  <div class="meta"><b>Descrição:</b> {esc(lead["descricao"])}</div>
-                  <div class="meta"><b>Prazo:</b> {esc(lead["prazo"])} · <b>Valor estimado:</b> {esc(lead["valor_estimado"])} · <b>Score aderência:</b> {lead["fit"]}</div>
-                  <a class="srclink" href="{esc(lead["link"])}" target="_blank" rel="noopener">↗ Fonte: {esc(lead["link"])}</a>
-                </div>
-                """,
+                '<div class="lead" style="text-align:center;padding:26px 18px">'
+                '<div style="font-size:26px;margin-bottom:6px">🛰️</div>'
+                '<div class="ttl">Nenhuma oportunidade nova no momento</div>'
+                '<div class="why">O radar roda todo dia às 06:00 e coloca aqui os editais '
+                'que passam no filtro. Volte mais tarde.</div></div>',
                 unsafe_allow_html=True,
             )
-            b1, b2, _sp = st.columns([1.3, 1, 1.7])
-            with b1:
-                if st.button("✓ Aprovar e mover à base", key=f"ok_{lead['id']}",
-                             type="primary", disabled=not modo_conectado):
-                    res = dados.adicionar_lead_radar({
-                        "data": pd.Timestamp.now().strftime("%d/%m/%Y"), "fonte": lead["fonte"],
-                        "titulo": lead["titulo"], "descricao": lead["descricao"],
-                        "score_aderencia": lead["fit"], "prazo": lead["prazo"],
-                        "valor_estimado": lead["valor_estimado"], "link": lead["link"],
-                        "status": "Pendente de revisão"})
-                    st.session_state.radar_resolvidos[lead["id"]] = "ok"
-                    st.session_state["radar_msg"] = res
-                    st.toast(res["mensagem"], icon="✅" if res["sucesso"] else "⚠️")
-                    st.rerun()
-            with b2:
-                if st.button("Descartar", key=f"no_{lead['id']}"):
-                    st.session_state.radar_resolvidos[lead["id"]] = "no"
-                    st.toast("Descartado da fila.", icon="🗑️")
-                    st.rerun()
+        else:
+            for i, nv in enumerate(fila):
+                fonte = str(nv.get("Fonte", "")).strip() or "Fonte"
+                titulo = str(nv.get("Título", "")).strip() or "(sem título)"
+                desc = str(nv.get("Descrição", "")).strip()
+                desc_trunc = (desc[:200].rstrip() + "…") if len(desc) > 200 else desc
+                prazo = str(nv.get("Prazo", "")).strip()
+                valor = str(nv.get("Valor estimado", "")).strip()
+                link = str(nv.get("Link da fonte", "")).strip()
+                sc = _score_novidade(nv)
+                cls = "hi" if sc >= 70 else "mid" if sc >= 45 else "lo"
 
-        st.markdown(
-            f'<div class="lead rej"><div class="lead-top">'
-            f'<span class="src" style="color:var(--red);background:var(--red-soft)">{esc(LEAD_FILTRADO["fonte"])}</span>'
-            f'<span class="fit lo">fit {LEAD_FILTRADO["fit"]}</span></div>'
-            f'<div class="ttl">{esc(LEAD_FILTRADO["titulo"])}</div>'
-            f'<div class="why"><span class="rej-tag">Fora do escopo:</span> {esc(LEAD_FILTRADO["why"])}</div></div>',
-            unsafe_allow_html=True,
-        )
+                metas = [f"<b>Fonte:</b> {esc(fonte)}"]
+                if prazo:
+                    metas.append(f"<b>Prazo:</b> {esc(prazo)}")
+                if valor:
+                    metas.append(f"<b>Valor:</b> {esc(valor)}")
+                link_html = (f'<a class="srclink" href="{esc(link)}" target="_blank" '
+                             f'rel="noopener">↗ {esc(link)}</a>') if link.startswith("http") else ""
+                desc_html = f'<div class="why">{esc(desc_trunc)}</div>' if desc_trunc else ""
+
+                st.markdown(
+                    f'<div class="lead"><div class="lead-top">'
+                    f'<span class="src">{esc(fonte)}</span>'
+                    f'<span class="fit {cls}">score {int(sc)}</span></div>'
+                    f'<div class="ttl">{esc(titulo)}</div>{desc_html}'
+                    f'<div class="meta">{" · ".join(metas)}</div>{link_html}</div>',
+                    unsafe_allow_html=True,
+                )
+                b1, b2, _sp = st.columns([1.3, 1, 1.7])
+                with b1:
+                    if st.button("✓ Aprovar (vira Edital)", key=f"rad_ok_{i}",
+                                 type="primary", disabled=not modo_conectado):
+                        res = dados.aprovar_novidade(nv)
+                        st.session_state["radar_msg"] = res
+                        st.toast(res["mensagem"], icon="✅" if res["sucesso"] else "⚠️")
+                        st.rerun()
+                with b2:
+                    if st.button("Descartar", key=f"rad_no_{i}", disabled=not modo_conectado):
+                        res = dados.descartar_novidade(nv)
+                        st.session_state["radar_msg"] = res
+                        st.toast(res["mensagem"], icon="🗑️" if res["sucesso"] else "⚠️")
+                        st.rerun()
 
     with col_lado:
-        fontes = ["CAPTA", "Prosas", "ABCR", "CNPq", "FAPESP", "Finep", "CAPES", "Itaú Social",
-                  "Fund. Bradesco", "Inst. Lemann", "Fund. Banco do Brasil", "MEC",
-                  "Fund. Telefônica", "Sec. Educação SP"]
+        fontes = ["Prosas", "ABCR", "Obs. 3º Setor", "Mapa OSC (IPEA)", "CNPq", "FAPESP",
+                  "Finep", "Fund. Banco do Brasil", "Itaú Social", "Inst. Unibanco",
+                  "Fund. Telefônica", "Fund. Lemann", "Inst. Ayrton Senna", "Inst. CPFL",
+                  "GIFE", "Fund. Bradesco", "Fund. Roberto Marinho", "Parque Tec. Sorocaba"]
         chips = "".join(f'<span class="src-tag">{esc(f)}</span>' for f in fontes)
         st.markdown(
             f"""
             <div class="card"><div class="card-h"><div><h2>Fontes monitoradas</h2>
-              <div class="cap">{len(fontes)} fontes · última varredura hoje 06:00</div></div></div>
+              <div class="cap">{len(fontes)} fontes · varredura diária às 06:00</div></div></div>
               <div class="pad">{chips}<div class="note">O radar vigia fontes conhecidas e estáveis —
               nada de varrer a internet inteira. Você decide o que entra na base.</div></div></div>
-            <div class="card"><div class="card-h"><div><h2>Resumo de hoje</h2><div class="cap">06:00</div></div></div>
+            <div class="card"><div class="card-h"><div><h2>Sua fila agora</h2>
+              <div class="cap">itens aguardando revisão</div></div></div>
               <div class="pad">
-                <div class="statline"><span style="color:var(--muted)">Itens varridos</span><b>37</b></div>
-                <div class="statline"><span style="color:var(--muted)">Filtrados (fora do escopo)</span><b style="color:var(--red)">33</b></div>
-                <div class="statline"><span style="color:var(--muted)">Na sua fila</span><b style="color:var(--green)">4</b></div>
+                <div class="statline"><span style="color:var(--muted)">Pendentes de revisão</span>
+                  <b style="color:var(--green)">{total}</b></div>
+                <div class="note">Aprovar cria um card em <b>Edital</b> no Funil/Ranking;
+                descartar apenas remove da fila.</div>
               </div></div>
             """,
             unsafe_allow_html=True,
