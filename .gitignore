@@ -19,6 +19,12 @@ venv/
 env/
 .env
 
+# Saídas geradas pelo Radar (publicadas como artefatos no CI)
+radar/preview_local.csv
+radar/log_filtrados.csv
+radar/log_descartado_sem_sinal.csv
+radar/fontes_candidatas.csv
+
 # Sistema / editores
 .DS_Store
 Thumbs.db

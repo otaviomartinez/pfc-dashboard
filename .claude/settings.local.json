@@ -19,7 +19,14 @@
       "Bash(python -m pip install \"plotly>=5.24\")",
       "Bash(python -m pip show plotly)",
       "Bash(find \"/c/Users/otavi/OneDrive/Desktop\" \"/c/Users/otavi/Downloads\" -iname \"*pfc*dashboard*\" -o -iname \"*pfc*v4*\" 2>/dev/null | head -20)",
-      "Bash(grep -vE \"ScriptRunContext|No runtime|MemoryCache|^\\\\s*$\")"
+      "Bash(grep -vE \"ScriptRunContext|No runtime|MemoryCache|^\\\\s*$\")",
+      "Bash(python -m pip install \"requests>=2.31\" \"beautifulsoup4>=4.12\")",
+      "Bash(python -c \"import requests,bs4;print\\('requests',requests.__version__,'| bs4',bs4.__version__\\)\")",
+      "Bash(python -m py_compile radar/*.py)",
+      "Bash(RADAR_TIMEOUT=8 python -m radar.main)",
+      "Bash(python -m py_compile app.py src/dados.py radar/*.py)",
+      "Bash(python \"C:\\\\Users\\\\otavi\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-otavi-OneDrive-Desktop-PROJETO-PFC\\\\625e14b1-9898-4f6b-b450-d151c90ac00b\\\\scratchpad\\\\listar_fila.py\")",
+      "Bash(rm -rf radar/__pycache__)"
     ]
   }
 }
