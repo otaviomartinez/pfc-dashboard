@@ -45,7 +45,7 @@ SINAIS_FORTES = [
 ]
 SINAIS_FRACOS = [
     "recursos", "proposta", "financiamento", "apoio financeiro", "doação",
-    "fomento", "bolsa", "candidatura", "prazo de submissão",
+    "fomento", "bolsa", "candidatura", "prazo de submissão", "chamada",
 ]
 _RE_VALOR = re.compile(r"r\$\s?[\d.,]+")
 
@@ -55,6 +55,7 @@ _RE_VALOR = re.compile(r"r\$\s?[\d.,]+")
 FONTES_CONTEXTO_EDITAL = {
     "FAPESP", "CNPq", "Finep", "Fundação Banco do Brasil",
     "Itaú Social", "Instituto Unibanco",
+    "FEBRACE", "Prêmio Itaú-Unicef", "PORVIR",
 }
 
 # Títulos genéricos/administrativos descartados sempre (camada extra de segurança).

@@ -1,15 +1,16 @@
 [
   {
-    "_ajuda": "Camada 2: adicione fontes aqui SEM tocar em Python. Copie um bloco, preencha nome/url e ponha ativo=true. Veja o README (seção 'Radar automático').",
+    "_ajuda": "Camada 2: adicione fontes aqui SEM tocar em Python. Copie um bloco, preencha nome/url e ponha ativo=true. Fontes com 'exemplo.org' ou ativo=false são ignoradas.",
     "nome": "Exemplo — Fundação X (editais)",
     "url": "https://exemplo.org/editais",
     "categoria": "generico",
     "ativo": false
   },
-  {
-    "nome": "Exemplo — Instituto Y (notícias)",
-    "url": "https://exemplo.org/noticias",
-    "categoria": "generico",
-    "ativo": false
-  }
+  { "nome": "Cenpec", "url": "https://www.cenpec.org.br/", "categoria": "generico", "ativo": true },
+  { "nome": "Conviva Educação", "url": "https://convivaeducacao.org.br/", "categoria": "generico", "ativo": true },
+  { "nome": "Todos Pela Educação", "url": "https://todospelaeducacao.org.br/", "categoria": "generico", "ativo": true },
+  { "nome": "UNICEF Brasil", "url": "https://www.unicef.org/brazil/", "categoria": "generico", "ativo": true },
+  { "nome": "Instituto Natura", "url": "https://www.institutonatura.org/", "categoria": "generico", "ativo": true },
+  { "nome": "Fundação Tide Setubal", "url": "https://fundacaotidesetubal.org.br/", "categoria": "generico", "ativo": true },
+  { "nome": "FECTI/CECIERJ", "url": "https://www.cecierj.edu.br/", "categoria": "generico", "ativo": true }
 ]

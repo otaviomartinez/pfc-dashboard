@@ -121,6 +121,37 @@ def fonte_parque_sorocaba():
                     ["article", "div[class*=card]", "div[class*=noticia]", ".elementor-post"])
 
 
+# --- Ciência jovem / feiras / prêmios / educação -----------------------------
+def fonte_febrace():
+    return _coletar("https://febrace.org.br/noticias/", "FEBRACE",
+                    ["article", "div[class*=card]", "div[class*=noticia]", ".elementor-post", "div[class*=post]"])
+
+
+def fonte_mostratec():
+    return _coletar("https://www.mostratec.com.br/", "MOSTRATEC",
+                    ["article", "div[class*=card]", "div[class*=noticia]", "div[class*=post]", ".elementor-post"])
+
+
+def fonte_mcti():
+    return _coletar("https://www.gov.br/mcti/pt-br/acompanhe-o-mcti/noticias", "MCTI",
+                    ["article", ".tileItem", "li[class*=item]", "div[class*=noticia]", "div[class*=card]"])
+
+
+def fonte_premio_itau_unicef():
+    return _coletar("https://premioitauunicef.org.br/", "Prêmio Itaú-Unicef",
+                    ["article", "div[class*=card]", "div[class*=post]", ".elementor-post", "div[class*=noticia]"])
+
+
+def fonte_porvir():
+    return _coletar("https://porvir.org/", "PORVIR",
+                    ["article", "div[class*=card]", "div[class*=post]", ".elementor-post", "li.item"])
+
+
+def fonte_instituto_votorantim():
+    return _coletar("https://www.institutovotorantim.org.br/", "Instituto Votorantim",
+                    ["article", "div[class*=card]", "div[class*=noticia]", "div[class*=post]", ".elementor-post"])
+
+
 # Registro nome -> função (usado com isolamento em main.py).
 FONTES = {
     "Prosas": fonte_prosas,
@@ -141,6 +172,12 @@ FONTES = {
     "Fundação Bradesco": fonte_fund_bradesco,
     "Fundação Roberto Marinho": fonte_frm,
     "Parque Tecnológico de Sorocaba": fonte_parque_sorocaba,
+    "FEBRACE": fonte_febrace,
+    "MOSTRATEC": fonte_mostratec,
+    "MCTI": fonte_mcti,
+    "Prêmio Itaú-Unicef": fonte_premio_itau_unicef,
+    "PORVIR": fonte_porvir,
+    "Instituto Votorantim": fonte_instituto_votorantim,
 }
 
 # URLs das fontes-âncora (para a Camada 3 varrer links externos).
@@ -163,4 +200,10 @@ ANCORA_URLS = [
     "https://fundacao.bradesco/instituicoes",
     "https://www.frm.org.br/",
     "https://www.parquetecsorocaba.com.br/",
+    "https://febrace.org.br/noticias/",
+    "https://www.mostratec.com.br/",
+    "https://www.gov.br/mcti/pt-br/acompanhe-o-mcti/noticias",
+    "https://premioitauunicef.org.br/",
+    "https://porvir.org/",
+    "https://www.institutovotorantim.org.br/",
 ]
