@@ -1,5 +1,5 @@
 """
-Camada 1 — extração DEDICADA das 18 fontes verificadas.
+Camada 1 — extração DEDICADA das fontes-âncora verificadas.
 
 Uma função por fonte, cada uma devolvendo uma lista de dicts padronizados
 (titulo, descricao, url, fonte, data_encontrada, prazo, valor_estimado).
@@ -152,6 +152,50 @@ def fonte_instituto_votorantim():
                     ["article", "div[class*=card]", "div[class*=noticia]", "div[class*=post]", ".elementor-post"])
 
 
+# --- Olimpíadas científicas (núcleo do PFC: 6º ano-EM de escola pública) -----
+def fonte_obmep():
+    return _coletar("https://www.obmep.org.br/", "OBMEP",
+                    ["article", "div[class*=card]", "div[class*=noticia]",
+                     "div[class*=post]", "li[class*=item]", "div[class*=destaque]"])
+
+
+def fonte_oba():
+    return _coletar("https://www.oba.org.br/", "OBA",
+                    ["article", "div[class*=card]", "div[class*=noticia]",
+                     "div[class*=post]", "li[class*=item]", "div[class*=destaque]"])
+
+
+def fonte_obbiotec():
+    return _coletar("https://www.obbiotec.com.br/", "OBBiotec",
+                    ["article", "div[class*=card]", "div[class*=noticia]",
+                     "div[class*=post]", ".elementor-post", "li[class*=item]"])
+
+
+def fonte_comunidade_cientifica_jr():
+    return _coletar("https://comunidadecientificajr.com.br/", "Comunidade Científica Jr",
+                    ["article", "div[class*=card]", "div[class*=post]",
+                     ".elementor-post", "div[class*=noticia]", "li[class*=item]"])
+
+
+# --- Pesquisa / institutos de educação ---------------------------------------
+def fonte_impa():
+    return _coletar("https://impa.br/noticias/", "IMPA",
+                    ["article", "div[class*=card]", "div[class*=noticia]",
+                     "div[class*=post]", "li[class*=item]"])
+
+
+def fonte_instituto_peninsula():
+    return _coletar("https://www.institutopeninsula.org.br/", "Instituto Península",
+                    ["article", "div[class*=card]", "div[class*=post]",
+                     ".elementor-post", "div[class*=noticia]"])
+
+
+def fonte_educar_dpaschoal():
+    return _coletar("https://educar.org.br/", "Fundação Educar DPaschoal",
+                    ["article", "div[class*=card]", "div[class*=post]",
+                     ".elementor-post", "div[class*=noticia]", "li[class*=item]"])
+
+
 # Registro nome -> função (usado com isolamento em main.py).
 FONTES = {
     "Prosas": fonte_prosas,
@@ -178,6 +222,13 @@ FONTES = {
     "Prêmio Itaú-Unicef": fonte_premio_itau_unicef,
     "PORVIR": fonte_porvir,
     "Instituto Votorantim": fonte_instituto_votorantim,
+    "OBMEP": fonte_obmep,
+    "OBA": fonte_oba,
+    "OBBiotec": fonte_obbiotec,
+    "Comunidade Científica Jr": fonte_comunidade_cientifica_jr,
+    "IMPA": fonte_impa,
+    "Instituto Península": fonte_instituto_peninsula,
+    "Fundação Educar DPaschoal": fonte_educar_dpaschoal,
 }
 
 # URLs das fontes-âncora (para a Camada 3 varrer links externos).
@@ -206,4 +257,11 @@ ANCORA_URLS = [
     "https://premioitauunicef.org.br/",
     "https://porvir.org/",
     "https://www.institutovotorantim.org.br/",
+    "https://www.obmep.org.br/",
+    "https://www.oba.org.br/",
+    "https://www.obbiotec.com.br/",
+    "https://comunidadecientificajr.com.br/",
+    "https://impa.br/noticias/",
+    "https://www.institutopeninsula.org.br/",
+    "https://educar.org.br/",
 ]

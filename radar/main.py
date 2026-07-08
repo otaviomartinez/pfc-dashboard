@@ -16,7 +16,7 @@ import json
 import os
 import threading
 
-from radar import dedup, descoberta
+from radar import dedup, descoberta, enriquecimento, prazos
 from radar.fontes_ancora import ANCORA_URLS, FONTES
 from radar.fontes_genericas import dominio_de, extrair_generico
 from radar.scorer import avaliar_sinal, pontuacao
@@ -31,15 +31,18 @@ CANDIDATAS_CSV = os.path.join(BASE, "fontes_candidatas.csv")
 LIMIAR_FILA = 45  # score_total mínimo para entrar na fila
 ABA = "Novidades_pendentes"
 # Mesmo cabeçalho de src/dados.py (mantido aqui para não importar Streamlit).
+# "Dias restantes" entra por ÚLTIMO para não desalinhar linhas já gravadas
+# na planilha com o cabeçalho antigo de 9 colunas.
 HEADERS = ["Data", "Fonte", "Título", "Descrição", "Score Aderência",
-           "Prazo", "Valor estimado", "Link da fonte", "Status aprovação"]
+           "Prazo", "Valor estimado", "Link da fonte", "Status aprovação",
+           "Dias restantes"]
 
 
 # --------------------------------------------------------------------------- #
 # Coleta (com isolamento por fonte)
 # --------------------------------------------------------------------------- #
 def coletar_ancoras():
-    """Roda as 18 fontes-âncora isoladas. Devolve (itens, n_ok, falhas)."""
+    """Roda as fontes-âncora isoladas. Devolve (itens, n_ok, falhas)."""
     itens, falhas, n_ok = [], {}, 0
     for nome, func in FONTES.items():
         try:
@@ -102,8 +105,12 @@ def _conectar_worksheet():
         except Exception:
             ws = sh.add_worksheet(title=ABA, rows=1000, cols=len(HEADERS))
             ws.append_row(HEADERS)
-        if not ws.row_values(1):
+        linha1 = ws.row_values(1)
+        if not linha1:
             ws.append_row(HEADERS)
+        elif "Dias restantes" not in linha1:
+            # planilha antiga (9 colunas): acrescenta a coluna nova no FIM
+            ws.update_cell(1, len(linha1) + 1, "Dias restantes")
         return ws
     except Exception as e:
         print(f"  ! Falha ao conectar no Google Sheets: {type(e).__name__}: {str(e)[:90]}")
@@ -111,11 +118,13 @@ def _conectar_worksheet():
 
 
 def _linha(op) -> list:
+    dias = op.get("dias_restantes")
     return [
         op.get("data_encontrada", datetime.date.today().isoformat()),
         op.get("fonte", ""), op.get("titulo", ""), op.get("descricao", ""),
         op.get("score_aderencia", ""), op.get("prazo", ""),
         op.get("valor_estimado", ""), op.get("url", ""), "Pendente de revisão",
+        dias if isinstance(dias, int) else "",
     ]
 
 
@@ -173,6 +182,14 @@ def executar():
         else:
             descartados.append((op, motivo))
 
+    # Prazo real (data-limite) extraído do texto da listagem, quando houver.
+    for op in com_sinal:
+        iso = prazos.extrair_prazo(
+            f"{op.get('titulo', '')} {op.get('descricao', '')} {op.get('prazo', '')}")
+        if iso:
+            op["prazo"] = iso
+            op["dias_restantes"] = prazos.dias_restantes(iso)
+
     # Pontuação + separação (só o que passou no filtro de sinal).
     fila, filtradas = [], []
     for op in com_sinal:
@@ -184,6 +201,14 @@ def executar():
     ws = _conectar_worksheet()
     existentes = _existentes_da_planilha(ws) if ws else []
     unicas, n_dups = dedup.deduplicar(fila, existentes)
+
+    # Enriquecimento: visita a página do edital só de quem VAI para a fila
+    # (maiores scores primeiro, com teto de requests) e re-pontua, porque
+    # prazo/valor/descrição novos mudam acionabilidade e fit de valor.
+    stats_enr = enriquecimento.enriquecer_lote(unicas)
+    for op in unicas:
+        op.update(pontuacao(op))
+    unicas.sort(key=lambda o: o["score_total"], reverse=True)
 
     # Gravação (Sheets ou preview local).
     destino = "Google Sheets (Novidades_pendentes)"
@@ -212,16 +237,25 @@ def executar():
     t_desc.join(timeout=90)
 
     _resumo(ancora_ok, generica_ok, brutos, com_sinal, descartados, unicas, filtradas,
-            {**ancora_falhas, **generica_falhas}, resultado_desc["n"], destino)
+            {**ancora_falhas, **generica_falhas}, resultado_desc["n"], destino, stats_enr)
 
 
 def _resumo(ancora_ok, generica_ok, brutos, com_sinal, descartados, unicas, filtradas,
-            falhas, n_cand, destino):
+            falhas, n_cand, destino, stats_enr):
+    n_com_prazo = sum(1 for o in unicas if isinstance(o.get("dias_restantes"), int))
+    n_vencidas = sum(1 for o in unicas
+                     if isinstance(o.get("dias_restantes"), int) and o["dias_restantes"] < 0)
     print("\n---------------- RESUMO ----------------")
     print(f"{ancora_ok} fontes-âncora + {generica_ok} fontes genéricas varridas")
     print(f"{len(brutos)} itens extraídos · {len(com_sinal)} com sinal de oportunidade · "
           f"{len(descartados)} descartados sem sinal")
     print(f"{len(unicas)} na fila (score >= {LIMIAR_FILA}) · {len(filtradas)} filtradas (score baixo)")
+    print(f"Prazos: {n_com_prazo} itens da fila com data-limite detectada"
+          + (f" ({n_vencidas} vencida(s))" if n_vencidas else ""))
+    print(f"Enriquecimento: {stats_enr['tentadas']} páginas visitadas · "
+          f"{stats_enr['enriquecidas']} fichas melhoradas · "
+          f"{stats_enr['com_prazo']} ganharam prazo · "
+          f"{stats_enr['com_valor']} ganharam valor")
     print(f"Destino da fila: {destino}")
     print(f"{n_cand} novas fontes candidatas descobertas -> "
           f"{os.path.basename(CANDIDATAS_CSV)}")

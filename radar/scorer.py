@@ -56,6 +56,8 @@ FONTES_CONTEXTO_EDITAL = {
     "FAPESP", "CNPq", "Finep", "Fundação Banco do Brasil",
     "Itaú Social", "Instituto Unibanco",
     "FEBRACE", "Prêmio Itaú-Unicef", "PORVIR",
+    # olimpíadas científicas p/ 6º ano-EM de escola pública = núcleo do PFC
+    "OBMEP", "OBA", "OBBiotec", "Comunidade Científica Jr",
 }
 
 # Títulos genéricos/administrativos descartados sempre (camada extra de segurança).
@@ -183,7 +185,20 @@ def _score_regiao(texto: str):
 
 def _score_acionabilidade(op: dict):
     score, notas = 40, []
-    if op.get("prazo", "").strip():
+    dias = op.get("dias_restantes")
+    if isinstance(dias, int):
+        # prazo REAL extraído (radar/prazos.py): urgência conta a favor,
+        # prazo vencido derruba (oportunidade perdida).
+        if dias < 0:
+            score -= 30
+            notas.append(f"VENCIDA (prazo há {-dias}d)")
+        elif dias <= 30:
+            score += 40
+            notas.append(f"prazo em {dias}d — agir agora")
+        else:
+            score += 30
+            notas.append(f"prazo em {dias}d")
+    elif str(op.get("prazo", "")).strip():
         score += 30
         notas.append("tem prazo")
     if str(op.get("url", "")).startswith("http"):
@@ -191,7 +206,7 @@ def _score_acionabilidade(op: dict):
         notas.append("link direto")
     if len(op.get("descricao", "")) > 60:
         score += 5
-    return min(100, score), "; ".join(notas) or "pouca informação de contato"
+    return max(0, min(100, score)), "; ".join(notas) or "pouca informação de contato"
 
 
 def pontuacao(op: dict) -> dict:
