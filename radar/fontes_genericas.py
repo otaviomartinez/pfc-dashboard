@@ -97,23 +97,52 @@ def _descricao_do_bloco(bloco, titulo) -> str:
 
 
 # Seletores comuns em sites institucionais (WordPress, Drupal, Elementor…).
+# Obs.: li[class*=item] fica de fora de propósito (casa "menu-item"), e os li
+# de card/post levam :not([class*=menu]) porque o WordPress usa classes como
+# "menu-item-type-post_type" em navegação.
 _SELETORES_GENERICOS = [
     "article", "li[class*=edital]", "div[class*=edital]", "div[class*=chamada]",
-    "div[class*=card]", "div[class*=noticia]", "div[class*=post]",
-    ".views-row", ".elementor-post", "li.item", "div.item",
+    "li[class*=chamada]", "div[class*=card]", "li[class*=card]:not([class*=menu])",
+    "div[class*=noticia]", "li[class*=noticia]", "div[class*=post]",
+    "li[class*=post]:not([class*=menu])", "div[class*=oportunidade]",
+    "li[class*=oportunidade]", ".views-row", ".elementor-post",
+    "li.item", "div.item", "h2 a[href]", "h3 a[href]",
 ]
 
+_MAX_BLOCOS = 120  # teto de blocos agregados por página (evita páginas gigantes)
 
-def coletar_blocos(soup, seletores) -> list:
-    """Primeiro conjunto de blocos não-vazio entre os seletores fornecidos."""
+
+def coletar_blocos(soup, seletores, agregar: bool = False) -> list:
+    """Blocos candidatos a item de listagem.
+
+    agregar=False (Camada 1): devolve o PRIMEIRO conjunto não-vazio entre os
+    seletores dedicados — comportamento conservador original.
+    agregar=True (Camada 2): UNE os blocos de todos os seletores (sem repetir
+    elemento), cobrindo layouts mistos; o ruído extra é barrado adiante pelo
+    filtro de sinal do scorer.
+    """
+    if not agregar:
+        for sel in seletores:
+            try:
+                blocos = soup.select(sel)
+            except Exception:
+                blocos = []
+            if len(blocos) >= 2:
+                return blocos
+        return []
+    achados, vistos = [], set()
     for sel in seletores:
         try:
             blocos = soup.select(sel)
         except Exception:
             blocos = []
-        if len(blocos) >= 2:
-            return blocos
-    return []
+        for b in blocos:
+            if id(b) not in vistos:
+                vistos.add(id(b))
+                achados.append(b)
+        if len(achados) >= _MAX_BLOCOS:
+            break
+    return achados if len(achados) >= 2 else []
 
 
 def extrair_de_soup(soup, base_url, fonte, seletores=None, limite=30,
@@ -126,7 +155,9 @@ def extrair_de_soup(soup, base_url, fonte, seletores=None, limite=30,
     if soup is None:
         return []
     seletores = seletores or _SELETORES_GENERICOS
-    blocos = coletar_blocos(soup, seletores)
+    # Camada 2 (permitir_fallback=True) agrega blocos de TODOS os seletores;
+    # Camada 1 mantém o primeiro-que-casar (extração dedicada conservadora).
+    blocos = coletar_blocos(soup, seletores, agregar=permitir_fallback)
     itens, vistos = [], set()
 
     if not blocos and not permitir_fallback:

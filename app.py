@@ -20,6 +20,7 @@ from urllib.parse import quote_plus
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
+import streamlit.components.v2 as components_v2
 
 from src import dados
 from src.dados import (
@@ -84,7 +85,7 @@ CSS = """
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 :root{
   /* superfícies neutras — o contraste vem do espaço, não da cor */
-  --bg:#0A0C0F; --surface:#141820; --surface-2:#1B202A; --surface-3:#232A35; --raise:#1B202A;
+  --bg:#080B14; --surface:#141820; --surface-2:#1B202A; --surface-3:#232A35; --raise:#1B202A;
   --glass:rgba(20,24,32,.60);
   --line:rgba(255,255,255,.05); --line-2:rgba(255,255,255,.10); --line-3:rgba(255,255,255,.20);
   --text:#E9EBEE; --text-2:#C2C7CE; --muted:#828A94; --dim:#565E68; --white:#FFFFFF;
@@ -93,7 +94,12 @@ CSS = """
   --green:#5FB137; --green-2:#9FD27F; --green-soft:rgba(95,177,55,.12);
   --blue:#5B9BD5; --blue-2:#8FBDE6; --blue-soft:rgba(91,155,213,.12);
   --red:#E2574A; --red-2:#EE8076; --red-soft:rgba(226,87,74,.12);
-  --r:10px; --r-lg:14px;
+  /* acentos de marca (KPIs e destaques "de grife") */
+  --acc-white:#FFFFFF; --acc-orange:#F2911E; --acc-blue:#3B8BD0; --acc-green:#5FB137;
+  --acc-orange-soft:rgba(242,145,30,.14); --acc-blue-soft:rgba(59,139,208,.14); --acc-green-soft:rgba(95,177,55,.14);
+  /* escala de espaçamento e raios */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px;
+  --r-sm:8px; --r:10px; --r-lg:14px; --r-xl:18px;
   --sh-1:0 1px 2px rgba(0,0,0,.16); --sh-2:0 24px 70px rgba(0,0,0,.50);
   --ease:cubic-bezier(.22,.61,.36,1);
   --disp:'Space Grotesk',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif;
@@ -101,7 +107,10 @@ CSS = """
 html, body, [class*="css"]{font-family:var(--body);line-height:1.6;}
 .stApp{
   background:var(--bg);
-  background-image:radial-gradient(900px 520px at 85% -15%, rgba(255,255,255,.022), transparent 62%);
+  background-image:
+    radial-gradient(1000px 560px at 82% -12%, rgba(59,139,208,.055), transparent 62%),
+    radial-gradient(760px 440px at 10% 110%, rgba(242,145,30,.03), transparent 65%),
+    radial-gradient(900px 520px at 50% -20%, rgba(255,255,255,.02), transparent 60%);
 }
 /* Neutraliza a barra fixa do Streamlit (que sobrepunha/cortava a logo) */
 [data-testid="stHeader"]{display:none;height:0;}
@@ -310,7 +319,12 @@ div[data-baseweb="select"]>div:focus-within{border-color:var(--blue)!important;}
 
 /* ============ fundo cósmico + superfícies táteis ============ */
 .stApp,[data-testid="stAppViewContainer"],[data-testid="stMain"],section.main,[data-testid="stHeader"]{background:transparent!important}
-body{background:#0A0C0F}
+body{background:#080B14;
+  background-image:
+    radial-gradient(1000px 560px at 82% -12%, rgba(59,139,208,.055), transparent 62%),
+    radial-gradient(760px 440px at 10% 110%, rgba(242,145,30,.03), transparent 65%),
+    radial-gradient(900px 520px at 50% -20%, rgba(255,255,255,.02), transparent 60%);
+  background-attachment:fixed}
 #pfc-cosmos-layer{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
 #pfc-stars{position:absolute;inset:0}
 .pfc-nebula{position:absolute;inset:-12%;
@@ -351,6 +365,40 @@ body{background:#0A0C0F}
 .vbadge2{font-size:11px;font-weight:600;padding:2px 9px;border-radius:7px;border:1px solid transparent;white-space:nowrap}
 .vb-nao{background:var(--red-soft);color:var(--red-2);border-color:rgba(226,87,74,.25)}
 .vb-pend{background:var(--orange-soft);color:var(--orange-2);border-color:rgba(232,154,60,.25)}
+
+/* ============ Visão Geral · widgets nativos estilizados via st-key ============ */
+/* alerta de prazos: faixa âmbar com acento à esquerda */
+.st-key-alerta_prazos button{width:100%;justify-content:flex-start;text-align:left;
+  background:linear-gradient(90deg,rgba(242,145,30,.10),rgba(242,145,30,.015) 70%);
+  border:1px solid rgba(242,145,30,.30);border-left:3px solid var(--acc-orange);
+  color:var(--orange-2);font-weight:600;font-size:13px;border-radius:var(--r-lg);padding:11px 16px}
+.st-key-alerta_prazos button:hover{border-color:rgba(242,145,30,.55);border-left-color:var(--acc-orange);
+  background:linear-gradient(90deg,rgba(242,145,30,.16),rgba(242,145,30,.03) 70%);color:#FFD9A8;transform:none}
+/* ações sob os KPIs: links fantasmas, discretos */
+[class*="st-key-kpi_"] button{width:100%;border:1px solid var(--line);background:rgba(255,255,255,.014);
+  color:var(--dim);font-size:12px;font-weight:500;padding:7px 12px;border-radius:var(--r)}
+[class*="st-key-kpi_"] button:hover{color:var(--text);border-color:var(--line-3);
+  background:rgba(255,255,255,.05);transform:translateY(-1px)}
+/* chips das etapas do funil: pílulas com ponto colorido por status */
+[class*="st-key-seg_"] button{border-radius:999px;font-size:11.5px;font-weight:500;color:var(--muted);
+  border:1px solid var(--line);background:rgba(255,255,255,.014);padding:6px 6px;white-space:nowrap;min-height:0}
+[class*="st-key-seg_"] button p{white-space:nowrap;font-size:11.5px}
+[class*="st-key-seg_"] button::before{content:"";width:7px;height:7px;border-radius:50%;
+  background:var(--dot,#4A515A);display:inline-block;margin-right:7px;flex:none}
+[class*="st-key-seg_"] button:hover{color:var(--white);border-color:var(--line-3);
+  background:rgba(255,255,255,.05);transform:translateY(-1px)}
+.st-key-seg_Mapear button{--dot:#4A515A} .st-key-seg_Prospectar button{--dot:#6E7681}
+.st-key-seg_Monitorar button{--dot:#939BA5} .st-key-seg_Edital button{--dot:#E89A3C}
+.st-key-seg_Ativo button{--dot:#5FB137}
+/* botões de município: pílulas com hover azul */
+[class*="st-key-cid_"] button{border-radius:999px;font-size:12.5px;font-weight:500;color:var(--text-2);
+  border:1px solid var(--line-2);background:rgba(255,255,255,.014);padding:8px 12px}
+[class*="st-key-cid_"] button:hover{color:var(--white);border-color:rgba(59,139,208,.5);
+  background:var(--acc-blue-soft);transform:translateY(-1px);box-shadow:0 0 18px rgba(59,139,208,.10)}
+/* select do filtro de cobertura: pílula compacta */
+.st-key-filtro_cobertura div[data-baseweb="select"]>div{border-radius:999px!important;
+  background:rgba(255,255,255,.02)!important;border-color:var(--line-2)!important}
+.st-key-filtro_cobertura div[data-baseweb="select"]>div:hover{border-color:var(--line-3)!important}
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -1084,6 +1132,234 @@ def mostrar_dossie(org: dict):
 
 
 # =========================================================================== #
+# COMPONENTES v2 · VISÃO GERAL
+# ---------------------------------------------------------------------------
+# st.components.v2 monta o HTML direto no DOM do app (shadow root, sem
+# iframe): altura automática (height="content"), sem corte nem scroll
+# interno. As fontes (Space Grotesk/Inter) são herdadas do documento e as
+# cores de texto usam var(--st-text-color) com fallback para o token local.
+# Só visuais nesta rodada — os cliques continuam nos widgets nativos.
+# =========================================================================== #
+_KPI_V2_CSS = """
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
+@media (max-width:900px){.kpi-grid{grid-template-columns:1fr 1fr}}
+.kpi-card{position:relative;overflow:hidden;border-radius:14px;padding:20px 20px 18px;
+  background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.008) 60%),#0D1119;
+  border:1px solid rgba(255,255,255,.07);opacity:0;transform:translateY(10px);
+  transition:transform .3s cubic-bezier(.22,.61,.36,1),border-color .3s,box-shadow .3s,opacity .45s ease}
+.kpi-card.in{opacity:1;transform:none}
+.kpi-card::before{content:"";position:absolute;left:0;right:0;top:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--acc),transparent);opacity:.28;transition:opacity .3s}
+.kpi-card:hover{transform:translateY(-3px);
+  border-color:rgba(255,255,255,.18);
+  border-color:color-mix(in srgb,var(--acc) 38%,rgba(255,255,255,.12));
+  box-shadow:0 12px 34px rgba(0,0,0,.45),0 0 0 1px var(--glow),0 0 30px var(--glow)}
+.kpi-card:hover::before{opacity:.85}
+.kpi-top{display:flex;align-items:center;gap:8px}
+.kpi-ic{font-size:13px;line-height:1;opacity:.95}
+.kpi-lab{font-family:'Inter',system-ui,sans-serif;font-size:10.5px;font-weight:600;
+  letter-spacing:.12em;text-transform:uppercase;color:#828A94;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.kpi-val{font-family:'Space Grotesk',system-ui,sans-serif;font-weight:600;font-size:37px;
+  letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums;
+  color:var(--acc);margin:15px 0 7px}
+.kpi-foot{font-family:'Inter',system-ui,sans-serif;font-size:12px;color:#565E68}
+.kpi-foot b{color:#C2C7CE;font-weight:600}
+"""
+
+_KPI_V2_JS = """
+export default function(component){
+  const {data, parentElement} = component;
+  const old = parentElement.querySelector('.kpi-grid'); if (old) old.remove();
+  const grid = document.createElement('div'); grid.className = 'kpi-grid';
+  const items = (data && data.items) || [];
+  items.forEach(function(k, i){
+    const card = document.createElement('div'); card.className = 'kpi-card';
+    card.style.setProperty('--acc', k.accent);
+    card.style.setProperty('--glow', k.glow);
+    card.innerHTML =
+      '<div class="kpi-top"><span class="kpi-ic">' + k.icon + '</span>' +
+      '<span class="kpi-lab" title="' + k.label + '">' + k.label + '</span></div>' +
+      '<div class="kpi-val">' + k.value + '</div>' +
+      '<div class="kpi-foot">' + k.foot + '</div>';
+    grid.appendChild(card);
+    setTimeout(function(){ card.classList.add('in'); }, 60 + i * 90);
+    if (Number.isFinite(k.num)) {           // count-up só para valores inteiros
+      const el = card.querySelector('.kpi-val');
+      const t0 = performance.now(), dur = 950;
+      (function step(){
+        const p = Math.min(1, (performance.now() - t0) / dur);
+        const e = 1 - Math.pow(1 - p, 3);
+        el.textContent = String(Math.round(k.num * e));
+        if (p < 1) { requestAnimationFrame(step); }
+      })();
+    }
+  });
+  parentElement.appendChild(grid);
+  return function(){ grid.remove(); };
+}
+"""
+
+_FUNIL_V2_CSS = """
+.fb-card{background:rgba(13,17,25,.62);border:1px solid rgba(255,255,255,.06);border-radius:16px;
+  overflow:hidden;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  box-shadow:0 1px 2px rgba(0,0,0,.16),inset 0 0 0 1px rgba(255,255,255,.018)}
+.fb-h{padding:18px 22px 14px;border-bottom:1px solid rgba(255,255,255,.05)}
+.fb-h h2{font-family:'Space Grotesk',system-ui,sans-serif;font-weight:600;font-size:15.5px;
+  margin:0;color:var(--st-text-color,#E9EBEE)}
+.fb-h .cap{font-family:'Inter',system-ui,sans-serif;font-size:12px;color:#565E68;margin-top:3px}
+.fb-body{padding:20px 22px 22px;display:flex;flex-direction:column;gap:15px}
+.fb-row{display:grid;grid-template-columns:100px 1fr 92px;align-items:center;gap:12px;
+  font-family:'Inter',system-ui,sans-serif}
+.fb-name{font-size:12.5px;font-weight:500;color:#C2C7CE;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.fb-dot{width:8px;height:8px;border-radius:3px;flex:none;background:var(--c)}
+.fb-track{position:relative;height:9px;border-radius:6px;background:rgba(255,255,255,.045);
+  overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.03)}
+.fb-fill{position:absolute;top:0;bottom:0;left:0;width:0;border-radius:6px;background:var(--c);
+  transition:width 1s cubic-bezier(.22,.61,.36,1)}
+.fb-fill::after{content:"";position:absolute;inset:0;border-radius:6px;
+  background:linear-gradient(90deg,transparent 38%,rgba(255,255,255,.25) 50%,transparent 62%);
+  background-size:220% 100%;background-position:180% 0;
+  animation:fb-shine 2.4s ease-in-out 1.15s 2}
+@keyframes fb-shine{to{background-position:-80% 0}}
+.fb-num{text-align:right;font-size:12px;color:#565E68;white-space:nowrap}
+.fb-num b{font-family:'Space Grotesk',system-ui,sans-serif;font-weight:600;font-size:14px;
+  color:var(--st-text-color,#E9EBEE);font-variant-numeric:tabular-nums}
+"""
+
+_FUNIL_V2_JS = """
+export default function(component){
+  const {data, parentElement} = component;
+  const old = parentElement.querySelector('.fb-card'); if (old) old.remove();
+  const d = data || {}, rows = d.rows || [];
+  const card = document.createElement('div'); card.className = 'fb-card';
+  let body = '';
+  rows.forEach(function(r){
+    body += '<div class="fb-row" style="--c:' + r.cor + '">' +
+      '<span class="fb-name"><span class="fb-dot"></span>' + r.status + '</span>' +
+      '<span class="fb-track"><span class="fb-fill" data-w="' + r.pct + '"></span></span>' +
+      '<span class="fb-num"><b>' + r.n + '</b> · ' + r.pct_lab + '%</span></div>';
+  });
+  card.innerHTML = '<div class="fb-h"><h2>' + d.titulo + '</h2>' +
+    '<div class="cap">' + d.cap + '</div></div>' +
+    '<div class="fb-body">' + body + '</div>';
+  parentElement.appendChild(card);
+  const fills = card.querySelectorAll('.fb-fill');
+  requestAnimationFrame(function(){ requestAnimationFrame(function(){
+    fills.forEach(function(f, i){
+      f.style.transitionDelay = (i * 110) + 'ms';
+      f.style.width = f.getAttribute('data-w') + '%';
+    });
+  }); });
+  return function(){ card.remove(); };
+}
+"""
+
+_DONUT_V2_CSS = """
+.dn-card{background:rgba(13,17,25,.62);border:1px solid rgba(255,255,255,.06);border-radius:16px;
+  overflow:hidden;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  box-shadow:0 1px 2px rgba(0,0,0,.16),inset 0 0 0 1px rgba(255,255,255,.018)}
+.dn-h{padding:18px 22px 14px;border-bottom:1px solid rgba(255,255,255,.05)}
+.dn-h h2{font-family:'Space Grotesk',system-ui,sans-serif;font-weight:600;font-size:15.5px;
+  margin:0;color:var(--st-text-color,#E9EBEE)}
+.dn-h .cap{font-family:'Inter',system-ui,sans-serif;font-size:12px;color:#565E68;margin-top:3px}
+.dn-body{padding:16px 20px 20px;display:grid;place-items:center;gap:12px}
+.dn-svgwrap{display:grid;place-items:center}
+.dn-svgwrap svg .seg{transition:filter .25s ease}
+.dn-svgwrap svg .seg:hover{filter:brightness(1.3)}
+.dn-total{font-family:'Space Grotesk',system-ui,sans-serif;font-weight:600;font-variant-numeric:tabular-nums}
+.dn-leg{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:center;font-family:'Inter',system-ui,sans-serif}
+.dn-leg span{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#828A94}
+.dn-leg i{width:8px;height:8px;border-radius:3px;flex:none}
+.dn-leg b{font-family:'Space Grotesk',system-ui,sans-serif;font-weight:600;
+  color:var(--st-text-color,#E9EBEE);font-variant-numeric:tabular-nums}
+"""
+
+_DONUT_V2_JS = """
+export default function(component){
+  const {data, parentElement} = component;
+  const old = parentElement.querySelector('.dn-card'); if (old) old.remove();
+  const d = data || {}, segs = d.segs || [], total = d.total || 0;
+  const NS = 'http://www.w3.org/2000/svg';
+  const R = 72, C = 2 * Math.PI * R, GAP = segs.length > 1 ? 3 : 0;
+  const card = document.createElement('div'); card.className = 'dn-card';
+  card.innerHTML = '<div class="dn-h"><h2>' + d.titulo + '</h2>' +
+    '<div class="cap">' + d.cap + '</div></div>' +
+    '<div class="dn-body"><div class="dn-svgwrap"></div><div class="dn-leg"></div></div>';
+  parentElement.appendChild(card);
+
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 200 200');
+  svg.setAttribute('width', '212'); svg.setAttribute('height', '212');
+  const ring = document.createElementNS(NS, 'circle');
+  ring.setAttribute('cx', 100); ring.setAttribute('cy', 100); ring.setAttribute('r', R);
+  ring.setAttribute('fill', 'none'); ring.setAttribute('stroke', 'rgba(255,255,255,.05)');
+  ring.setAttribute('stroke-width', 13);
+  svg.appendChild(ring);
+
+  let start = 0;
+  const arcs = segs.map(function(s){
+    const len = Math.max(0, s.frac * C - GAP);
+    const c = document.createElementNS(NS, 'circle');
+    c.setAttribute('class', 'seg');
+    c.setAttribute('cx', 100); c.setAttribute('cy', 100); c.setAttribute('r', R);
+    c.setAttribute('fill', 'none'); c.setAttribute('stroke', s.cor);
+    c.setAttribute('stroke-width', 13);
+    c.setAttribute('stroke-dasharray', '0 ' + C);
+    c.setAttribute('stroke-dashoffset', -start);
+    c.setAttribute('transform', 'rotate(-90 100 100)');
+    const tip = document.createElementNS(NS, 'title');
+    tip.textContent = s.label + ' \\u00b7 ' + s.n;
+    c.appendChild(tip);
+    svg.appendChild(c);
+    const arc = { el: c, start: start, len: len };
+    start += s.frac * C;
+    return arc;
+  });
+
+  const num = document.createElementNS(NS, 'text');
+  num.setAttribute('x', 100); num.setAttribute('y', 96);
+  num.setAttribute('text-anchor', 'middle'); num.setAttribute('dominant-baseline', 'central');
+  num.setAttribute('font-size', 44); num.setAttribute('fill', '#FFFFFF');
+  num.setAttribute('class', 'dn-total'); num.textContent = '0';
+  svg.appendChild(num);
+  const sub = document.createElementNS(NS, 'text');
+  sub.setAttribute('x', 100); sub.setAttribute('y', 126);
+  sub.setAttribute('text-anchor', 'middle');
+  sub.setAttribute('font-size', 11); sub.setAttribute('fill', '#828A94');
+  sub.setAttribute('font-family', 'Inter, system-ui, sans-serif');
+  sub.textContent = d.sub || '';
+  svg.appendChild(sub);
+  card.querySelector('.dn-svgwrap').appendChild(svg);
+
+  const leg = card.querySelector('.dn-leg');
+  segs.forEach(function(s){
+    const item = document.createElement('span');
+    item.innerHTML = '<i style="background:' + s.cor + '"></i>' + s.label + ' <b>' + s.n + '</b>';
+    leg.appendChild(item);
+  });
+
+  const t0 = performance.now(), dur = 1000;   // desenho sequencial dos arcos
+  (function step(){
+    const p = Math.min(1, (performance.now() - t0) / dur);
+    const e = 1 - Math.pow(1 - p, 3);
+    arcs.forEach(function(a){
+      const vis = Math.max(0, Math.min(a.len, e * C - a.start));
+      a.el.setAttribute('stroke-dasharray', vis + ' ' + (C - vis));
+    });
+    num.textContent = String(Math.round(total * e));
+    if (p < 1) { requestAnimationFrame(step); }
+  })();
+  return function(){ card.remove(); };
+}
+"""
+
+_kpis_v2 = components_v2.component("pfc_kpis", css=_KPI_V2_CSS, js=_KPI_V2_JS)
+_funil_v2 = components_v2.component("pfc_funil_barras", css=_FUNIL_V2_CSS, js=_FUNIL_V2_JS)
+_donut_v2 = components_v2.component("pfc_donut", css=_DONUT_V2_CSS, js=_DONUT_V2_JS)
+
+
+# =========================================================================== #
 # PÁGINA · VISÃO GERAL
 # =========================================================================== #
 def page_visao():
@@ -1117,24 +1393,28 @@ def page_visao():
     valor_total = float(df[COL_VALVO].sum()) if TOTAL else 0.0
     n_verif = int(df[COL_VERIF].apply(verificada_ok).sum()) if TOTAL else 0
 
-    kpis = [
-        ("📚", "Organizações mapeadas", str(TOTAL),
-         f"<b>{n_verif}</b> de {TOTAL} fontes verificadas", "Ver breakdown", "breakdown"),
-        ("📈", "Em prospecção ativa", str(n_prospectar),
-         f"<b>{n_monitorar}</b> monitorando · <b>{n_edital}</b> em edital", "Listar prospecção", "prospeccao"),
-        ("💰", "Valor-alvo potencial", brl_curto(valor_total),
-         "soma do pipeline de captação", "Top 10 por valor", "valor"),
-        ("⚡", "Oportunidades hoje", "4",
-         "novas · aguardando revisão", "Abrir Radar", "radar"),
+    # KPIs em Custom Component v2 (visual); as ações continuam nos botões nativos.
+    kpi_cards = [
+        {"icon": "📚", "label": "Organizações mapeadas", "value": str(TOTAL), "num": TOTAL,
+         "foot": f"<b>{n_verif}</b> de {TOTAL} fontes verificadas",
+         "accent": "#FFFFFF", "glow": "rgba(255,255,255,.10)"},
+        {"icon": "📈", "label": "Em prospecção ativa", "value": str(n_prospectar), "num": n_prospectar,
+         "foot": f"<b>{n_monitorar}</b> monitorando · <b>{n_edital}</b> em edital",
+         "accent": "#F2911E", "glow": "rgba(242,145,30,.16)"},
+        {"icon": "💰", "label": "Valor-alvo potencial", "value": brl_curto(valor_total), "num": None,
+         "foot": "soma do pipeline de captação",
+         "accent": "#3B8BD0", "glow": "rgba(59,139,208,.16)"},
+        {"icon": "⚡", "label": "Oportunidades hoje", "value": "4", "num": 4,
+         "foot": "novas · aguardando revisão",
+         "accent": "#5FB137", "glow": "rgba(95,177,55,.16)"},
     ]
+    _kpis_v2(data={"items": kpi_cards}, key="kpis_visao")
+
+    acoes = [("Ver breakdown", "breakdown"), ("Listar prospecção", "prospeccao"),
+             ("Top 10 por valor", "valor"), ("Abrir Radar", "radar")]
     cols = st.columns(4)
-    for col, (icon, name, val, foot, btn_lab, acao) in zip(cols, kpis):
+    for col, (btn_lab, acao) in zip(cols, acoes):
         with col:
-            st.markdown(
-                f'<div class="kpi"><div class="lab"><span class="ic">{icon}</span> {name}</div>'
-                f'<div class="val">{val}</div><div class="foot">{foot}</div></div>',
-                unsafe_allow_html=True,
-            )
             if st.button(btn_lab, key=f"kpi_{acao}", use_container_width=True):
                 if acao == "breakdown":
                     dlg_breakdown()
@@ -1149,51 +1429,33 @@ def page_visao():
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
     esq, dir_ = st.columns([1.15, 1])
 
-    # ---- Funil clicável + distribuição em gráfico ----
+    # ---- Funil por etapa: barras animadas (componente v2) + chips clicáveis ----
     with esq:
-        cores_funil = {s: CORES_STATUS[s] for s in STATUS_FUNIL}
-        segs, legs = "", ""
+        fun_rows = []
         for s in STATUS_FUNIL:
             n = int(cont.get(s, 0))
-            if TOTAL > 0 and n > 0:
-                segs += f'<i style="width:{n / TOTAL * 100:.2f}%;background:{cores_funil[s]}" title="{s} · {n}"></i>'
-            legs += (f'<span><span class="sw" style="background:{cores_funil[s]}"></span>{s} <b>{n}</b></span>')
-        st.markdown(
-            f'<div class="card"><div class="card-h"><div><h2>Distribuição do funil</h2>'
-            f'<div class="cap">clique numa etapa para ver as organizações</div></div></div>'
-            f'<div class="pad"><div class="funil">{segs}</div><div class="fleg">{legs}</div></div></div>',
-            unsafe_allow_html=True,
-        )
+            pct = (n / TOTAL * 100) if TOTAL else 0.0
+            fun_rows.append({"status": s, "n": n, "pct": round(pct, 1),
+                             "pct_lab": f"{pct:.0f}", "cor": CORES_STATUS[s]})
+        _funil_v2(data={"titulo": "Distribuição do funil",
+                        "cap": "barras por etapa · clique num chip para ver as organizações",
+                        "rows": fun_rows}, key="funil_visao")
         chip_cols = st.columns(len(STATUS_FUNIL))
         for j, s in enumerate(STATUS_FUNIL):
             n = int(cont.get(s, 0))
             if chip_cols[j].button(f"{s} · {n}", key=f"seg_{s}", use_container_width=True):
                 dlg_status_list(s)
 
-    # ---- Distribuição (Plotly donut) ----
+    # ---- Donut de status: SVG clean com total no centro (componente v2) ----
     with dir_:
-        st.markdown(
-            '<div class="card"><div class="card-h"><div><h2>Pipeline por status</h2>'
-            '<div class="cap">distribuição das organizações</div></div></div>'
-            '<div class="pad" id="pie-pad"></div></div>',
-            unsafe_allow_html=True,
-        )
-        if PLOTLY_OK and TOTAL:
-            labels = [s for s in STATUS_FUNIL if int(cont.get(s, 0)) > 0]
-            values = [int(cont.get(s, 0)) for s in labels]
-            fig = go.Figure(go.Pie(
-                labels=labels, values=values, hole=0.58, sort=False,
-                marker=dict(colors=[CORES_STATUS[s] for s in labels],
-                            line=dict(color="#0A0C0F", width=2)),
-                textinfo="label+value",
-                hovertemplate="<b>%{label}</b><br>%{value} orgs · %{percent}<extra></extra>",
-            ))
-            fig.add_annotation(text=f"<b>{TOTAL}</b><br>orgs", showarrow=False,
-                               font=dict(size=18, color="#F2F0E9", family="Space Grotesk"))
-            st.plotly_chart(estilo_plotly(fig, altura=300), use_container_width=True,
-                            config={"displayModeBar": False})
-        elif not PLOTLY_OK:
-            st.info("Instale o Plotly (`pip install plotly`) para ver o gráfico interativo.")
+        segs = [{"label": s, "n": int(cont.get(s, 0)),
+                 "frac": (int(cont.get(s, 0)) / TOTAL) if TOTAL else 0.0,
+                 "cor": CORES_STATUS[s]}
+                for s in STATUS_FUNIL if int(cont.get(s, 0)) > 0]
+        _donut_v2(data={"titulo": "Pipeline por status",
+                        "cap": "distribuição das organizações",
+                        "total": TOTAL, "sub": "organizações", "segs": segs},
+                  key="donut_visao")
 
     # ---- Cobertura regional interativa ----
     st.markdown(
@@ -1210,7 +1472,7 @@ def page_visao():
                "Corumbataí": "Implantação · 2024"}
     filtro = st.selectbox("Filtro de cobertura",
                           ["Apenas ativas", "Todas", "Próximas (2024)"],
-                          label_visibility="collapsed")
+                          key="filtro_cobertura", label_visibility="collapsed")
     if filtro == "Apenas ativas":
         cidades = [(c, True) for c in ATIVAS]
     elif filtro == "Próximas (2024)":
@@ -1224,7 +1486,9 @@ def page_visao():
         ccols = st.columns(n_por_linha)
         for k, (cidade, ativa) in enumerate(linha):
             rotulo = ("📍 " if ativa else "🆕 ") + cidade
-            if ccols[k].button(rotulo, key=f"cid_{cidade}", use_container_width=True):
+            # key sem espaço/acento -> classe st-key-cid_* válida p/ CSS
+            slug = re.sub(r"[^0-9A-Za-z]+", "_", cidade)
+            if ccols[k].button(rotulo, key=f"cid_{slug}", use_container_width=True):
                 dlg_cidade(cidade, ativa=ativa, evento=EVENTOS.get(cidade, "A definir"))
 
 
@@ -1700,6 +1964,123 @@ def page_metodo():
 
 
 # =========================================================================== #
+# FONTES SUGERIDAS PELO RADAR (aba Verificação)
+# ---------------------------------------------------------------------------
+# radar/avaliar_candidatas.py grava fichas em candidatas_avaliadas.csv; aqui
+# o usuário confirma com 1 clique: aprovar adiciona a URL sugerida ao
+# config_fontes.json (Camada 2 do radar) — arquivos locais, planilha intocada.
+# =========================================================================== #
+_RADAR_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "radar")
+_AVALIADAS_CSV = os.path.join(_RADAR_DIR, "candidatas_avaliadas.csv")
+_CONFIG_FONTES = os.path.join(_RADAR_DIR, "config_fontes.json")
+
+
+def _ler_candidatas_avaliadas() -> pd.DataFrame:
+    try:
+        return pd.read_csv(_AVALIADAS_CSV, dtype=str).fillna("")
+    except Exception:
+        return pd.DataFrame()
+
+
+def _atualizar_status_candidata(dominio: str, novo_status: str) -> bool:
+    try:
+        df_c = pd.read_csv(_AVALIADAS_CSV, dtype=str).fillna("")
+        df_c.loc[df_c["dominio"] == dominio, "status"] = novo_status
+        df_c.to_csv(_AVALIADAS_CSV, index=False, encoding="utf-8")
+        return True
+    except Exception:
+        return False
+
+
+def _aprovar_fonte_no_config(nome: str, url: str) -> bool:
+    """Acrescenta a fonte ao config_fontes.json (Camada 2), sem duplicar URL."""
+    try:
+        try:
+            with open(_CONFIG_FONTES, encoding="utf-8") as f:
+                cfg = json.load(f)
+        except Exception:
+            cfg = []
+        if not isinstance(cfg, list):
+            cfg = []
+        urls = {str(e.get("url", "")).rstrip("/") for e in cfg}
+        if url.rstrip("/") not in urls:
+            cfg.append({"nome": nome, "url": url,
+                        "categoria": "radar-sugerida", "ativo": True})
+            with open(_CONFIG_FONTES, "w", encoding="utf-8") as f:
+                json.dump(cfg, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception:
+        return False
+
+
+def _secao_fontes_sugeridas():
+    df_c = _ler_candidatas_avaliadas()
+    if df_c.empty or "status" not in df_c.columns:
+        return
+    pend = df_c[df_c["status"] == "pendente"].copy()
+    pend["aderencia_n"] = pd.to_numeric(pend.get("aderencia"), errors="coerce").fillna(0)
+    sug = pend[pend["veredito"].isin(["recomendada", "talvez"])]
+    sug = sug.sort_values(["veredito", "aderencia_n"], ascending=[True, False])
+
+    st.markdown(
+        '<div class="phead" style="margin-top:18px"><h2 style="font-size:18px">'
+        '📡 Novas fontes sugeridas pelo radar</h2>'
+        '<p>o radar descobre e avalia; você só confirma — aprovar liga a fonte na Camada 2</p></div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f'<span class="pill {"ok" if len(sug) else "local"}" style="margin-bottom:10px">'
+        f'{len(sug)} fonte(s) sugerida(s) aguardando sua confirmação</span>',
+        unsafe_allow_html=True,
+    )
+    if sug.empty:
+        st.caption("Nenhuma sugestão pendente. Rode `python -m radar.avaliar_candidatas` "
+                   "após uma varredura do radar para gerar novas fichas.")
+        return
+
+    for _, r in sug.iterrows():
+        dom = str(r["dominio"])
+        slug = re.sub(r"[^0-9A-Za-z]+", "_", dom)
+        verd = str(r["veredito"])
+        v_cls, v_txt = (("vb-ok", "recomendada") if verd == "recomendada"
+                        else ("vb-no", "talvez"))
+        editais_txt = ("✓ parece listar editais" if str(r["tem_editais"]) == "True"
+                       else "sem seção de editais aparente")
+        st.markdown(
+            f'<div class="lead" style="margin-bottom:8px"><div class="lead-top">'
+            f'<span class="src">{esc(dom)}</span>'
+            f'<span class="vbadge {v_cls}">{v_txt}</span></div>'
+            f'<div class="ttl">{texto_ou(r["nome"], dom)}</div>'
+            f'<div class="meta">aderência <b>{int(float(r["aderencia_n"]))}</b> · '
+            f'{esc(editais_txt)} · <b>{esc(r["mencoes"])}</b> menção(ões) · '
+            f'<a href="{esc(r["url_sugerida"])}" target="_blank" rel="noopener" '
+            f'style="color:var(--blue-2);text-decoration:none">abrir página sugerida ↗</a>'
+            f'</div></div>',
+            unsafe_allow_html=True,
+        )
+        b1, b2, _sp = st.columns([1.4, 1, 2.6])
+        with b1:
+            if st.button("✓ Aprovar como fonte", key=f"fnt_ok_{slug}", type="primary"):
+                ok = (_aprovar_fonte_no_config(str(r["nome"]) or dom, str(r["url_sugerida"]))
+                      and _atualizar_status_candidata(dom, "aprovada"))
+                st.toast("Fonte adicionada à Camada 2 do radar." if ok
+                         else "Não consegui gravar — veja os arquivos do radar.",
+                         icon="✅" if ok else "⚠️")
+                st.rerun()
+        with b2:
+            if st.button("✗ Descartar", key=f"fnt_no_{slug}"):
+                ok = _atualizar_status_candidata(dom, "descartada")
+                st.toast("Sugestão descartada." if ok else "Não consegui gravar.",
+                         icon="🗑️" if ok else "⚠️")
+                st.rerun()
+
+    n_desc = int((pend["veredito"] == "descartar").sum())
+    if n_desc:
+        st.caption(f"➕ {n_desc} candidata(s) com veredito automático “descartar” "
+                   "(baixa aderência e sem editais) ficam fora desta lista.")
+
+
+# =========================================================================== #
 # PÁGINA · VERIFICAÇÃO (saneamento da base)
 # =========================================================================== #
 def page_verificacao():
@@ -1725,6 +2106,7 @@ def page_verificacao():
            if TOTAL else df.iloc[0:0])
     if nao.empty:
         st.success("🎉 Todas as fontes da base estão verificadas. Nada a sanear!")
+        _secao_fontes_sugeridas()
         return
 
     st.session_state.setdefault("verif_n", 10)
@@ -1778,6 +2160,8 @@ def page_verificacao():
                      key="verif_more", use_container_width=True):
             st.session_state["verif_n"] += 10
             st.rerun()
+
+    _secao_fontes_sugeridas()
 
 
 # =========================================================================== #
