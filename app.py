@@ -1077,364 +1077,535 @@ def mostrar_dossie(org: dict):
 
 
 # =========================================================================== #
-# COMPONENTES v2 · VISÃO GERAL
+# VISÃO GERAL · maquete pfc_app_v3 (Custom Component v2 bidirecional)
 # ---------------------------------------------------------------------------
-# st.components.v2 monta o HTML direto no DOM do app (shadow root, sem
-# iframe): altura automática (height="content"), sem corte nem scroll
-# interno. As fontes (Space Grotesk/Inter) são herdadas do documento e as
-# cores de texto usam var(--st-text-color) com fallback para o token local.
-# Só visuais nesta rodada — os cliques continuam nos widgets nativos.
+# Um único componente v2 renderiza a tela (herói + radar-scópio + glowcards +
+# legenda + painéis). Cliques viajam ao Python via setTriggerValue('acao', …)
+# e abrem dialogs/navegação reais. Montado no DOM (shadow root, sem iframe);
+# as CSS vars do tema (:root) atravessam o shadow boundary por herança.
 # =========================================================================== #
-_KPI_V2_CSS = """
-.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
-@media (max-width:900px){.kpi-grid{grid-template-columns:1fr 1fr}}
-.kpi-card{position:relative;overflow:hidden;border-radius:14px;padding:20px 20px 18px;
-  background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.008) 60%),#0D1119;
-  border:1px solid rgba(255,255,255,.07);opacity:0;transform:translateY(10px);
-  transition:transform .3s cubic-bezier(.22,.61,.36,1),border-color .3s,box-shadow .3s,opacity .45s ease}
-.kpi-card.in{opacity:1;transform:none}
-.kpi-card::before{content:"";position:absolute;left:0;right:0;top:0;height:1px;
-  background:linear-gradient(90deg,transparent,var(--acc),transparent);opacity:.28;transition:opacity .3s}
-.kpi-card:hover{transform:translateY(-3px);
-  border-color:rgba(255,255,255,.18);
-  border-color:color-mix(in srgb,var(--acc) 38%,rgba(255,255,255,.12));
-  box-shadow:0 12px 34px rgba(0,0,0,.45),0 0 0 1px var(--glow),0 0 30px var(--glow)}
-.kpi-card:hover::before{opacity:.85}
-.kpi-top{display:flex;align-items:center;gap:8px}
-.kpi-ic{font-size:13px;line-height:1;opacity:.95}
-.kpi-lab{font-family:'Inter',system-ui,sans-serif;font-size:10.5px;font-weight:600;
-  letter-spacing:.12em;text-transform:uppercase;color:#828A94;white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis}
-.kpi-val{font-family:'Space Grotesk',system-ui,sans-serif;font-weight:600;font-size:37px;
-  letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums;
-  color:var(--acc);margin:15px 0 7px}
-.kpi-foot{font-family:'Inter',system-ui,sans-serif;font-size:12px;color:#565E68}
-.kpi-foot b{color:#C2C7CE;font-weight:600}
+ATIVAS = ["Iperó", "Tatuí", "Salto", "São Roque", "Rio Claro", "Coronel Macedo", "Mirassol"]
+PROXIMAS = ["Dois Córregos", "Corumbataí"]
+EVENTOS = {"Iperó": "Feira de Ciências · ago/2026", "Tatuí": "Clube de Ciências · jul/2026",
+           "Salto": "Mostra STEM · set/2026", "São Roque": "Maratona PFC · out/2026",
+           "Rio Claro": "Olimpíada · ago/2026", "Coronel Macedo": "Visita técnica · jul/2026",
+           "Mirassol": "Roda de mentoria · set/2026", "Dois Córregos": "Implantação · 2024",
+           "Corumbataí": "Implantação · 2024"}
+
+CORES_ETAPA = {"Mapear": "var(--sem-low,#7C8698)", "Prospectar": "var(--accent,#E8873A)",
+               "Monitorar": "var(--sem-info,#5B9BD5)", "Edital": "var(--sem-mid,#E8B54A)",
+               "Ativo": "var(--sem-high,#4ADE80)"}
+
+
+def _n_fontes_radar() -> int:
+    """Fontes monitoradas: âncoras do radar + genéricas ativas do config."""
+    n = 31
+    try:
+        from radar.fontes_ancora import FONTES as _FA
+        n = len(_FA)
+    except Exception:
+        pass
+    try:
+        with open(_CONFIG_FONTES, encoding="utf-8") as f:
+            cfg = json.load(f)
+        n += sum(1 for e in cfg if isinstance(e, dict) and e.get("ativo", True)
+                 and str(e.get("url", "")).startswith("http")
+                 and "exemplo.org" not in str(e.get("url", "")))
+    except Exception:
+        pass
+    return n
+
+
+def _data_prazo(prazo):
+    """Data do prazo: primeiro ISO (AAAA-MM-DD, como o radar grava), depois
+    formatos livres via _parse_data. O ISO precisa vir ANTES porque a regex
+    dd/mm/aaaa acharia '26-07-29' dentro de '2026-07-29'."""
+    s = str(prazo or "").strip()
+    try:
+        return datetime.date.fromisoformat(s)
+    except ValueError:
+        return _parse_data(s)
+
+
+def _dias_novidade(nv: dict):
+    """Dias restantes da novidade, SEMPRE recalculado da data (a coluna
+    'Dias restantes' da planilha congela no dia da gravação e envelhece);
+    a coluna é só fallback para prazos não parseáveis."""
+    d = _data_prazo(nv.get("Prazo", ""))
+    if d:
+        return (d - datetime.date.today()).days
+    try:
+        return int(str(nv.get("Dias restantes", "")).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _fmt_prazo(prazo: str) -> str:
+    """Prazo legível dd/mm; texto livre passa como veio."""
+    d = _data_prazo(prazo)
+    return d.strftime("%d/%m") if d else (str(prazo).strip() or "—")
+
+
+def _op_de_novidade(nv: dict) -> dict:
+    return {"titulo": str(nv.get("Título", "")).strip() or "(sem título)",
+            "fonte": str(nv.get("Fonte", "")).strip() or "Radar",
+            "score": int(_score_novidade(nv)),
+            "valor": str(nv.get("Valor estimado", "")).strip(),
+            "prazo": str(nv.get("Prazo", "")).strip(),
+            "dias": _dias_novidade(nv),
+            "link": str(nv.get("Link da fonte", "")).strip(),
+            "desc": str(nv.get("Descrição", "")).strip(),
+            "nv": nv}
+
+
+@st.dialog("Detalhe da oportunidade", width="large")
+def dlg_oportunidade(op: dict):
+    breadcrumb("Visão geral", "Oportunidade")
+    score = op.get("score")
+    sc_html = (f'<span style="font-weight:800;font-size:30px;color:var(--accent);'
+               f'font-variant-numeric:tabular-nums">{int(score)}</span>'
+               if score is not None else "")
+    meta = op.get("fonte", "")
+    if op.get("prazo"):
+        meta += f" · encerra {_fmt_prazo(op['prazo'])}"
+    st.markdown(
+        f'<div style="display:flex;align-items:flex-start;gap:14px">{sc_html}'
+        f'<div><div style="font-size:18px;font-weight:600;line-height:1.3">{esc(op.get("titulo"))}</div>'
+        f'<div style="font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:6px">{esc(meta)}</div>'
+        f'</div></div>',
+        unsafe_allow_html=True,
+    )
+    linhas = []
+    if score is not None:
+        linhas.append(("Aderência ao PFC", f"{int(score)} / 100"))
+    linhas.append(("Valor", op.get("valor") or "—"))
+    linhas.append(("Prazo de inscrição", _fmt_prazo(op.get("prazo", ""))))
+    dias = op.get("dias")
+    if isinstance(dias, int):
+        cor = "var(--sem-urgent)" if dias <= 7 else "var(--accent)"
+        linhas.append(("Tempo restante",
+                       f'<b style="color:{cor}">faltam {dias} dias</b>' if dias >= 0
+                       else f'<b style="color:var(--sem-urgent)">vencida há {-dias} dias</b>'))
+    linhas.append(("Fonte", op.get("fonte") or "—"))
+    corpo = "".join(
+        f'<div style="margin-bottom:16px"><div style="font-family:var(--mono);font-size:11px;'
+        f'letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">{lab}</div>'
+        f'<div style="font-size:15px;color:var(--ink)">{val}</div></div>'
+        for lab, val in linhas)
+    st.markdown(corpo, unsafe_allow_html=True)
+    if op.get("desc"):
+        st.markdown(f'<div style="font-size:13px;color:var(--muted);line-height:1.6;'
+                    f'border-top:1px solid var(--line);padding-top:14px">{esc(op["desc"][:400])}</div>',
+                    unsafe_allow_html=True)
+    if str(op.get("link", "")).startswith("http"):
+        st.link_button("↗ Abrir página oficial", op["link"], use_container_width=True)
+    if op.get("nv") is not None:
+        if not modo_conectado:
+            st.caption(HINT_ESCRITA)
+        b1, b2 = st.columns(2)
+        with b1:
+            if st.button("✓ Aprovar e mover à base", key="dlgop_ok", type="primary",
+                         use_container_width=True, disabled=not modo_conectado):
+                res = dados.aprovar_novidade(op["nv"])
+                st.toast(res["mensagem"], icon="✅" if res["sucesso"] else "⚠️")
+                st.rerun()
+        with b2:
+            if st.button("Descartar", key="dlgop_no", use_container_width=True,
+                         disabled=not modo_conectado):
+                res = dados.descartar_novidade(op["nv"])
+                st.toast(res["mensagem"], icon="🗑️" if res["sucesso"] else "⚠️")
+                st.rerun()
+
+
+@st.dialog("Cobertura regional", width="large")
+def dlg_cobertura():
+    breadcrumb("Visão geral", "Cobertura")
+    st.markdown(f"#### 🗺️ {len(ATIVAS)} municípios ativos · {len(PROXIMAS)} em implantação")
+    st.caption("Clique num município para ver as organizações do território.")
+    todas = [(c, True) for c in ATIVAS] + [(c, False) for c in PROXIMAS]
+    cols = st.columns(3)
+    for i, (cidade, ativa) in enumerate(todas):
+        slug = re.sub(r"[^0-9A-Za-z]+", "_", cidade)
+        with cols[i % 3]:
+            if st.button(("📍 " if ativa else "🆕 ") + cidade, key=f"cid_{slug}",
+                         use_container_width=True):
+                st.session_state["abrir_cidade"] = (cidade, ativa)
+                st.rerun()
+
+
+_VISAO_V2_CSS = """
+.vw{display:flex;flex-direction:column;gap:22px;font-family:'Inter',system-ui,sans-serif;
+  color:var(--ink,#F5F7FA);animation:vw-fade .4s ease}
+@keyframes vw-fade{from{opacity:0;transform:translateY(10px)}}
+.mono{font-family:'JetBrains Mono',monospace}
+.tnum{font-variant-numeric:tabular-nums}
+
+/* hero */
+.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:22px}
+@media (max-width:1000px){.hero{grid-template-columns:1fr}}
+.lead-card{position:relative;background:linear-gradient(150deg,var(--surface2,#1C222B),var(--surface,#161A21));
+  border:1px solid var(--line,rgba(255,255,255,.06));border-radius:16px;padding:32px 34px;
+  display:flex;flex-direction:column;justify-content:space-between;overflow:hidden}
+.lead-card::before{content:"";position:absolute;inset:0;border-radius:16px;padding:1.5px;
+  background:linear-gradient(145deg,var(--accent,#E8873A),transparent 50%);
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;opacity:.6}
+.lead-card::after{content:"";position:absolute;top:-40%;right:-10%;width:320px;height:320px;
+  border-radius:50%;background:radial-gradient(circle,var(--accent-dim,rgba(232,135,58,.12)),transparent 70%)}
+.hl-top{position:relative;z-index:1}
+.hl-label{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:1.2px;
+  text-transform:uppercase;color:var(--muted,#A4AEBF);margin-bottom:14px}
+.hl-num{font-size:80px;font-weight:800;letter-spacing:-4px;line-height:.9}
+.hl-num .u{font-size:26px;font-weight:600;color:var(--muted,#A4AEBF);letter-spacing:-1px;margin-left:6px}
+.hl-cap{font-size:15px;color:var(--muted,#A4AEBF);margin-top:10px}
+.hl-headline{position:relative;z-index:1;margin-top:24px;padding-top:22px;
+  border-top:1px solid var(--line,rgba(255,255,255,.06))}
+.hh-lbl{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:1px;
+  text-transform:uppercase;color:var(--dim,#6B7688);margin-bottom:10px}
+.hh-row{display:flex;align-items:center;gap:14px;cursor:pointer}
+.hh-sc{font-weight:800;font-size:26px;color:var(--accent,#E8873A);flex:none;font-variant-numeric:tabular-nums}
+.hh-t{font-size:16px;font-weight:600;line-height:1.3}
+.hh-m{font-size:12px;color:var(--dim,#6B7688);margin-top:4px}
+.hh-dl{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:600;
+  color:var(--sem-urgent,#F0663F);background:rgba(240,102,63,.1);border:1px solid rgba(240,102,63,.3);
+  padding:8px 12px;border-radius:8px;flex:none;white-space:nowrap}
+.hh-dl.ok{color:var(--accent,#E8873A);background:var(--accent-dim,rgba(232,135,58,.12));
+  border-color:rgba(232,135,58,.3)}
+
+/* scope */
+.scope-card{position:relative;background:var(--surface,#161A21);border:1px solid var(--line,rgba(255,255,255,.06));
+  border-radius:16px;padding:26px 28px;display:flex;flex-direction:column;overflow:hidden}
+.scope-card::before{content:"";position:absolute;inset:0;border-radius:16px;padding:1.5px;
+  background:linear-gradient(145deg,var(--sem-info,#5B9BD5),transparent 55%);
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;opacity:.4}
+.sc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;position:relative;z-index:1}
+.scope-card h3{font-size:16px;font-weight:600;margin:0}
+.sc-live{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--sem-high,#4ADE80);
+  display:flex;align-items:center;gap:6px}
+.sc-live .d{width:6px;height:6px;border-radius:50%;background:var(--sem-high,#4ADE80);
+  box-shadow:0 0 8px var(--sem-high,#4ADE80)}
+.sc-sub{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--dim,#6B7688);
+  letter-spacing:.5px;margin-bottom:14px;position:relative;z-index:1}
+.scopevis{flex:1;display:grid;place-items:center;min-height:0;position:relative;z-index:1}
+.scopevis svg{width:100%;height:auto;max-height:300px}
+.gr{stroke:rgba(255,255,255,.09);fill:none}
+.swf{transform-origin:center;animation:sw 4s linear infinite}
+.swl{transform-origin:center;animation:sw 4s linear infinite;stroke:var(--accent,#E8873A)}
+@keyframes sw{to{transform:rotate(360deg)}}
+.blip-hit{cursor:pointer}
+.scope-foot{display:flex;justify-content:space-between;gap:12px;margin-top:18px;padding-top:18px;
+  border-top:1px solid var(--line,rgba(255,255,255,.06));font-family:'JetBrains Mono',monospace;
+  font-size:11.5px;color:var(--muted,#A4AEBF);position:relative;z-index:1}
+.scope-foot b{font-weight:700}
+
+/* glowcards */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+@media (max-width:1000px){.kpis{grid-template-columns:1fr 1fr}}
+.glowcard{position:relative;background:var(--surface,#161A21);border:1px solid var(--line,rgba(255,255,255,.06));
+  border-radius:16px;padding:22px 24px;cursor:pointer;transition:.25s;overflow:hidden;--c:var(--accent,#E8873A)}
+.glowcard::before{content:"";position:absolute;inset:0;border-radius:16px;padding:1.5px;
+  background:linear-gradient(145deg,var(--c),transparent 55%);
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;opacity:.55;transition:.25s}
+.glowcard::after{content:"";position:absolute;top:-30%;right:-15%;width:140px;height:140px;
+  border-radius:50%;background:radial-gradient(circle,var(--c),transparent 70%);opacity:.10;
+  transition:.25s;pointer-events:none}
+.glowcard:hover{transform:translateY(-4px)}
+.glowcard:hover::before{opacity:1}
+.glowcard:hover::after{opacity:.2}
+.gc-ic{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;margin-bottom:16px;
+  position:relative;z-index:1;background:color-mix(in srgb,var(--c) 16%,transparent);
+  border:1px solid color-mix(in srgb,var(--c) 30%,transparent)}
+.gc-ic svg{width:22px;height:22px;fill:none;stroke:var(--c);stroke-width:1.9}
+.gc-lab{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.8px;
+  text-transform:uppercase;color:var(--muted,#A4AEBF);position:relative;z-index:1}
+.gc-val{font-weight:800;font-size:40px;letter-spacing:-1.8px;margin-top:8px;line-height:1;
+  position:relative;z-index:1;font-variant-numeric:tabular-nums}
+.gc-val.small{font-size:29px;letter-spacing:-1px}
+.gc-foot{font-size:13px;color:var(--dim,#6B7688);margin-top:10px;position:relative;z-index:1}
+.gc-foot .up{color:var(--sem-high,#4ADE80);font-weight:600}
+
+/* legenda */
+.cmean{display:flex;gap:20px;flex-wrap:wrap;padding:14px 18px;background:var(--surface,#161A21);
+  border:1px solid var(--line,rgba(255,255,255,.06));border-radius:12px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted,#A4AEBF)}
+.cmean b{color:var(--dim,#6B7688);font-weight:500;margin-right:4px}
+.cmean .m{display:flex;align-items:center;gap:7px}
+.cmean .m i{width:9px;height:9px;border-radius:3px;display:inline-block}
+
+/* painéis */
+.detail{display:grid;grid-template-columns:1.4fr 1fr;gap:22px}
+@media (max-width:1000px){.detail{grid-template-columns:1fr}}
+.panel{position:relative;background:var(--surface,#161A21);border:1px solid var(--line,rgba(255,255,255,.06));
+  border-radius:16px;padding:26px 28px}
+.panel h3{font-size:16px;font-weight:600;margin:0 0 4px}
+.panel .psub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dim,#6B7688);
+  margin-bottom:22px;letter-spacing:.5px}
+.fb{display:flex;align-items:center;gap:16px;margin-bottom:18px;cursor:pointer}
+.fb:last-child{margin-bottom:0}
+.fb:hover .n{color:var(--ink,#F5F7FA)}
+.fb:hover .tk{outline:1px solid var(--line2,rgba(255,255,255,.12));outline-offset:2px}
+.fb .n{font-size:14px;color:var(--muted,#A4AEBF);width:96px;flex:none;font-weight:500}
+.fb .tk{flex:1;height:11px;background:rgba(255,255,255,.05);border-radius:6px;overflow:hidden}
+.fb .fl{height:100%;border-radius:6px;width:0;transition:width 1.1s cubic-bezier(.16,1,.3,1)}
+.fb .v{font-size:16px;font-weight:700;width:34px;text-align:right;flex:none;font-variant-numeric:tabular-nums}
+.prazos .pr{display:flex;align-items:center;gap:14px;padding:14px 0;
+  border-bottom:1px solid var(--line,rgba(255,255,255,.06));cursor:pointer}
+.prazos .pr:first-of-type{padding-top:0}
+.prazos .pr:last-child{border:none;padding-bottom:0}
+.prazos .pr:hover{background:rgba(255,255,255,.03);border-radius:10px;padding-left:8px;margin:0 -8px}
+.pr .days{font-weight:800;font-size:22px;width:44px;flex:none;text-align:center;font-variant-numeric:tabular-nums}
+.pr .days.u{color:var(--sem-urgent,#F0663F)}
+.pr .days.s{color:var(--accent,#E8873A)}
+.pr .info{flex:1;min-width:0}
+.pr .info .t{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pr .info .m{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dim,#6B7688);margin-top:3px}
+.pr-vazio{font-size:13px;color:var(--dim,#6B7688);padding:8px 0}
 """
 
-_KPI_V2_JS = """
+_VISAO_V2_JS = r"""
 export default function(component){
-  const {data, parentElement} = component;
-  const old = parentElement.querySelector('.kpi-grid'); if (old) old.remove();
-  const grid = document.createElement('div'); grid.className = 'kpi-grid';
-  const items = (data && data.items) || [];
-  items.forEach(function(k, i){
-    const card = document.createElement('div'); card.className = 'kpi-card';
-    card.style.setProperty('--acc', k.accent);
-    card.style.setProperty('--glow', k.glow);
-    card.innerHTML =
-      '<div class="kpi-top"><span class="kpi-ic">' + k.icon + '</span>' +
-      '<span class="kpi-lab" title="' + k.label + '">' + k.label + '</span></div>' +
-      '<div class="kpi-val">' + k.value + '</div>' +
-      '<div class="kpi-foot">' + k.foot + '</div>';
-    grid.appendChild(card);
-    setTimeout(function(){ card.classList.add('in'); }, 60 + i * 90);
-    if (Number.isFinite(k.num)) {           // count-up só para valores inteiros
-      const el = card.querySelector('.kpi-val');
-      const t0 = performance.now(), dur = 950;
-      (function step(){
-        const p = Math.min(1, (performance.now() - t0) / dur);
-        const e = 1 - Math.pow(1 - p, 3);
-        el.textContent = String(Math.round(k.num * e));
-        if (p < 1) { requestAnimationFrame(step); }
-      })();
+  const {data, parentElement, setTriggerValue} = component;
+  const old = parentElement.querySelector('.vw'); if (old) old.remove();
+  const d = data || {};
+  const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const sem = s => s >= 60 ? 'var(--sem-high,#4ADE80)' : s >= 50 ? 'var(--sem-mid,#E8B54A)'
+    : 'var(--sem-low,#7C8698)';
+  const ICONES = {
+    org: '<path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-3"/>',
+    pros: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+    money: '<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+    globe: '<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/>'
+  };
+  const root = document.createElement('div'); root.className = 'vw';
+
+  // ---- hero: métrica-herói + mais aderente ----
+  const h = d.hero || {};
+  let topHtml = '';
+  if (h.top) {
+    const t = h.top;
+    let dl = '';
+    if (Number.isFinite(t.dias)) {
+      dl = '<span class="hh-dl' + (t.dias <= 7 ? '' : ' ok') + '">' + t.dias + ' DIAS</span>';
     }
-  });
-  parentElement.appendChild(grid);
-  return function(){ grid.remove(); };
-}
-"""
+    topHtml = '<div class="hl-headline"><div class="hh-lbl">Mais aderente ao PFC agora</div>' +
+      '<div class="hh-row" data-act="hero"><span class="hh-sc tnum">' + esc(t.score) + '</span>' +
+      '<div style="min-width:0"><div class="hh-t">' + esc(t.titulo) + '</div>' +
+      '<div class="mono hh-m">' + esc(t.meta) + '</div></div>' + dl + '</div></div>';
+  }
 
-_FUNIL_V2_CSS = """
-.fb-card{background:rgba(13,17,25,.62);border:1px solid rgba(255,255,255,.06);border-radius:16px;
-  overflow:hidden;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
-  box-shadow:0 1px 2px rgba(0,0,0,.16),inset 0 0 0 1px rgba(255,255,255,.018)}
-.fb-h{padding:18px 22px 14px;border-bottom:1px solid rgba(255,255,255,.05)}
-.fb-h h2{font-family:'Space Grotesk',system-ui,sans-serif;font-weight:600;font-size:15.5px;
-  margin:0;color:var(--st-text-color,#E9EBEE)}
-.fb-h .cap{font-family:'Inter',system-ui,sans-serif;font-size:12px;color:#565E68;margin-top:3px}
-.fb-body{padding:20px 22px 22px;display:flex;flex-direction:column;gap:15px}
-.fb-row{display:grid;grid-template-columns:100px 1fr 92px;align-items:center;gap:12px;
-  font-family:'Inter',system-ui,sans-serif}
-.fb-name{font-size:12.5px;font-weight:500;color:#C2C7CE;display:flex;align-items:center;gap:8px;white-space:nowrap}
-.fb-dot{width:8px;height:8px;border-radius:3px;flex:none;background:var(--c)}
-.fb-track{position:relative;height:9px;border-radius:6px;background:rgba(255,255,255,.045);
-  overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.03)}
-.fb-fill{position:absolute;top:0;bottom:0;left:0;width:0;border-radius:6px;background:var(--c);
-  transition:width 1s cubic-bezier(.22,.61,.36,1)}
-.fb-fill::after{content:"";position:absolute;inset:0;border-radius:6px;
-  background:linear-gradient(90deg,transparent 38%,rgba(255,255,255,.25) 50%,transparent 62%);
-  background-size:220% 100%;background-position:180% 0;
-  animation:fb-shine 2.4s ease-in-out 1.15s 2}
-@keyframes fb-shine{to{background-position:-80% 0}}
-.fb-num{text-align:right;font-size:12px;color:#565E68;white-space:nowrap}
-.fb-num b{font-family:'Space Grotesk',system-ui,sans-serif;font-weight:600;font-size:14px;
-  color:var(--st-text-color,#E9EBEE);font-variant-numeric:tabular-nums}
-"""
-
-_FUNIL_V2_JS = """
-export default function(component){
-  const {data, parentElement} = component;
-  const old = parentElement.querySelector('.fb-card'); if (old) old.remove();
-  const d = data || {}, rows = d.rows || [];
-  const card = document.createElement('div'); card.className = 'fb-card';
-  let body = '';
-  rows.forEach(function(r){
-    body += '<div class="fb-row" style="--c:' + r.cor + '">' +
-      '<span class="fb-name"><span class="fb-dot"></span>' + r.status + '</span>' +
-      '<span class="fb-track"><span class="fb-fill" data-w="' + r.pct + '"></span></span>' +
-      '<span class="fb-num"><b>' + r.n + '</b> · ' + r.pct_lab + '%</span></div>';
+  // ---- scope: blips por aderência ----
+  let blips = '';
+  (d.blips || []).forEach(function(b, i){
+    const ang = i * 2.399963;                       // ângulo áureo: espalha sem colidir
+    const r = 140 - Math.max(0, Math.min(100, b.score)) * 1.2;  // + score = + perto do centro
+    const cx = (150 + r * Math.cos(ang)).toFixed(1);
+    const cy = (150 + r * Math.sin(ang)).toFixed(1);
+    const cor = sem(b.score);
+    const raio = (4 + b.score / 25).toFixed(1);
+    blips += '<circle cx="' + cx + '" cy="' + cy + '" r="' + raio + '" fill="' + cor +
+      '" class="blip-hit" data-act="blip" data-i="' + i + '" style="filter:drop-shadow(0 0 6px ' +
+      cor + ')"><title>' + esc(b.fonte) + ' · ' + esc(b.score) + '</title></circle>';
   });
-  card.innerHTML = '<div class="fb-h"><h2>' + d.titulo + '</h2>' +
-    '<div class="cap">' + d.cap + '</div></div>' +
-    '<div class="fb-body">' + body + '</div>';
-  parentElement.appendChild(card);
-  const fills = card.querySelectorAll('.fb-fill');
-  requestAnimationFrame(function(){ requestAnimationFrame(function(){
-    fills.forEach(function(f, i){
-      f.style.transitionDelay = (i * 110) + 'ms';
-      f.style.width = f.getAttribute('data-w') + '%';
+  const f = d.foot || {};
+  const scope =
+    '<div class="scope-card"><div class="sc-head"><h3>Radar de oportunidades</h3>' +
+    '<div class="sc-live"><span class="d"></span>ao vivo</div></div>' +
+    '<div class="sc-sub">PROXIMIDADE DO CENTRO = MAIOR ADERÊNCIA · CLIQUE NUM PONTO</div>' +
+    '<div class="scopevis"><svg viewBox="0 0 300 300">' +
+    '<defs><radialGradient id="sfv"><stop offset="0" stop-color="rgba(232,135,58,.3)"/>' +
+    '<stop offset="1" stop-color="rgba(232,135,58,0)"/></radialGradient></defs>' +
+    '<circle class="gr" cx="150" cy="150" r="144"/><circle class="gr" cx="150" cy="150" r="98"/>' +
+    '<circle class="gr" cx="150" cy="150" r="52"/>' +
+    '<line class="gr" x1="150" y1="6" x2="150" y2="294"/><line class="gr" x1="6" y1="150" x2="294" y2="150"/>' +
+    '<path class="swf" d="M150 150 L150 6 A144 144 0 0 1 252 48 Z" fill="url(#sfv)"/>' +
+    '<line class="swl" x1="150" y1="150" x2="150" y2="6" stroke-width="2"/>' +
+    '<circle cx="150" cy="150" r="4" fill="var(--accent,#E8873A)"/>' + blips + '</svg></div>' +
+    '<div class="scope-foot"><span><b style="color:var(--accent,#E8873A)">' + (f.fila || 0) +
+    '</b> na fila</span><span><b style="color:var(--sem-urgent,#F0663F)">' + (f.encerrando || 0) +
+    '</b> encerrando</span><span><b>' + (f.fontes || 0) + '</b> fontes</span></div></div>';
+
+  root.innerHTML =
+    '<div class="hero"><div class="lead-card"><div class="hl-top">' +
+    '<div class="hl-label">Oportunidades no radar hoje</div>' +
+    '<div class="hl-num tnum"><span data-c="' + (h.num || 0) + '">0</span>' +
+    '<span class="u">novas</span></div>' +
+    '<div class="hl-cap">' + esc(h.cap || '') + '</div></div>' + topHtml + '</div>' +
+    scope + '</div>';
+
+  // ---- glowcards ----
+  let kpis = '';
+  (d.kpis || []).forEach(function(k){
+    const val = (k.txt != null)
+      ? '<div class="gc-val' + (String(k.txt).length > 6 ? ' small' : '') + '">' + esc(k.txt) + '</div>'
+      : '<div class="gc-val tnum" data-c="' + k.val + '">0</div>';
+    kpis += '<div class="glowcard" style="--c:' + k.c + '" data-act="kpi" data-k="' + k.k + '">' +
+      '<div class="gc-ic"><svg viewBox="0 0 24 24">' + (ICONES[k.icon] || '') + '</svg></div>' +
+      '<div class="gc-lab">' + esc(k.lab) + '</div>' + val +
+      '<div class="gc-foot">' + k.foot + '</div></div>';
+  });
+  root.insertAdjacentHTML('beforeend', '<div class="kpis">' + kpis + '</div>');
+
+  // ---- legenda ----
+  root.insertAdjacentHTML('beforeend',
+    '<div class="cmean"><b>Cor = aderência:</b>' +
+    '<span class="m"><i style="background:var(--sem-high,#4ADE80)"></i>Alta (60+)</span>' +
+    '<span class="m"><i style="background:var(--sem-mid,#E8B54A)"></i>Média (50–59)</span>' +
+    '<span class="m"><i style="background:var(--sem-low,#7C8698)"></i>Baixa (&lt;50)</span>' +
+    '<span class="m"><i style="background:var(--sem-urgent,#F0663F)"></i>Prazo urgente</span></div>');
+
+  // ---- painéis: pipeline + prazos ----
+  let fbs = '';
+  (d.stages || []).forEach(function(s){
+    fbs += '<div class="fb" data-act="stage" data-k="' + esc(s.nome) + '">' +
+      '<span class="n">' + esc(s.nome) + '</span>' +
+      '<span class="tk"><span class="fl" data-w="' + s.pct + '" style="background:' + s.cor +
+      '"></span></span><span class="v tnum">' + s.n + '</span></div>';
+  });
+  let prs = '';
+  (d.prazos || []).forEach(function(p, i){
+    prs += '<div class="pr" data-act="prazo" data-i="' + i + '">' +
+      '<span class="days ' + (p.dias <= 7 ? 'u' : 's') + '">' + p.dias + '</span>' +
+      '<div class="info"><div class="t">' + esc(p.titulo) + '</div>' +
+      '<div class="m">' + esc(p.meta) + '</div></div></div>';
+  });
+  if (!prs) { prs = '<div class="pr-vazio">Nenhum edital com data-limite próxima. ✨</div>'; }
+  root.insertAdjacentHTML('beforeend',
+    '<div class="detail"><div class="panel"><h3>Pipeline por etapa</h3>' +
+    '<div class="psub">' + (d.total_orgs || 0) + ' ORGANIZAÇÕES · CLIQUE PARA VER A ETAPA</div>' +
+    fbs + '</div>' +
+    '<div class="panel prazos"><h3>Prazos próximos</h3>' +
+    '<div class="psub">EDITAIS QUE ESTÃO PARA ENCERRAR</div>' + prs + '</div></div>');
+
+  parentElement.appendChild(root);
+
+  // ---- cliques -> Python ----
+  root.addEventListener('click', function(e){
+    const el = e.target.closest('[data-act]');
+    if (!el) { return; }
+    setTriggerValue('acao', {t: el.dataset.act, k: el.dataset.k || null,
+                             i: el.dataset.i != null ? +el.dataset.i : null, n: Date.now()});
+  });
+
+  // ---- animações: count-up + barras (setInterval/setTimeout — o rAF não
+  // dispara no runtime do módulo v2, como na própria maquete) ----
+  root.querySelectorAll('[data-c]').forEach(function(el){
+    const alvo = +el.dataset.c; const t0 = Date.now(), dur = 900;
+    const iv = setInterval(function(){
+      const p = Math.min(1, (Date.now() - t0) / dur);
+      el.textContent = String(Math.round(alvo * (1 - Math.pow(1 - p, 3))));
+      if (p >= 1) { clearInterval(iv); }
+    }, 16);
+  });
+  setTimeout(function(){
+    root.querySelectorAll('.fl').forEach(function(fl, i){
+      fl.style.transitionDelay = (i * 90) + 'ms';
+      fl.style.width = fl.dataset.w + '%';
     });
-  }); });
-  return function(){ card.remove(); };
+  }, 60);
+  return function(){ root.remove(); };
 }
 """
 
-_DONUT_V2_CSS = """
-.dn-card{background:rgba(13,17,25,.62);border:1px solid rgba(255,255,255,.06);border-radius:16px;
-  overflow:hidden;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
-  box-shadow:0 1px 2px rgba(0,0,0,.16),inset 0 0 0 1px rgba(255,255,255,.018)}
-.dn-h{padding:18px 22px 14px;border-bottom:1px solid rgba(255,255,255,.05)}
-.dn-h h2{font-family:'Space Grotesk',system-ui,sans-serif;font-weight:600;font-size:15.5px;
-  margin:0;color:var(--st-text-color,#E9EBEE)}
-.dn-h .cap{font-family:'Inter',system-ui,sans-serif;font-size:12px;color:#565E68;margin-top:3px}
-.dn-body{padding:16px 20px 20px;display:grid;place-items:center;gap:12px}
-.dn-svgwrap{display:grid;place-items:center}
-.dn-svgwrap svg .seg{transition:filter .25s ease}
-.dn-svgwrap svg .seg:hover{filter:brightness(1.3)}
-.dn-total{font-family:'Space Grotesk',system-ui,sans-serif;font-weight:600;font-variant-numeric:tabular-nums}
-.dn-leg{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:center;font-family:'Inter',system-ui,sans-serif}
-.dn-leg span{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#828A94}
-.dn-leg i{width:8px;height:8px;border-radius:3px;flex:none}
-.dn-leg b{font-family:'Space Grotesk',system-ui,sans-serif;font-weight:600;
-  color:var(--st-text-color,#E9EBEE);font-variant-numeric:tabular-nums}
-"""
-
-_DONUT_V2_JS = """
-export default function(component){
-  const {data, parentElement} = component;
-  const old = parentElement.querySelector('.dn-card'); if (old) old.remove();
-  const d = data || {}, segs = d.segs || [], total = d.total || 0;
-  const NS = 'http://www.w3.org/2000/svg';
-  const R = 72, C = 2 * Math.PI * R, GAP = segs.length > 1 ? 3 : 0;
-  const card = document.createElement('div'); card.className = 'dn-card';
-  card.innerHTML = '<div class="dn-h"><h2>' + d.titulo + '</h2>' +
-    '<div class="cap">' + d.cap + '</div></div>' +
-    '<div class="dn-body"><div class="dn-svgwrap"></div><div class="dn-leg"></div></div>';
-  parentElement.appendChild(card);
-
-  const svg = document.createElementNS(NS, 'svg');
-  svg.setAttribute('viewBox', '0 0 200 200');
-  svg.setAttribute('width', '212'); svg.setAttribute('height', '212');
-  const ring = document.createElementNS(NS, 'circle');
-  ring.setAttribute('cx', 100); ring.setAttribute('cy', 100); ring.setAttribute('r', R);
-  ring.setAttribute('fill', 'none'); ring.setAttribute('stroke', 'rgba(255,255,255,.05)');
-  ring.setAttribute('stroke-width', 13);
-  svg.appendChild(ring);
-
-  let start = 0;
-  const arcs = segs.map(function(s){
-    const len = Math.max(0, s.frac * C - GAP);
-    const c = document.createElementNS(NS, 'circle');
-    c.setAttribute('class', 'seg');
-    c.setAttribute('cx', 100); c.setAttribute('cy', 100); c.setAttribute('r', R);
-    c.setAttribute('fill', 'none'); c.setAttribute('stroke', s.cor);
-    c.setAttribute('stroke-width', 13);
-    c.setAttribute('stroke-dasharray', '0 ' + C);
-    c.setAttribute('stroke-dashoffset', -start);
-    c.setAttribute('transform', 'rotate(-90 100 100)');
-    const tip = document.createElementNS(NS, 'title');
-    tip.textContent = s.label + ' \\u00b7 ' + s.n;
-    c.appendChild(tip);
-    svg.appendChild(c);
-    const arc = { el: c, start: start, len: len };
-    start += s.frac * C;
-    return arc;
-  });
-
-  const num = document.createElementNS(NS, 'text');
-  num.setAttribute('x', 100); num.setAttribute('y', 96);
-  num.setAttribute('text-anchor', 'middle'); num.setAttribute('dominant-baseline', 'central');
-  num.setAttribute('font-size', 44); num.setAttribute('fill', '#FFFFFF');
-  num.setAttribute('class', 'dn-total'); num.textContent = '0';
-  svg.appendChild(num);
-  const sub = document.createElementNS(NS, 'text');
-  sub.setAttribute('x', 100); sub.setAttribute('y', 126);
-  sub.setAttribute('text-anchor', 'middle');
-  sub.setAttribute('font-size', 11); sub.setAttribute('fill', '#828A94');
-  sub.setAttribute('font-family', 'Inter, system-ui, sans-serif');
-  sub.textContent = d.sub || '';
-  svg.appendChild(sub);
-  card.querySelector('.dn-svgwrap').appendChild(svg);
-
-  const leg = card.querySelector('.dn-leg');
-  segs.forEach(function(s){
-    const item = document.createElement('span');
-    item.innerHTML = '<i style="background:' + s.cor + '"></i>' + s.label + ' <b>' + s.n + '</b>';
-    leg.appendChild(item);
-  });
-
-  const t0 = performance.now(), dur = 1000;   // desenho sequencial dos arcos
-  (function step(){
-    const p = Math.min(1, (performance.now() - t0) / dur);
-    const e = 1 - Math.pow(1 - p, 3);
-    arcs.forEach(function(a){
-      const vis = Math.max(0, Math.min(a.len, e * C - a.start));
-      a.el.setAttribute('stroke-dasharray', vis + ' ' + (C - vis));
-    });
-    num.textContent = String(Math.round(total * e));
-    if (p < 1) { requestAnimationFrame(step); }
-  })();
-  return function(){ card.remove(); };
-}
-"""
-
-_kpis_v2 = components_v2.component("pfc_kpis", css=_KPI_V2_CSS, js=_KPI_V2_JS)
-_funil_v2 = components_v2.component("pfc_funil_barras", css=_FUNIL_V2_CSS, js=_FUNIL_V2_JS)
-_donut_v2 = components_v2.component("pfc_donut", css=_DONUT_V2_CSS, js=_DONUT_V2_JS)
+_visao_v2 = components_v2.component("pfc_visao", css=_VISAO_V2_CSS, js=_VISAO_V2_JS)
 
 
 # =========================================================================== #
 # PÁGINA · VISÃO GERAL
 # =========================================================================== #
 def page_visao():
-    st.markdown(
-        '<div class="phead"><h1>Painel de captação</h1>'
-        f'<p>{TOTAL} organizações monitoradas · clique nos cartões e segmentos para explorar</p></div>',
-        unsafe_allow_html=True,
-    )
-
-    # ---- Alerta de prazos de editais (próximos 15 dias) ----
-    prox = _editais_proximos(15)
-    if prox:
-        urgentes = sum(1 for e in prox if e["dias"] < 7)
-        rotulo = (f"⏰ {len(prox)} edital(is) fecham nos próximos 15 dias"
-                  + (f"  ·  {urgentes} em menos de 7 dias" if urgentes else "")
-                  + "  —  ver lista")
-        if st.button(rotulo, key="alerta_prazos", use_container_width=True):
-            dlg_prazos(prox)
-    else:
-        st.markdown(
-            '<div style="border:1px solid var(--line);border-radius:12px;background:var(--surface);'
-            'padding:11px 16px;font-size:13px;color:var(--muted);margin-bottom:6px">'
-            '⏰ Nenhum edital fechando em breve · pipeline sob controle</div>',
-            unsafe_allow_html=True,
-        )
+    # cidade escolhida dentro do dlg_cobertura abre na rerun seguinte
+    pend = st.session_state.pop("abrir_cidade", None)
+    if pend:
+        dlg_cidade(pend[0], ativa=pend[1], evento=EVENTOS.get(pend[0], "A definir"))
 
     cont = df[COL_STATUS].value_counts() if TOTAL else pd.Series(dtype=int)
     n_prospectar = int(cont.get("Prospectar", 0))
-    n_monitorar = int(cont.get("Monitorar", 0))
-    n_edital = int(cont.get("Edital", 0))
     valor_total = float(df[COL_VALVO].sum()) if TOTAL else 0.0
     n_verif = int(df[COL_VERIF].apply(verificada_ok).sum()) if TOTAL else 0
+    pct_pros = round(n_prospectar / TOTAL * 100) if TOTAL else 0
 
-    # KPIs em Custom Component v2 (visual); as ações continuam nos botões nativos.
-    kpi_cards = [
-        {"icon": "📚", "label": "Organizações mapeadas", "value": str(TOTAL), "num": TOTAL,
-         "foot": f"<b>{n_verif}</b> de {TOTAL} fontes verificadas",
-         "accent": "#FFFFFF", "glow": "rgba(255,255,255,.10)"},
-        {"icon": "📈", "label": "Em prospecção ativa", "value": str(n_prospectar), "num": n_prospectar,
-         "foot": f"<b>{n_monitorar}</b> monitorando · <b>{n_edital}</b> em edital",
-         "accent": "#F2911E", "glow": "rgba(242,145,30,.16)"},
-        {"icon": "💰", "label": "Valor-alvo potencial", "value": brl_curto(valor_total), "num": None,
-         "foot": "soma do pipeline de captação",
-         "accent": "#3B8BD0", "glow": "rgba(59,139,208,.16)"},
-        {"icon": "⚡", "label": "Oportunidades hoje", "value": "4", "num": 4,
-         "foot": "novas · aguardando revisão",
-         "accent": "#5FB137", "glow": "rgba(95,177,55,.16)"},
-    ]
-    _kpis_v2(data={"items": kpi_cards}, key="kpis_visao")
+    # fila real do radar (Sheets), ordenada por aderência
+    fila = sorted(dados.carregar_novidades_pendentes(), key=_score_novidade, reverse=True)
+    ops = [_op_de_novidade(nv) for nv in fila]
+    n_fontes = _n_fontes_radar()
+    encerrando = sum(1 for o in ops if isinstance(o["dias"], int) and 0 <= o["dias"] <= 7)
 
-    acoes = [("Ver breakdown", "breakdown"), ("Listar prospecção", "prospeccao"),
-             ("Top 10 por valor", "valor"), ("Abrir Radar", "radar")]
-    cols = st.columns(4)
-    for col, (btn_lab, acao) in zip(cols, acoes):
-        with col:
-            if st.button(btn_lab, key=f"kpi_{acao}", use_container_width=True):
-                if acao == "breakdown":
-                    dlg_breakdown()
-                elif acao == "prospeccao":
-                    dlg_status_list("Prospectar")
-                elif acao == "valor":
-                    dlg_valor_top10()
-                elif acao == "radar":
-                    ir_para("Radar")
-                    st.rerun()
+    blip_items = ops[:12]
+    top = ops[0] if ops else None
 
-    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-    esq, dir_ = st.columns([1.15, 1])
+    # prazos próximos: novidades com dias >= 0 + editais da base (até 45 dias)
+    prazo_items, vistos = [], set()
+    for o in ops:
+        if isinstance(o["dias"], int) and o["dias"] >= 0:
+            prazo_items.append(o)
+            vistos.add(o["titulo"].lower())
+    for e in _editais_proximos(45):
+        if str(e["nome"]).lower() in vistos:
+            continue
+        prazo_items.append({"titulo": str(e["nome"]), "fonte": "Base PFC", "score": None,
+                            "valor": brl_curto(e.get("valor")), "prazo": e["data"].isoformat(),
+                            "dias": e["dias"], "link": str(e.get("link", "")), "desc": "", "nv": None})
+    prazo_items.sort(key=lambda o: o["dias"])
+    prazo_items = prazo_items[:4]
 
-    # ---- Funil por etapa: barras animadas (componente v2) + chips clicáveis ----
-    with esq:
-        fun_rows = []
-        for s in STATUS_FUNIL:
-            n = int(cont.get(s, 0))
-            pct = (n / TOTAL * 100) if TOTAL else 0.0
-            fun_rows.append({"status": s, "n": n, "pct": round(pct, 1),
-                             "pct_lab": f"{pct:.0f}", "cor": CORES_STATUS[s]})
-        _funil_v2(data={"titulo": "Distribuição do funil",
-                        "cap": "barras por etapa · clique num chip para ver as organizações",
-                        "rows": fun_rows}, key="funil_visao")
-        chip_cols = st.columns(len(STATUS_FUNIL))
-        for j, s in enumerate(STATUS_FUNIL):
-            n = int(cont.get(s, 0))
-            if chip_cols[j].button(f"{s} · {n}", key=f"seg_{s}", use_container_width=True):
-                dlg_status_list(s)
+    def _meta(o):
+        m = str(o["fonte"]).upper()
+        if o.get("prazo"):
+            m += f" · encerra {_fmt_prazo(o['prazo'])}"
+        return m
 
-    # ---- Donut de status: SVG clean com total no centro (componente v2) ----
-    with dir_:
-        segs = [{"label": s, "n": int(cont.get(s, 0)),
-                 "frac": (int(cont.get(s, 0)) / TOTAL) if TOTAL else 0.0,
-                 "cor": CORES_STATUS[s]}
-                for s in STATUS_FUNIL if int(cont.get(s, 0)) > 0]
-        _donut_v2(data={"titulo": "Pipeline por status",
-                        "cap": "distribuição das organizações",
-                        "total": TOTAL, "sub": "organizações", "segs": segs},
-                  key="donut_visao")
+    payload = {
+        "hero": {"num": len(ops),
+                 "cap": f"de {n_fontes} fontes monitoradas · aguardando revisão",
+                 "top": ({"titulo": top["titulo"], "score": top["score"], "dias": top["dias"],
+                          "meta": _meta(top)} if top else None)},
+        "blips": [{"score": o["score"], "fonte": o["fonte"]} for o in blip_items],
+        "foot": {"fila": len(ops), "encerrando": encerrando, "fontes": n_fontes},
+        "kpis": [
+            {"k": "rk", "c": "var(--sem-info,#5B9BD5)", "icon": "org", "lab": "Organizações",
+             "val": TOTAL, "txt": None,
+             "foot": f"<span class='up'>{n_verif}</span> fontes verificadas"},
+            {"k": "fn", "c": "var(--accent,#E8873A)", "icon": "pros", "lab": "Em prospecção",
+             "val": n_prospectar, "txt": None, "foot": f"{pct_pros}% do pipeline"},
+            {"k": "valor", "c": "var(--sem-high,#4ADE80)", "icon": "money", "lab": "Valor-alvo",
+             "val": None, "txt": brl_curto(valor_total), "foot": "potencial estimado"},
+            {"k": "cobertura", "c": "var(--sem-mid,#E8B54A)", "icon": "globe", "lab": "Cobertura",
+             "val": len(ATIVAS) + len(PROXIMAS), "txt": None, "foot": "municípios · SP"},
+        ],
+        "total_orgs": TOTAL,
+        "stages": [{"nome": s, "n": int(cont.get(s, 0)),
+                    "pct": round(int(cont.get(s, 0)) / TOTAL * 100, 1) if TOTAL else 0,
+                    "cor": CORES_ETAPA[s]} for s in STATUS_FUNIL],
+        "prazos": [{"titulo": o["titulo"], "dias": o["dias"], "meta": _meta(o)}
+                   for o in prazo_items],
+    }
 
-    # ---- Cobertura regional interativa ----
-    st.markdown(
-        '<div class="phead" style="margin-top:6px"><h2 style="font-size:18px">🗺️ Cobertura regional</h2>'
-        '<p>municípios com atuação do PFC · clique numa cidade para ver detalhes</p></div>',
-        unsafe_allow_html=True,
-    )
-    ATIVAS = ["Iperó", "Tatuí", "Salto", "São Roque", "Rio Claro", "Coronel Macedo", "Mirassol"]
-    PROXIMAS = ["Dois Córregos", "Corumbataí"]
-    EVENTOS = {"Iperó": "Feira de Ciências · ago/2026", "Tatuí": "Clube de Ciências · jul/2026",
-               "Salto": "Mostra STEM · set/2026", "São Roque": "Maratona PFC · out/2026",
-               "Rio Claro": "Olimpíada · ago/2026", "Coronel Macedo": "Visita técnica · jul/2026",
-               "Mirassol": "Roda de mentoria · set/2026", "Dois Córregos": "Implantação · 2024",
-               "Corumbataí": "Implantação · 2024"}
-    filtro = st.selectbox("Filtro de cobertura",
-                          ["Apenas ativas", "Todas", "Próximas (2024)"],
-                          key="filtro_cobertura", label_visibility="collapsed")
-    if filtro == "Apenas ativas":
-        cidades = [(c, True) for c in ATIVAS]
-    elif filtro == "Próximas (2024)":
-        cidades = [(c, False) for c in PROXIMAS]
-    else:
-        cidades = [(c, True) for c in ATIVAS] + [(c, False) for c in PROXIMAS]
-
-    n_por_linha = 5
-    for inicio in range(0, len(cidades), n_por_linha):
-        linha = cidades[inicio:inicio + n_por_linha]
-        ccols = st.columns(n_por_linha)
-        for k, (cidade, ativa) in enumerate(linha):
-            rotulo = ("📍 " if ativa else "🆕 ") + cidade
-            # key sem espaço/acento -> classe st-key-cid_* válida p/ CSS
-            slug = re.sub(r"[^0-9A-Za-z]+", "_", cidade)
-            if ccols[k].button(rotulo, key=f"cid_{slug}", use_container_width=True):
-                dlg_cidade(cidade, ativa=ativa, evento=EVENTOS.get(cidade, "A definir"))
+    res = _visao_v2(data=payload, key="visao_v2", on_acao_change=lambda: None)
+    ac = getattr(res, "acao", None)
+    if isinstance(ac, dict):
+        t, k, i = ac.get("t"), ac.get("k"), ac.get("i")
+        if t == "kpi":
+            if k == "rk":
+                ir_para("Ranking")
+                st.rerun()
+            elif k == "fn":
+                ir_para("Funil")
+                st.rerun()
+            elif k == "valor":
+                dlg_valor_top10()
+            elif k == "cobertura":
+                dlg_cobertura()
+        elif t == "hero" and top:
+            dlg_oportunidade(top)
+        elif t == "blip" and isinstance(i, int) and 0 <= i < len(blip_items):
+            dlg_oportunidade(blip_items[i])
+        elif t == "prazo" and isinstance(i, int) and 0 <= i < len(prazo_items):
+            dlg_oportunidade(prazo_items[i])
+        elif t == "stage" and k in STATUS_FUNIL:
+            dlg_status_list(k)
 
 
 # =========================================================================== #
