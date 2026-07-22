@@ -324,19 +324,34 @@ body{background:var(--bg)}
 .login-logo svg{transition:transform .4s var(--ease)}
 .login-logo:hover svg .orbit{animation:spin 9s linear infinite}
 
-/* ---------- aba Verificação ---------- */
+/* ---------- aba Verificação (maquete: listra âmbar + confirmar/pular) ---------- */
 .vbar{height:10px;border-radius:6px;background:var(--line-2);overflow:hidden;margin:8px 0 2px}
-.vbar i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#E89A3C,#5FB137);transition:width .7s var(--ease)}
+.vbar i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#E8873A,#4ADE80);transition:width .7s var(--ease)}
 .vprog-lab{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
-.vprog-lab .big{font-family:var(--disp);font-weight:600;font-size:22px;color:var(--text)}
-.vprog-lab .pct{font-family:var(--disp);font-weight:600;font-size:14px;color:var(--green-2)}
+.vprog-lab .big{font-weight:700;font-size:22px;color:var(--ink);letter-spacing:-.4px}
+.vprog-lab .pct{font-family:var(--mono);font-weight:600;font-size:14px;color:var(--sem-high)}
 .vhead{display:flex;align-items:center;gap:11px;min-width:0}
-.vhead .nm{font-weight:600;font-size:14px;color:var(--text)}
-.vhead .st{font-size:11.5px;color:var(--dim)}
-.vcur{font-size:11.5px;color:var(--dim);word-break:break-all;margin-top:2px}
-.vbadge2{font-size:11px;font-weight:600;padding:2px 9px;border-radius:7px;border:1px solid transparent;white-space:nowrap}
-.vb-nao{background:var(--red-soft);color:var(--red-2);border-color:rgba(226,87,74,.25)}
-.vb-pend{background:var(--orange-soft);color:var(--orange-2);border-color:rgba(232,154,60,.25)}
+.vhead .nm{font-weight:600;font-size:14.5px;color:var(--ink)}
+.vhead .st{font-family:var(--mono);font-size:11px;color:var(--sem-mid);letter-spacing:.3px;
+  text-transform:uppercase;margin-top:3px}
+.vcur{font-family:var(--mono);font-size:11px;color:var(--dim);word-break:break-all;margin-top:2px}
+.vbadge2{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.5px;
+  text-transform:uppercase;padding:4px 10px;border-radius:7px;border:1px solid transparent;white-space:nowrap}
+.vb-nao{background:rgba(232,181,74,.1);color:var(--sem-mid);border-color:rgba(232,181,74,.3)}
+.vb-pend{background:rgba(232,181,74,.1);color:var(--sem-mid);border-color:rgba(232,181,74,.3)}
+/* card do item com listra âmbar de atenção (container com key vcard_*) */
+[class*="st-key-vcard_"]{position:relative;overflow:hidden;
+  background:var(--surface)!important;border:1px solid var(--line)!important;border-radius:14px!important}
+[class*="st-key-vcard_"]::before{content:"";position:absolute;
+  left:0;top:0;bottom:0;width:3px;background:var(--sem-mid);z-index:1}
+/* botões: confirmar sólido verde, pular fantasma (maquete .vbtn) */
+[class*="st-key-vok_"] button{background:var(--sem-high);color:#0A2417;border:none;
+  font-weight:600;font-size:13px;border-radius:9px}
+[class*="st-key-vok_"] button:hover{background:var(--sem-high);color:#0A2417;filter:brightness(1.1);transform:none}
+[class*="st-key-vok_"] button:disabled{opacity:.4}
+[class*="st-key-vno_"] button{background:none;border:1px solid var(--line2);color:var(--muted);
+  font-weight:600;font-size:13px;border-radius:9px}
+[class*="st-key-vno_"] button:hover{color:var(--ink);border-color:var(--line2);background:none;transform:none}
 
 /* ============ Visão Geral · widgets nativos estilizados via st-key ============ */
 /* alerta de prazos: faixa âmbar com acento à esquerda */
@@ -360,8 +375,8 @@ body{background:var(--bg)}
 [class*="st-key-seg_"] button:hover{color:var(--white);border-color:var(--line-3);
   background:rgba(255,255,255,.05);transform:translateY(-1px)}
 .st-key-seg_Mapear button{--dot:#4A515A} .st-key-seg_Prospectar button{--dot:#6E7681}
-.st-key-seg_Monitorar button{--dot:#939BA5} .st-key-seg_Edital button{--dot:#E89A3C}
-.st-key-seg_Ativo button{--dot:#5FB137}
+.st-key-seg_Monitorar button{--dot:#939BA5} .st-key-seg_Edital button{--dot:#E8873A}
+.st-key-seg_Ativo button{--dot:#4ADE80}
 /* botões de município: pílulas com hover azul */
 [class*="st-key-cid_"] button{border-radius:999px;font-size:12.5px;font-weight:500;color:var(--text-2);
   border:1px solid var(--line-2);background:rgba(255,255,255,.014);padding:8px 12px}
@@ -427,15 +442,15 @@ st.markdown(CSS, unsafe_allow_html=True)
 LOGO_SVG = """
 <svg width="{size}" height="{size}" viewBox="0 0 42 42" aria-hidden="true">
   <g class="orbit" style="transform-origin:21px 21px">
-    <circle cx="21" cy="21" r="18" fill="none" stroke="#3B8BD0" stroke-opacity=".55" stroke-width="1.4"/>
-    <circle cx="21" cy="21" r="11.5" fill="none" stroke="#3B8BD0" stroke-opacity=".32" stroke-width="1.2"/>
-    <circle cx="21" cy="3.2" r="2.2" fill="#3B8BD0"/><circle cx="38.4" cy="24" r="1.9" fill="#3B8BD0" fill-opacity=".8"/>
+    <circle cx="21" cy="21" r="18" fill="none" stroke="#5B9BD5" stroke-opacity=".55" stroke-width="1.4"/>
+    <circle cx="21" cy="21" r="11.5" fill="none" stroke="#5B9BD5" stroke-opacity=".32" stroke-width="1.2"/>
+    <circle cx="21" cy="3.2" r="2.2" fill="#5B9BD5"/><circle cx="38.4" cy="24" r="1.9" fill="#5B9BD5" fill-opacity=".8"/>
   </g>
-  <g stroke="#5FB137" stroke-width="1.7" stroke-linecap="round">
+  <g stroke="#4ADE80" stroke-width="1.7" stroke-linecap="round">
     <line x1="21" y1="13.5" x2="21" y2="28.5"/><line x1="13.5" y1="21" x2="28.5" y2="21"/>
     <line x1="15.7" y1="15.7" x2="26.3" y2="26.3"/><line x1="26.3" y1="15.7" x2="15.7" y2="26.3"/>
   </g>
-  <circle cx="21" cy="21" r="2.6" fill="#5FB137"/>
+  <circle cx="21" cy="21" r="2.6" fill="#4ADE80"/>
 </svg>
 """
 
@@ -886,7 +901,7 @@ def dlg_valor_top10():
     if PLOTLY_OK and not top.empty:
         fig = go.Figure(go.Bar(
             x=top[COL_VALVO][::-1], y=top[COL_EMPRESA][::-1], orientation="h",
-            marker=dict(color="#5FB137", line=dict(color="rgba(255,255,255,.1)", width=1)),
+            marker=dict(color="#4ADE80", line=dict(color="rgba(255,255,255,.1)", width=1)),
             hovertemplate="<b>%{y}</b><br>Valor-alvo: R$ %{x:,.0f}<extra></extra>",
         ))
         fig.update_xaxes(showgrid=True, gridcolor="rgba(255,255,255,.06)", zeroline=False)
@@ -1633,66 +1648,120 @@ def page_visao():
 
 
 # =========================================================================== #
-# PÁGINA · RANKING
+# PÁGINA · RANKING (maquete: tabela com ponto por score; linha abre o dossiê)
 # =========================================================================== #
+_RANKING_V2_CSS = """
+.rk{font-family:'Inter',system-ui,sans-serif;color:var(--ink,#F5F7FA);animation:rk-fade .4s ease}
+@keyframes rk-fade{from{opacity:0;transform:translateY(10px)}}
+.tbl{background:var(--surface,#161A21);border:1px solid var(--line,rgba(255,255,255,.06));
+  border-radius:16px;overflow:hidden}
+.tr{display:grid;grid-template-columns:2.4fr 1fr 1.1fr 1fr auto;gap:16px;align-items:center;
+  padding:16px 24px;border-bottom:1px solid var(--line,rgba(255,255,255,.06));cursor:pointer;transition:.15s}
+.tr:last-child{border-bottom:none}
+.tr:hover{background:var(--hover,#222834)}
+.tr.head{cursor:default;font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:1px;
+  text-transform:uppercase;color:var(--dim,#6B7688)}
+.tr.head:hover{background:none}
+.org{display:flex;align-items:center;gap:13px;min-width:0}
+.org .sd{width:9px;height:9px;border-radius:50%;flex:none}
+.org .nm{font-weight:600;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.org .sub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dim,#6B7688);
+  margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.score{font-weight:800;font-size:19px;font-variant-numeric:tabular-nums}
+.pill{font-size:12px;font-weight:600;padding:5px 12px;border-radius:20px;width:fit-content;white-space:nowrap}
+.val{font-weight:600;font-variant-numeric:tabular-nums;font-size:13.5px}
+.rarrow{color:var(--dim,#6B7688);transition:.2s}
+.tr:hover .rarrow{color:var(--accent,#E8873A);transform:translateX(3px)}
+.rk-foot{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dim,#6B7688);
+  padding:12px 24px;border-top:1px solid var(--line,rgba(255,255,255,.06))}
+.rk-vazio{padding:26px 24px;text-align:center;color:var(--muted,#A4AEBF);font-size:14px}
+"""
+
+_RANKING_V2_JS = r"""
+export default function(component){
+  const {data, parentElement, setTriggerValue} = component;
+  const old = parentElement.querySelector('.rk'); if (old) old.remove();
+  const d = data || {}, rows = d.rows || [];
+  const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  // limiares de Score PFC de organização (mesmos dos chips/kanban do app)
+  const sem = s => s >= 85 ? 'var(--sem-high,#4ADE80)' : s >= 70 ? 'var(--sem-mid,#E8B54A)'
+    : 'var(--sem-low,#7C8698)';
+  const root = document.createElement('div'); root.className = 'rk';
+  let html = '<div class="tbl"><div class="tr head"><div>Organização</div><div>Score PFC</div>' +
+    '<div>Status</div><div>Valor-alvo</div><div></div></div>';
+  rows.forEach(function(o, i){
+    const c = sem(o.score);
+    html += '<div class="tr" data-i="' + i + '">' +
+      '<div class="org"><span class="sd" style="background:' + c + ';box-shadow:0 0 8px ' + c + '"></span>' +
+      '<div style="min-width:0"><div class="nm">' + esc(o.nome) + '</div>' +
+      '<div class="sub">' + esc(String(o.setor).toUpperCase()) + '</div></div></div>' +
+      '<div class="score" style="color:' + c + '">' + esc(o.score) + '</div>' +
+      '<div><span class="pill" style="background:' + o.cor_status + '22;color:' + o.cor_status + '">' +
+      esc(o.status) + '</span></div>' +
+      '<div class="val">' + esc(o.valor) + '</div><div class="rarrow">→</div></div>';
+  });
+  if (!rows.length) {
+    html += '<div class="rk-vazio">Nenhuma organização encontrada — ajuste a busca ou o filtro.</div>';
+  }
+  if (d.restantes > 0) {
+    html += '<div class="rk-foot">+ ' + d.restantes + ' organizações · refine a busca para ver mais</div>';
+  }
+  html += '</div>';
+  root.innerHTML = html;
+  parentElement.appendChild(root);
+  root.addEventListener('click', function(e){
+    const el = e.target.closest('.tr[data-i]');
+    if (!el) { return; }
+    setTriggerValue('acao', {i: +el.dataset.i, n: Date.now()});
+  });
+  return function(){ root.remove(); };
+}
+"""
+
+_ranking_v2 = components_v2.component("pfc_ranking", css=_RANKING_V2_CSS, js=_RANKING_V2_JS)
+
+
 def page_ranking():
     st.markdown(
         '<div class="phead"><h1>Ranking de captação</h1>'
-        '<p>ordenado por Score PFC · busca e filtro ao vivo · abra o dossiê completo</p></div>',
+        '<p>ordenado por Score PFC · busca e filtro ao vivo · clique na linha para abrir o dossiê</p></div>',
         unsafe_allow_html=True,
     )
     c1, c2, c3 = st.columns([3, 1.6, 1])
     with c1:
-        busca = st.text_input("Buscar", placeholder="Buscar organização ou setor…",
+        busca = st.text_input("Buscar", key="rk_busca",
+                              placeholder="Buscar organização ou setor…",
                               label_visibility="collapsed")
     with c2:
-        filtro_status = st.selectbox("Status", ["Todos"] + STATUS_FUNIL,
+        filtro_status = st.selectbox("Status", ["Todos"] + STATUS_FUNIL, key="rk_status",
                                      label_visibility="collapsed")
     with c3:
-        if st.button("🔄 Atualizar", use_container_width=True,
+        if st.button("🔄 Atualizar", key="rk_refresh", use_container_width=True,
                      help="Recarrega os dados (limpa o cache de 60s)"):
             dados.limpar_caches()
             st.rerun()
 
     rank = df.sort_values(COL_SCORE, ascending=False).copy() if TOTAL else df.copy()
-    if busca.strip() and TOTAL:
+    if busca and busca.strip() and TOTAL:
         q = busca.strip().lower()
         rank = rank[rank[COL_EMPRESA].str.lower().str.contains(q, na=False)
                     | rank[COL_SETOR].str.lower().str.contains(q, na=False)]
     if filtro_status != "Todos":
         rank = rank[rank[COL_STATUS] == filtro_status]
 
-    st.caption(f"{len(rank)} organização(ões) · mostrando as primeiras 30 por score")
-    st.markdown('<div class="rkhead"><span>Organização</span><span>Score PFC</span>'
-                '<span>Status</span><span class="r">Valor-alvo</span></div>',
-                unsafe_allow_html=True)
+    top = rank.head(30)
+    rows = [{"nome": str(r[COL_EMPRESA]), "setor": texto_ou(r[COL_SETOR]),
+             "score": int(r[COL_SCORE]), "status": str(r[COL_STATUS]).strip() or "—",
+             "cor_status": CORES_STATUS.get(str(r[COL_STATUS]).strip(), "#7C8698"),
+             "valor": brl_curto(r[COL_VALVO])}
+            for _, r in top.iterrows()]
 
-    for i, (_, row) in enumerate(rank.head(30).iterrows()):
-        cA, cB, cC, cD, cE = st.columns([2.7, 1.45, 1, 1, 0.95], gap="medium")
-        paridade = "odd" if i % 2 else "even"
-        with cA:
-            st.markdown(
-                f'<div class="org {paridade}"><span class="sem" style="background:{sem_cor(row[COL_SEMAFORO])}"></span>'
-                f'<div><div class="nm">{texto_ou(row[COL_EMPRESA])}</div>'
-                f'<div class="st">{texto_ou(row[COL_SETOR])}</div></div></div>',
-                unsafe_allow_html=True)
-        with cB:
-            st.markdown(f'<div class="scorecell"><span class="scoreN">{int(row[COL_SCORE])}</span>'
-                        f'{seg_html(row[COL_SCORE])}</div>', unsafe_allow_html=True)
-        with cC:
-            st.markdown(status_badge(row[COL_STATUS]), unsafe_allow_html=True)
-        with cD:
-            st.markdown(f'<div class="alvo">{brl_curto(row[COL_VALVO])}</div>', unsafe_allow_html=True)
-        with cE:
-            if st.button("Ver dossiê", key=f"dos_{row[COL_ID]}_{i}"):
-                mostrar_dossie(row.to_dict())
-
-    if len(rank) > 30:
-        st.markdown(
-            f'<div class="pad" style="color:var(--dim);font-size:12px">'
-            f'+ {len(rank) - 30} organizações · refine a busca para ver mais</div>',
-            unsafe_allow_html=True,
-        )
+    res = _ranking_v2(data={"rows": rows, "restantes": max(0, len(rank) - len(top))},
+                      key="ranking_v2", on_acao_change=lambda: None)
+    ac = getattr(res, "acao", None)
+    if isinstance(ac, dict) and isinstance(ac.get("i"), int) and 0 <= ac["i"] < len(top):
+        mostrar_dossie(top.iloc[ac["i"]].to_dict())
 
 
 # =========================================================================== #
@@ -1958,30 +2027,30 @@ def page_funil():
 
 # Gráfico de Score: donut único elegante + chips clicáveis (SVG/JS autocontido).
 ORBITAL_TEMPLATE = r"""<!doctype html><html><head><meta charset="utf-8"><style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{background:transparent;font-family:'Inter',system-ui,sans-serif;color:#E9EBEE}
 .wrap{background:rgba(20,24,32,.6);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.06);border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.16),inset 0 0 0 1px rgba(255,255,255,.02)}
 .h{padding:18px 20px 13px;border-bottom:1px solid rgba(255,255,255,.06)}
-.h h2{font-family:'Space Grotesk';font-weight:600;font-size:15.5px;margin:0}
+.h h2{font-family:'Inter';font-weight:600;font-size:15.5px;margin:0}
 .h .cap{font-size:12px;color:#565E68;margin-top:3px}
 .body{padding:14px 18px 18px}
 .orbit-wrap{display:grid;place-items:center}
 #arc{transition:stroke .35s ease;cursor:default}
-.cn{font-family:'Space Grotesk';font-weight:600;transition:fill .35s ease}
+.cn{font-family:'Inter';font-weight:600;transition:fill .35s ease}
 .chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:14px}
 .chip{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid rgba(255,255,255,.07);border-radius:999px;cursor:pointer;font-size:12.5px;color:#C2C7CE;background:rgba(255,255,255,.015);transition:background .22s ease,border-color .22s ease,transform .15s ease,color .22s ease}
 .chip:hover{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.16);transform:translateY(-2px);color:#fff}
 .chip.sel{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.24);color:#fff}
 .chip .dot{width:8px;height:8px;border-radius:50%;flex:none}
-.chip b{font-family:'Space Grotesk';font-weight:600}
+.chip b{font-family:'Inter';font-weight:600}
 .hint{font-size:11px;color:#565E68;text-align:center;margin-top:11px}
 </style></head><body>
 <div class="wrap"><div class="h"><h2>Anatomia do Score</h2><div class="cap" id="cap">__NOME__</div></div>
 <div class="body">
 <div class="orbit-wrap"><svg id="svg" width="206" height="206" viewBox="0 0 200 200" aria-label="Score">
   <defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="#E89A3C"/><stop offset="1" stop-color="#5FB137"/></linearGradient></defs>
+    <stop offset="0" stop-color="#E8873A"/><stop offset="1" stop-color="#4ADE80"/></linearGradient></defs>
   <circle cx="100" cy="100" r="80" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="10"/>
   <circle id="arc" cx="100" cy="100" r="80" fill="none" stroke="url(#grad)" stroke-width="10" stroke-linecap="round"
           transform="rotate(-90 100 100)"/>
@@ -2043,6 +2112,53 @@ EMAIL_COPY_TEMPLATE = r"""<!doctype html><html><head><meta charset="utf-8"><styl
 # =========================================================================== #
 # PÁGINA · METODOLOGIA
 # =========================================================================== #
+# Painel de pesos do score no estilo da maquete (barras animadas .fb/.fl).
+_PESOS_V2_CSS = """
+.mp{font-family:'Inter',system-ui,sans-serif;color:var(--ink,#F5F7FA);animation:mp-fade .4s ease}
+@keyframes mp-fade{from{opacity:0;transform:translateY(10px)}}
+.panel{background:var(--surface,#161A21);border:1px solid var(--line,rgba(255,255,255,.06));
+  border-radius:16px;padding:26px 28px}
+.panel h3{font-size:16px;font-weight:600;margin:0 0 4px}
+.psub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dim,#6B7688);
+  margin-bottom:22px;letter-spacing:.5px}
+.fb{display:flex;align-items:center;gap:16px;margin-bottom:18px}
+.fb:last-child{margin-bottom:0}
+.fb .n{font-size:14px;color:var(--muted,#A4AEBF);width:130px;flex:none;font-weight:500}
+.fb .tk{flex:1;height:11px;background:rgba(255,255,255,.05);border-radius:6px;overflow:hidden}
+.fb .fl{height:100%;border-radius:6px;width:0;transition:width 1.1s cubic-bezier(.16,1,.3,1)}
+.fb .v{font-size:16px;font-weight:700;width:44px;text-align:right;flex:none;font-variant-numeric:tabular-nums}
+"""
+
+_PESOS_V2_JS = r"""
+export default function(component){
+  const {data, parentElement} = component;
+  const old = parentElement.querySelector('.mp'); if (old) old.remove();
+  const d = data || {};
+  const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const root = document.createElement('div'); root.className = 'mp';
+  let fbs = '';
+  (d.rows || []).forEach(function(r){
+    fbs += '<div class="fb"><span class="n">' + esc(r.n) + '</span>' +
+      '<span class="tk"><span class="fl" data-w="' + r.w + '" style="background:' + r.cor +
+      '"></span></span><span class="v">' + r.w + '%</span></div>';
+  });
+  root.innerHTML = '<div class="panel"><h3>' + esc(d.titulo || '') + '</h3>' +
+    '<div class="psub">' + esc(d.sub || '') + '</div>' + fbs + '</div>';
+  parentElement.appendChild(root);
+  setTimeout(function(){
+    root.querySelectorAll('.fl').forEach(function(fl, i){
+      fl.style.transitionDelay = (i * 90) + 'ms';
+      fl.style.width = fl.dataset.w + '%';
+    });
+  }, 60);
+  return function(){ root.remove(); };
+}
+"""
+
+_pesos_v2 = components_v2.component("pfc_pesos", css=_PESOS_V2_CSS, js=_PESOS_V2_JS)
+
+
 def page_metodo():
     st.markdown(
         '<div class="phead"><h1>Como o Score PFC é calculado</h1>'
@@ -2050,28 +2166,36 @@ def page_metodo():
         unsafe_allow_html=True,
     )
     componentes = [
-        ("🎯 Aderência ao DNA", 35, "var(--orange)", "#F2911E",
+        ("🎯 Aderência ao DNA", 35, "var(--orange)", "#E8873A",
          "Mede o quanto a causa da organização conversa com o DNA do PFC: ciência, STEM, "
          "educação pública, permanência escolar e projeto de vida. É o maior peso porque "
          "sem aderência de missão a parceria não se sustenta, por mais dinheiro que exista.",
          "Ex.: uma fundação que financia Clubes de Ciência e feiras científicas = aderência altíssima."),
-        ("💰 Capacidade & fit de valor", 25, "var(--green)", "#5FB137",
+        ("💰 Capacidade & fit de valor", 25, "var(--green)", "#4ADE80",
          "Avalia a capacidade financeira do parceiro e se o ticket típico dele cabe no que o "
          "PFC precisa captar. Premia organizações com histórico de investimento social e faixa "
          "de valor compatível com os projetos do programa.",
          "Ex.: instituto com editais de R$ 100–300 mil casa melhor que um patrocínio pontual de R$ 5 mil."),
-        ("🗺️ Proximidade regional", 20, "var(--blue)", "#3B8BD0",
+        ("🗺️ Proximidade regional", 20, "var(--blue)", "#5B9BD5",
          "Pondera a presença do parceiro nos municípios onde o PFC atua (Iperó, Tatuí, Salto, "
          "Sorocaba e região). Proximidade geográfica reduz atrito logístico e aumenta a chance "
          "de visitas, eventos e engajamento local.",
          "Ex.: empresa com unidade em Sorocaba pontua mais que uma sediada fora do estado."),
-        ("⚡ Acionabilidade", 20, "var(--muted)", "#969CA6",
+        ("⚡ Acionabilidade", 20, "var(--muted)", "#7C8698",
          "Mede o quão fácil é agir AGORA: existe canal de contato claro, edital aberto, "
          "porta de entrada conhecida? Premia oportunidades destravadas e penaliza as que "
          "exigem meses de prospecção fria.",
          "Ex.: edital com inscrições abertas e contato do ESG mapeado = acionabilidade alta."),
     ]
-    st.markdown("#### Pesos & leitura — clique para expandir cada critério")
+    _pesos_v2(data={"titulo": "Pesos do algoritmo",
+                    "sub": "SCORE = 0,35·ADERÊNCIA + 0,25·VALOR + 0,20·REGIÃO + 0,20·AÇÃO",
+                    "rows": [{"n": "Aderência", "w": 35, "cor": "#E8873A"},
+                             {"n": "Valor", "w": 25, "cor": "#5B9BD5"},
+                             {"n": "Região", "w": 20, "cor": "#E8B54A"},
+                             {"n": "Acionabilidade", "w": 20, "cor": "#4ADE80"}]},
+              key="pesos_v2")
+
+    st.markdown("#### Detalhe por critério — clique para expandir")
     for nome, w, var, _hex, desc, exemplo in componentes:
         with st.expander(f"{nome}  ·  {w}%"):
             st.markdown(
@@ -2094,10 +2218,10 @@ def page_metodo():
         # TODO: trocar pela leitura de colunas reais (ex.: "Score Aderência",
         # "Score Fit", ...) na planilha quando esses dados existirem.
         comps = [
-            {"n": "Aderência", "v": min(100, score_sel), "c": "#E89A3C"},
-            {"n": "Fit", "v": max(0, score_sel - 2), "c": "#5FB137"},
+            {"n": "Aderência", "v": min(100, score_sel), "c": "#E8873A"},
+            {"n": "Fit", "v": max(0, score_sel - 2), "c": "#4ADE80"},
             {"n": "Região", "v": max(0, score_sel - 4), "c": "#5B9BD5"},
-            {"n": "Ação", "v": max(0, score_sel - 3), "c": "#9AA2AC"},
+            {"n": "Ação", "v": max(0, score_sel - 3), "c": "#7C8698"},
         ]
         orb = (ORBITAL_TEMPLATE
                .replace("__DATA__", json.dumps(comps))
@@ -2109,17 +2233,12 @@ def page_metodo():
         st.markdown(
             '<div class="card"><div class="card-h"><div><h2>Fórmula</h2>'
             '<div class="cap">transparente e auditável</div></div></div><div class="pad">'
-            '<div class="legend">'
-            + "".join(
-                f'<div class="lrow"><span class="nm"><span class="sw" style="background:{c}"></span>{n}</span>'
-                f'<span class="wt">{w}%</span><span class="ltrack"><i style="width:{w}%;background:{c}"></i></span></div>'
-                for n, w, c in [("Aderência ao DNA", 35, "var(--orange)"),
-                                ("Capacidade & fit de valor", 25, "var(--green)"),
-                                ("Proximidade regional", 20, "var(--blue)"),
-                                ("Acionabilidade", 20, "var(--muted)")])
-            + '</div><div class="divider"></div>'
+            '<p style="font-family:var(--mono);font-size:12.5px;color:var(--text);line-height:1.9">'
+            'SCORE = 0,35·ADERÊNCIA<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+ 0,25·VALOR'
+            '<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+ 0,20·REGIÃO'
+            '<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+ 0,20·AÇÃO</p>'
+            '<div class="divider"></div>'
             '<p style="font-size:12.5px;color:var(--muted);line-height:1.7">'
-            '<b style="color:var(--text)">Score = 0,35·Aderência + 0,25·Valor + 0,20·Região + 0,20·Acionabilidade.</b><br>'
             'No MVP, o app usa a coluna <code>Score PFC</code> já existente na planilha; esta aba '
             'documenta e visualiza a fórmula para que qualquer número seja defensável em reunião.</p>'
             '</div></div>',
@@ -2325,7 +2444,7 @@ def page_verificacao():
         badge = ('<span class="vbadge2 vb-pend">verificação pendente</span>' if pend
                  else '<span class="vbadge2 vb-nao">não verificada</span>')
         google = f"https://www.google.com/search?q={quote_plus(nome)}+site+oficial"
-        with st.container(border=True):
+        with st.container(border=True, key=f"vcard_{oid}"):
             st.markdown(
                 f'<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">'
                 f'<div class="vhead"><span class="sem" style="background:{sem_cor(row[COL_SEMAFORO])}"></span>'
