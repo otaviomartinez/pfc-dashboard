@@ -718,6 +718,275 @@ def tela_login():
         st.caption("🧪 Demo — fabio@pfc.org · otavio@pfc.org  (senha: pfc2026)")
 
 
+# =========================================================================== #
+# HUB DE ENTRADA (maquete pfc_hub_v4) — porta de entrada após o login
+# ---------------------------------------------------------------------------
+# Fundo cósmico + horizonte de planeta + dois cards (Captação laranja /
+# Emendas violeta). Custom Component v2 bidirecional: o clique num card
+# devolve a escolha ao Python (setTriggerValue), que grava em
+# session_state["radar_escolhido"] e entra no painel correspondente.
+# =========================================================================== #
+_HUB_CSS = """
+.hub{position:fixed;inset:0;z-index:0;font-family:'Space Grotesk',system-ui,sans-serif;
+  color:#EEF1F8;overflow:hidden;--ease:cubic-bezier(.16,1,.3,1)}
+.hub *{box-sizing:border-box}
+.hub-stars{position:absolute;inset:0;z-index:0}
+.hub-planet{position:absolute;left:50%;top:74vh;transform:translateX(-50%);
+  width:300vw;height:300vw;border-radius:50%;z-index:1;
+  background:linear-gradient(180deg,#0e1430,#080c1c 12%,#04060F 28%);
+  box-shadow:inset 0 8px 70px rgba(179,171,255,.10)}
+.hub-atmo{position:absolute;left:50%;bottom:0;transform:translateX(-50%);
+  width:130vw;height:26vh;z-index:1;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 100%,rgba(123,107,240,.20),rgba(59,139,208,.06) 45%,transparent 72%)}
+
+.hub-rail{position:absolute;top:0;left:0;height:100vh;width:74px;z-index:40;
+  background:linear-gradient(90deg,rgba(8,11,22,.9),rgba(8,11,22,.2));
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  border-right:1px solid rgba(255,255,255,.06);
+  display:flex;flex-direction:column;padding:22px 0;transition:width .42s var(--ease);overflow:hidden}
+.hub-rail:hover{width:238px;background:linear-gradient(90deg,rgba(8,11,22,.98),rgba(8,11,22,.85))}
+.hub-rlogo{display:flex;align-items:center;gap:13px;padding:0 20px 30px;white-space:nowrap}
+.hub-rings{width:34px;height:34px;position:relative;flex:none}
+.hub-rings span{position:absolute;inset:0;border-radius:50%;border:1.5px solid;animation:hub-spin 18s linear infinite}
+.hub-rings span:nth-child(1){border-color:transparent #F2911E transparent transparent}
+.hub-rings span:nth-child(2){border-color:transparent transparent #5FB137 transparent;inset:5px;animation-duration:12s;animation-direction:reverse}
+.hub-rings span:nth-child(3){border-color:#3B8BD0 transparent transparent transparent;inset:10px;animation-duration:8s}
+@keyframes hub-spin{to{transform:rotate(360deg)}}
+.hub-rlogo b{font-weight:600;font-size:14px;opacity:0;transition:opacity .3s}
+.hub-rail:hover .hub-rlogo b{opacity:1}
+.hub-ritem{display:flex;align-items:center;gap:15px;padding:13px 22px;color:#5A6278;
+  cursor:pointer;transition:.2s;white-space:nowrap}
+.hub-ritem:hover{color:#EEF1F8;background:rgba(255,255,255,.04)}
+.hub-ritem.on{color:#EEF1F8} .hub-ritem.on svg{stroke:#F2911E}
+.hub-ritem svg{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7}
+.hub-ritem span{font-size:13.5px;font-weight:500;opacity:0;transition:opacity .3s}
+.hub-rail:hover .hub-ritem span{opacity:1}
+.hub-rfoot{margin-top:auto;padding:0 22px;white-space:nowrap}
+.hub-rstat{font-family:'JetBrains Mono',monospace;font-size:10px;color:#5A6278;
+  display:flex;align-items:center;gap:8px;opacity:0;transition:.3s}
+.hub-rail:hover .hub-rstat{opacity:1}
+.hub-rstat .d{width:6px;height:6px;border-radius:50%;background:#5FB137;
+  box-shadow:0 0 8px #5FB137;animation:hub-pulse 2s infinite}
+@keyframes hub-pulse{50%{opacity:.4}}
+
+.hub-stage{position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;padding-left:74px}
+.hub-title{text-align:center;margin-bottom:46px;opacity:0;animation:hub-up .8s var(--ease) .2s forwards}
+.hub-title .eye{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:4px;
+  text-transform:uppercase;color:#5A6278;margin-bottom:14px}
+.hub-title h1{font-size:42px;font-weight:700;letter-spacing:-1.6px;color:#EEF1F8}
+@keyframes hub-up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+.hub-arena{display:flex;align-items:stretch;gap:38px;perspective:2200px}
+.hub-card{position:relative;width:440px;border-radius:30px;cursor:pointer;overflow:hidden;
+  background:linear-gradient(165deg,rgba(24,30,48,.82),rgba(9,12,22,.8));
+  border:1px solid rgba(255,255,255,.1);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+  box-shadow:0 44px 90px -34px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.09);
+  transform-style:preserve-3d;transition:transform .5s var(--ease),box-shadow .5s,border-color .5s;
+  display:flex;flex-direction:column;opacity:0}
+.hub-card.c1{animation:hub-pop 1s var(--ease) .4s forwards}
+.hub-card.c2{animation:hub-pop 1s var(--ease) .54s forwards}
+@keyframes hub-pop{from{opacity:0;transform:translateY(40px) scale(.94)}to{opacity:1;transform:none}}
+.hub-sheen{position:absolute;inset:0;z-index:3;pointer-events:none;border-radius:26px;
+  background:linear-gradient(160deg,rgba(255,255,255,.07),transparent 40%)}
+.hub-card.c1:hover{border-color:transparent;
+  box-shadow:0 56px 110px -34px rgba(242,145,30,.42),0 0 0 1px rgba(242,145,30,.5),inset 0 1px 0 rgba(255,255,255,.14)}
+.hub-card.c2:hover{border-color:transparent;
+  box-shadow:0 56px 110px -34px rgba(123,107,240,.5),0 0 0 1px rgba(123,107,240,.55),inset 0 1px 0 rgba(255,255,255,.14)}
+.hub-radarbox{padding:44px 0 40px;display:grid;place-items:center;z-index:2}
+.hub-radO{width:270px;height:270px;position:relative;transform:translateZ(30px);transition:transform .5s var(--ease)}
+.hub-card:hover .hub-radO{transform:translateZ(60px) scale(1.06)}
+.hub-radO svg{position:absolute;inset:0;width:100%;height:100%}
+.hub-grid{stroke:rgba(255,255,255,.09);fill:none}
+.hub-sweep,.hub-sweepfill{transform-origin:center;animation:hub-rsw 4s linear infinite}
+.hub-card.c1 .hub-sweep{stroke:#F2911E} .hub-card.c2 .hub-sweep{stroke:#b7abff}
+@keyframes hub-rsw{to{transform:rotate(360deg)}}
+.hub-blip{opacity:0;animation:hub-bl 4s ease-out infinite}
+@keyframes hub-bl{0%,100%{opacity:0}35%{opacity:1}}
+.hub-plate{position:relative;z-index:2;padding:26px 30px 34px;border-top:1px solid rgba(255,255,255,.07);
+  background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,.045))}
+.hub-htag{font-family:'JetBrains Mono',monospace;font-size:11.5px;letter-spacing:2px;
+  text-transform:uppercase;margin-bottom:10px}
+.hub-card.c1 .hub-htag{color:#ffc061} .hub-card.c2 .hub-htag{color:#b7abff}
+.hub-plate h2{font-size:30px;font-weight:700;letter-spacing:-.8px;margin-bottom:20px}
+.hub-stats{display:flex;gap:26px;margin-bottom:24px}
+.hub-stats .n{font-weight:700;font-size:28px;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+.hub-card.c1 .hub-stats .n{color:#F2911E} .hub-card.c2 .hub-stats .n{color:#b7abff}
+.hub-stats .l{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#5A6278;
+  text-transform:uppercase;margin-top:4px}
+.hub-enter{display:flex;align-items:center;justify-content:center;gap:10px;font-weight:600;font-size:16.5px;
+  padding:16px;border-radius:15px;border:1px solid rgba(255,255,255,.15);transition:.35s var(--ease)}
+.hub-card.c1 .hub-enter{color:#ffc061} .hub-card.c2 .hub-enter{color:#b7abff}
+.hub-card.c1:hover .hub-enter{background:#F2911E;color:#04060F;border-color:#F2911E}
+.hub-card.c2:hover .hub-enter{background:#8B7BF5;color:#fff;border-color:#8B7BF5}
+.hub-enter svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.3;transition:.35s}
+.hub-card:hover .hub-enter svg{transform:translateX(5px)}
+@media(max-width:980px){.hub-arena{flex-direction:column;gap:20px;overflow:auto;max-height:80vh}
+  .hub-card{width:340px}.hub-title h1{font-size:32px}}
+"""
+
+_HUB_JS = r"""
+export default function(component){
+  const {data, parentElement, setTriggerValue} = component;
+  const old = parentElement.querySelector('.hub'); if (old) old.remove();
+  const d = data || {}, cap = d.captacao || {}, emd = d.emendas || {};
+  const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const arrow = '<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+
+  function radarSVG(cls){
+    const blips = cls === 'c1'
+      ? [[172,78,0],[80,168,1.3],[176,158,2.5]]
+      : [[92,78,0],[170,138,1.6],[98,170,2.8]];
+    const cor = cls === 'c1' ? '#F2911E' : '#b7abff';
+    let b = '';
+    blips.forEach(function(p){ b += '<circle class="hub-blip" cx="'+p[0]+'" cy="'+p[1]+
+      '" r="4" fill="'+cor+'" style="animation-delay:'+p[2]+'s"/>'; });
+    return '<svg viewBox="0 0 246 246">' +
+      '<circle class="hub-grid" cx="123" cy="123" r="118"/>' +
+      '<circle class="hub-grid" cx="123" cy="123" r="80"/>' +
+      '<circle class="hub-grid" cx="123" cy="123" r="43"/>' +
+      '<line class="hub-grid" x1="123" y1="5" x2="123" y2="241"/>' +
+      '<line class="hub-grid" x1="5" y1="123" x2="241" y2="123"/>' +
+      '<line class="hub-sweep" x1="123" y1="123" x2="123" y2="5" stroke-width="2"/>' +
+      '<circle cx="123" cy="123" r="3" fill="'+cor+'"/>' + b + '</svg>';
+  }
+  function statCells(arr){
+    return arr.map(function(s){ return '<div><div class="n">'+esc(s[0])+'</div>'+
+      '<div class="l">'+esc(s[1])+'</div></div>'; }).join('');
+  }
+  function card(cls, radar, tag, titulo, stats){
+    return '<div class="hub-card '+cls+'" data-radar="'+radar+'">' +
+      '<div class="hub-sheen"></div>' +
+      '<div class="hub-radarbox"><div class="hub-radO">'+radarSVG(cls)+'</div></div>' +
+      '<div class="hub-plate"><div class="hub-htag">'+esc(tag)+'</div>' +
+      '<h2>'+esc(titulo)+'</h2><div class="hub-stats">'+statCells(stats)+'</div>' +
+      '<div class="hub-enter">Entrar neste radar '+arrow+'</div></div></div>';
+  }
+
+  const root = document.createElement('div'); root.className = 'hub';
+  root.innerHTML =
+    '<canvas class="hub-stars"></canvas><div class="hub-planet"></div><div class="hub-atmo"></div>' +
+    '<aside class="hub-rail"><div class="hub-rlogo">' +
+    '<div class="hub-rings"><span></span><span></span><span></span></div><b>Futuro Cientista</b></div>' +
+    '<div class="hub-ritem on"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/>' +
+    '<rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>' +
+    '<rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>Central</span></div>' +
+    '<div class="hub-ritem" data-radar="captacao"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l8-4v18"/></svg>' +
+    '<span>Captação Privada</span></div>' +
+    '<div class="hub-ritem" data-radar="emendas"><svg viewBox="0 0 24 24"><path d="M6 3h12l3 6-9 12L3 9z"/></svg>' +
+    '<span>Emendas</span></div>' +
+    '<div class="hub-rfoot"><div class="hub-rstat"><span class="d"></span>' + esc(d.status || '') + '</div></div></aside>' +
+    '<div class="hub-stage"><div class="hub-title"><div class="eye">Central de Captação</div>' +
+    '<h1>Escolha seu radar</h1></div><div class="hub-arena">' +
+    card('c1', 'captacao', cap.tag || 'Setor 01 · Recursos privados', 'Captação Privada',
+         [[cap.orgs, 'orgs'], [cap.novas, 'novas'], [cap.fontes, 'fontes']]) +
+    card('c2', 'emendas', emd.tag || 'Setor 02 · Recursos públicos', 'Emendas Parlamentares',
+         [[emd.deputados, 'deputados'], [emd.dialogos, 'diálogos'], [emd.aprovadas, 'aprovada']]) +
+    '</div></div>';
+  parentElement.appendChild(root);
+
+  // cliques -> Python (card inteiro ou item da rail)
+  root.addEventListener('click', function(e){
+    const el = e.target.closest('[data-radar]');
+    if (!el) { return; }
+    const card = el.closest('.hub-card');
+    if (card) { card.style.transition = 'transform .15s'; card.style.transform = 'scale(.97)'; }
+    setTriggerValue('escolha', {radar: el.dataset.radar, n: Date.now()});
+  });
+  // tilt 3D nos cards
+  root.querySelectorAll('.hub-card').forEach(function(c){
+    c.addEventListener('mousemove', function(e){
+      const r = c.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width - .5, py = (e.clientY - r.top) / r.height - .5;
+      c.style.transform = 'rotateY(' + (px*10) + 'deg) rotateX(' + (-py*10) + 'deg) translateY(-8px)';
+    });
+    c.addEventListener('mouseleave', function(){ c.style.transform = ''; });
+  });
+
+  // canvas de estrelas — setInterval (o rAF-loop não roda no runtime do módulo v2)
+  const cv = root.querySelector('.hub-stars'), g = cv.getContext('2d');
+  let W, H, stars = [];
+  function rz(){
+    W = cv.width = innerWidth; H = cv.height = innerHeight; stars = [];
+    const n = Math.min(220, W * H / 8000);
+    for (let i = 0; i < n; i++) stars.push({x: Math.random()*W, y: Math.random()*H*.85,
+      r: Math.random()*1.2+.3, b: Math.random(), s: Math.random()*.05+.01});
+  }
+  rz(); window.addEventListener('resize', rz);
+  const iv = setInterval(function(){
+    g.clearRect(0, 0, W, H);
+    for (const s of stars){ s.b += s.s; const a = .25 + Math.abs(Math.sin(s.b))*.65;
+      g.beginPath(); g.arc(s.x, s.y, s.r, 0, 7); g.fillStyle = 'rgba(255,255,255,'+a+')'; g.fill(); }
+  }, 33);
+
+  return function(){ clearInterval(iv); window.removeEventListener('resize', rz); root.remove(); };
+}
+"""
+
+_hub_component = components_v2.component("pfc_hub", css=_HUB_CSS, js=_HUB_JS)
+
+# CSS que "limpa" o chrome do Streamlit enquanto o hub está em cena.
+_HUB_CHROME_CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+[data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"],
+button[data-testid="stBaseButton-headerNoPadding"]{display:none!important}
+[data-testid="stMainBlockContainer"], .block-container{padding:0!important;max-width:100%!important}
+.stApp{background:#04060F!important}
+</style>
+"""
+
+
+def render_hub():
+    """Renderiza a Central e trata a escolha do radar (grava e entra no painel)."""
+    st.markdown(_HUB_CHROME_CSS, unsafe_allow_html=True)
+    try:
+        novas = len(dados.carregar_novidades_pendentes())
+    except Exception:
+        novas = 0
+    try:
+        from radar.fontes_ancora import FONTES as _FA
+        n_fontes = len(_FA)
+    except Exception:
+        n_fontes = 31
+    payload = {
+        "status": "SHEETS AO VIVO · 06:00" if modo_conectado else "MODO LOCAL · CSV",
+        "captacao": {"orgs": TOTAL, "novas": novas, "fontes": n_fontes,
+                     "tag": "Setor 01 · Recursos privados"},
+        # Emendas ainda não implementado — números ilustrativos do módulo futuro.
+        "emendas": {"deputados": 16, "dialogos": 4, "aprovadas": 1,
+                    "tag": "Setor 02 · Recursos públicos"},
+    }
+    res = _hub_component(data=payload, key="hub", on_escolha_change=lambda: None)
+    esc = getattr(res, "escolha", None)
+    if isinstance(esc, dict) and esc.get("radar") in ("captacao", "emendas"):
+        st.session_state["radar_escolhido"] = esc["radar"]
+        st.rerun()
+
+
+def render_emendas_placeholder():
+    """Tela provisória do radar de Emendas (a ser implementada)."""
+    st.markdown(_HUB_CHROME_CSS, unsafe_allow_html=True)
+    st.markdown(
+        '<div style="min-height:80vh;display:flex;flex-direction:column;align-items:center;'
+        'justify-content:center;text-align:center;gap:16px;font-family:\'Space Grotesk\',sans-serif">'
+        '<div style="font-size:52px">🏛️</div>'
+        '<div style="font-family:\'JetBrains Mono\',monospace;font-size:12px;letter-spacing:4px;'
+        'text-transform:uppercase;color:#8B7BF5">Setor 02 · Recursos públicos</div>'
+        '<div style="font-size:34px;font-weight:700;letter-spacing:-1px;color:#EEF1F8">'
+        'Radar de Emendas Parlamentares</div>'
+        '<div style="font-size:15px;color:#9AA3B8;max-width:440px;line-height:1.6">'
+        'Este módulo será implementado em seguida. Ele vai monitorar emendas, '
+        'deputados e diálogos com o mesmo motor do radar de captação.</div></div>',
+        unsafe_allow_html=True,
+    )
+    if st.button("← Voltar à Central", key="emendas_voltar", use_container_width=True):
+        st.session_state["radar_escolhido"] = None
+        st.rerun()
+
+
+
+
 # Gate de autenticação: nada carrega antes do login.
 if "user" not in st.session_state:
     tela_login()
@@ -732,6 +1001,18 @@ st.session_state.setdefault("page", "Visão geral")
 df, modo_conectado = dados.carregar_empresas()
 TOTAL = len(df)
 HINT_ESCRITA = "🔒 Conecte ao Google Sheets para habilitar escrita."
+
+# --------------------------------------------------------------------------- #
+# Hub de entrada: escolha do radar antes do painel (Central de Captação).
+# radar_escolhido: None -> hub · "emendas" -> placeholder · "captacao" -> painel
+# --------------------------------------------------------------------------- #
+st.session_state.setdefault("radar_escolhido", None)
+if st.session_state["radar_escolhido"] is None:
+    render_hub()
+    st.stop()
+if st.session_state["radar_escolhido"] == "emendas":
+    render_emendas_placeholder()
+    st.stop()
 
 
 # --------------------------------------------------------------------------- #
@@ -770,8 +1051,11 @@ def render_sidebar():
         st.markdown(f'<div class="sb-foot">{status}'
                     '<div class="sf"><span class="d n"></span>ÚLTIMO SCAN · 06:00</div></div>',
                     unsafe_allow_html=True)
+        if st.button("🛰️ Trocar radar", key="trocar_radar", use_container_width=True):
+            st.session_state["radar_escolhido"] = None
+            st.rerun()
         if st.button("🔓 Sair", key="logout", use_container_width=True):
-            for k in ("user", "page", "login_email", "login_senha"):
+            for k in ("user", "page", "login_email", "login_senha", "radar_escolhido"):
                 st.session_state.pop(k, None)
             st.rerun()
 
