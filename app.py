@@ -634,8 +634,8 @@ def estilo_plotly(fig, altura=300, legenda=False):
     return fig
 
 
-CORES_STATUS = {"Mapear": "#4A515A", "Prospectar": "#6E7681", "Monitorar": "#939BA5",
-                "Edital": "#E89A3C", "Ativo": "#5FB137"}
+CORES_STATUS = {"Mapear": "#7C8698", "Prospectar": "#E8873A", "Monitorar": "#5B9BD5",
+                "Edital": "#E8B54A", "Ativo": "#4ADE80"}
 
 
 # --------------------------------------------------------------------------- #
@@ -1872,8 +1872,9 @@ def page_radar():
 # =========================================================================== #
 # PÁGINA · FUNIL
 # =========================================================================== #
-ACENTOS_HEX = {"Mapear": "#4A515A", "Prospectar": "#6E7681", "Monitorar": "#939BA5",
-               "Edital": "#E89A3C", "Ativo": "#5FB137"}
+# Cores das colunas do kanban (paleta da maquete pfc_app_v3).
+ACENTOS_HEX = {"Mapear": "#7C8698", "Prospectar": "#E8873A", "Monitorar": "#5B9BD5",
+               "Edital": "#E8B54A", "Ativo": "#4ADE80"}
 
 
 def _kanban_estatico():
