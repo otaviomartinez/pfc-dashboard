@@ -1146,6 +1146,14 @@ def _fmt_prazo(prazo: str) -> str:
     return d.strftime("%d/%m") if d else (str(prazo).strip() or "—")
 
 
+def _prazo_confiavel(dias) -> bool:
+    """O extrator do radar assume 'próximo ano futuro' quando a data vem sem
+    ano — um prazo a 200+ dias (ou vencido há muito) provavelmente é esse
+    chute. Uma data errada é pior que nenhuma: fora da janela [-60, 180]
+    dias, o app mostra 'prazo a confirmar' em vez do número."""
+    return isinstance(dias, int) and -60 <= dias <= 180
+
+
 def _op_de_novidade(nv: dict) -> dict:
     return {"titulo": str(nv.get("Título", "")).strip() or "(sem título)",
             "fonte": str(nv.get("Fonte", "")).strip() or "Radar",
@@ -1166,8 +1174,10 @@ def dlg_oportunidade(op: dict):
                f'font-variant-numeric:tabular-nums">{int(score)}</span>'
                if score is not None else "")
     meta = op.get("fonte", "")
-    if op.get("prazo"):
+    if op.get("prazo") and _prazo_confiavel(op.get("dias")):
         meta += f" · encerra {_fmt_prazo(op['prazo'])}"
+    elif op.get("prazo"):
+        meta += " · prazo a confirmar"
     st.markdown(
         f'<div style="display:flex;align-items:flex-start;gap:14px">{sc_html}'
         f'<div><div style="font-size:18px;font-weight:600;line-height:1.3">{esc(op.get("titulo"))}</div>'
@@ -1179,13 +1189,20 @@ def dlg_oportunidade(op: dict):
     if score is not None:
         linhas.append(("Aderência ao PFC", f"{int(score)} / 100"))
     linhas.append(("Valor", op.get("valor") or "—"))
-    linhas.append(("Prazo de inscrição", _fmt_prazo(op.get("prazo", ""))))
     dias = op.get("dias")
-    if isinstance(dias, int):
+    prazo_v = _fmt_prazo(op.get("prazo", ""))
+    if op.get("prazo") and not _prazo_confiavel(dias):
+        prazo_v += ' <span style="color:var(--dim)">(a confirmar)</span>'
+    linhas.append(("Prazo de inscrição", prazo_v))
+    if _prazo_confiavel(dias):
         cor = "var(--sem-urgent)" if dias <= 7 else "var(--accent)"
         linhas.append(("Tempo restante",
                        f'<b style="color:{cor}">faltam {dias} dias</b>' if dias >= 0
                        else f'<b style="color:var(--sem-urgent)">vencida há {-dias} dias</b>'))
+    elif str(op.get("prazo", "")).strip():
+        # data possivelmente estimada (ano assumido) — não mostrar número
+        linhas.append(("Tempo restante",
+                       '<span style="color:var(--dim)">prazo a confirmar na página oficial</span>'))
     linhas.append(("Fonte", op.get("fonte") or "—"))
     corpo = "".join(
         f'<div style="margin-bottom:16px"><div style="font-family:var(--mono);font-size:11px;'
@@ -1233,6 +1250,35 @@ def dlg_cobertura():
                 st.rerun()
 
 
+# CSS do radar-scópio, compartilhado entre Visão Geral e Radar.
+_SCOPE_V2_CSS = """
+.scope-card{position:relative;background:var(--surface,#161A21);border:1px solid var(--line,rgba(255,255,255,.06));
+  border-radius:16px;padding:26px 28px;display:flex;flex-direction:column;overflow:hidden}
+.scope-card::before{content:"";position:absolute;inset:0;border-radius:16px;padding:1.5px;
+  background:linear-gradient(145deg,var(--sem-info,#5B9BD5),transparent 55%);
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;opacity:.4}
+.sc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;position:relative;z-index:1}
+.scope-card h3{font-size:16px;font-weight:600;margin:0}
+.sc-live{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--sem-high,#4ADE80);
+  display:flex;align-items:center;gap:6px}
+.sc-live .d{width:6px;height:6px;border-radius:50%;background:var(--sem-high,#4ADE80);
+  box-shadow:0 0 8px var(--sem-high,#4ADE80)}
+.sc-sub{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--dim,#6B7688);
+  letter-spacing:.5px;margin-bottom:14px;position:relative;z-index:1}
+.scopevis{flex:1;display:grid;place-items:center;min-height:0;position:relative;z-index:1}
+.scopevis svg{width:100%;height:auto;max-height:300px}
+.gr{stroke:rgba(255,255,255,.09);fill:none}
+.swf{transform-origin:center;animation:sw 4s linear infinite}
+.swl{transform-origin:center;animation:sw 4s linear infinite;stroke:var(--accent,#E8873A)}
+@keyframes sw{to{transform:rotate(360deg)}}
+.blip-hit{cursor:pointer}
+.scope-foot{display:flex;justify-content:space-between;gap:12px;margin-top:18px;padding-top:18px;
+  border-top:1px solid var(--line,rgba(255,255,255,.06));font-family:'JetBrains Mono',monospace;
+  font-size:11.5px;color:var(--muted,#A4AEBF);position:relative;z-index:1}
+.scope-foot b{font-weight:700}
+"""
+
 _VISAO_V2_CSS = """
 .vw{display:flex;flex-direction:column;gap:22px;font-family:'Inter',system-ui,sans-serif;
   color:var(--ink,#F5F7FA);animation:vw-fade .4s ease}
@@ -1271,33 +1317,6 @@ _VISAO_V2_CSS = """
   padding:8px 12px;border-radius:8px;flex:none;white-space:nowrap}
 .hh-dl.ok{color:var(--accent,#E8873A);background:var(--accent-dim,rgba(232,135,58,.12));
   border-color:rgba(232,135,58,.3)}
-
-/* scope */
-.scope-card{position:relative;background:var(--surface,#161A21);border:1px solid var(--line,rgba(255,255,255,.06));
-  border-radius:16px;padding:26px 28px;display:flex;flex-direction:column;overflow:hidden}
-.scope-card::before{content:"";position:absolute;inset:0;border-radius:16px;padding:1.5px;
-  background:linear-gradient(145deg,var(--sem-info,#5B9BD5),transparent 55%);
-  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
-  -webkit-mask-composite:xor;mask-composite:exclude;opacity:.4}
-.sc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;position:relative;z-index:1}
-.scope-card h3{font-size:16px;font-weight:600;margin:0}
-.sc-live{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--sem-high,#4ADE80);
-  display:flex;align-items:center;gap:6px}
-.sc-live .d{width:6px;height:6px;border-radius:50%;background:var(--sem-high,#4ADE80);
-  box-shadow:0 0 8px var(--sem-high,#4ADE80)}
-.sc-sub{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--dim,#6B7688);
-  letter-spacing:.5px;margin-bottom:14px;position:relative;z-index:1}
-.scopevis{flex:1;display:grid;place-items:center;min-height:0;position:relative;z-index:1}
-.scopevis svg{width:100%;height:auto;max-height:300px}
-.gr{stroke:rgba(255,255,255,.09);fill:none}
-.swf{transform-origin:center;animation:sw 4s linear infinite}
-.swl{transform-origin:center;animation:sw 4s linear infinite;stroke:var(--accent,#E8873A)}
-@keyframes sw{to{transform:rotate(360deg)}}
-.blip-hit{cursor:pointer}
-.scope-foot{display:flex;justify-content:space-between;gap:12px;margin-top:18px;padding-top:18px;
-  border-top:1px solid var(--line,rgba(255,255,255,.06));font-family:'JetBrains Mono',monospace;
-  font-size:11.5px;color:var(--muted,#A4AEBF);position:relative;z-index:1}
-.scope-foot b{font-weight:700}
 
 /* glowcards */
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
@@ -1509,7 +1528,8 @@ export default function(component){
 }
 """
 
-_visao_v2 = components_v2.component("pfc_visao", css=_VISAO_V2_CSS, js=_VISAO_V2_JS)
+_visao_v2 = components_v2.component("pfc_visao", css=_SCOPE_V2_CSS + _VISAO_V2_CSS,
+                                    js=_VISAO_V2_JS)
 
 
 # =========================================================================== #
@@ -1536,10 +1556,10 @@ def page_visao():
     blip_items = ops[:12]
     top = ops[0] if ops else None
 
-    # prazos próximos: novidades com dias >= 0 + editais da base (até 45 dias)
+    # prazos próximos: novidades com prazo CONFIÁVEL + editais da base (45 dias)
     prazo_items, vistos = [], set()
     for o in ops:
-        if isinstance(o["dias"], int) and o["dias"] >= 0:
+        if _prazo_confiavel(o["dias"]) and o["dias"] >= 0:
             prazo_items.append(o)
             vistos.add(o["titulo"].lower())
     for e in _editais_proximos(45):
@@ -1553,14 +1573,18 @@ def page_visao():
 
     def _meta(o):
         m = str(o["fonte"]).upper()
-        if o.get("prazo"):
+        if o.get("prazo") and _prazo_confiavel(o.get("dias")):
             m += f" · encerra {_fmt_prazo(o['prazo'])}"
+        elif o.get("prazo"):
+            m += " · prazo a confirmar"
         return m
 
     payload = {
         "hero": {"num": len(ops),
                  "cap": f"de {n_fontes} fontes monitoradas · aguardando revisão",
-                 "top": ({"titulo": top["titulo"], "score": top["score"], "dias": top["dias"],
+                 "top": ({"titulo": top["titulo"], "score": top["score"],
+                          "dias": (top["dias"] if _prazo_confiavel(top["dias"])
+                                   and top["dias"] >= 0 else None),
                           "meta": _meta(top)} if top else None)},
         "blips": [{"score": o["score"], "fonte": o["fonte"]} for o in blip_items],
         "foot": {"fila": len(ops), "encerrando": encerrando, "fontes": n_fontes},
@@ -1672,7 +1696,7 @@ def page_ranking():
 
 
 # =========================================================================== #
-# PÁGINA · RADAR
+# PÁGINA · RADAR (maquete pfc_app_v3: scópio à esquerda + fila à direita)
 # =========================================================================== #
 def _score_novidade(nv) -> float:
     try:
@@ -1681,105 +1705,168 @@ def _score_novidade(nv) -> float:
         return 0.0
 
 
+_RADAR_V2_CSS = """
+.rv{font-family:'Inter',system-ui,sans-serif;color:var(--ink,#F5F7FA);animation:rv-fade .4s ease}
+@keyframes rv-fade{from{opacity:0;transform:translateY(10px)}}
+.radar-layout{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}
+@media (max-width:1000px){.radar-layout{grid-template-columns:1fr}}
+.rlist{display:flex;flex-direction:column;gap:12px}
+.ritem{position:relative;background:var(--surface,#161A21);border:1px solid var(--line,rgba(255,255,255,.06));
+  border-radius:14px;padding:18px 20px;display:flex;gap:16px;align-items:center;cursor:pointer;
+  transition:.2s;overflow:hidden;--c:var(--sem-mid,#E8B54A)}
+.ritem::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c)}
+.ritem:hover{border-color:var(--line2,rgba(255,255,255,.12));transform:translateX(3px)}
+.ritem .rsc{font-weight:800;font-size:24px;width:46px;text-align:center;flex:none;
+  font-variant-numeric:tabular-nums;color:var(--c)}
+.ritem .rb{flex:1;min-width:0}
+.ritem .rtop{display:flex;align-items:center;gap:10px;margin-bottom:4px;min-width:0}
+.ritem .src{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.8px;
+  color:var(--sem-info,#5B9BD5);background:rgba(91,155,213,.1);padding:4px 9px;border-radius:5px;
+  flex:none;white-space:nowrap}
+.ritem .rt{font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ritem .rm{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dim,#6B7688);margin-top:3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ritem .rdl{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;flex:none;
+  text-align:right;white-space:nowrap}
+.ritem .rdl.u{color:var(--sem-urgent,#F0663F)}
+.ritem .rdl.s{color:var(--accent,#E8873A)}
+.ritem .rdl.n{color:var(--dim,#6B7688)}
+.rv-vazio{background:var(--surface,#161A21);border:1px solid var(--line,rgba(255,255,255,.06));
+  border-radius:14px;padding:28px 20px;text-align:center;color:var(--muted,#A4AEBF);font-size:14px}
+.rv-vazio .ic{font-size:26px;margin-bottom:8px}
+.rv-mais{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--dim,#6B7688);
+  text-align:center;padding:10px;border:1px dashed var(--line2,rgba(255,255,255,.12));border-radius:10px}
+"""
+
+_RADAR_V2_JS = r"""
+export default function(component){
+  const {data, parentElement, setTriggerValue} = component;
+  const old = parentElement.querySelector('.rv'); if (old) old.remove();
+  const d = data || {}, itens = d.itens || [];
+  const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const sem = s => s >= 60 ? 'var(--sem-high,#4ADE80)' : s >= 50 ? 'var(--sem-mid,#E8B54A)'
+    : 'var(--sem-low,#7C8698)';
+  const root = document.createElement('div'); root.className = 'rv';
+
+  // ---- scópio (mesma geometria da Visão Geral) ----
+  let blips = '';
+  itens.slice(0, d.max_blips || 14).forEach(function(o, i){
+    const ang = i * 2.399963;
+    const r = 140 - Math.max(0, Math.min(100, o.score)) * 1.2;
+    const cx = (150 + r * Math.cos(ang)).toFixed(1);
+    const cy = (150 + r * Math.sin(ang)).toFixed(1);
+    const cor = sem(o.score);
+    const raio = (4 + o.score / 25).toFixed(1);
+    blips += '<circle cx="' + cx + '" cy="' + cy + '" r="' + raio + '" fill="' + cor +
+      '" class="blip-hit" data-act="op" data-i="' + i + '" style="filter:drop-shadow(0 0 6px ' +
+      cor + ')"><title>' + esc(o.fonte) + ' · ' + esc(o.score) + '</title></circle>';
+  });
+  const f = d.foot || {};
+  const scope =
+    '<div class="scope-card"><div class="sc-head"><h3>Radar de oportunidades</h3>' +
+    '<div class="sc-live"><span class="d"></span>ao vivo</div></div>' +
+    '<div class="sc-sub">PROXIMIDADE DO CENTRO = MAIOR ADERÊNCIA · CLIQUE NUM PONTO</div>' +
+    '<div class="scopevis"><svg viewBox="0 0 300 300">' +
+    '<defs><radialGradient id="sfr"><stop offset="0" stop-color="rgba(232,135,58,.3)"/>' +
+    '<stop offset="1" stop-color="rgba(232,135,58,0)"/></radialGradient></defs>' +
+    '<circle class="gr" cx="150" cy="150" r="144"/><circle class="gr" cx="150" cy="150" r="98"/>' +
+    '<circle class="gr" cx="150" cy="150" r="52"/>' +
+    '<line class="gr" x1="150" y1="6" x2="150" y2="294"/><line class="gr" x1="6" y1="150" x2="294" y2="150"/>' +
+    '<path class="swf" d="M150 150 L150 6 A144 144 0 0 1 252 48 Z" fill="url(#sfr)"/>' +
+    '<line class="swl" x1="150" y1="150" x2="150" y2="6" stroke-width="2"/>' +
+    '<circle cx="150" cy="150" r="4" fill="var(--accent,#E8873A)"/>' + blips + '</svg></div>' +
+    '<div class="scope-foot"><span><b style="color:var(--accent,#E8873A)">' + (f.fila || 0) +
+    '</b> na fila</span><span><b style="color:var(--sem-urgent,#F0663F)">' + (f.encerrando || 0) +
+    '</b> encerrando</span><span><b>' + (f.fontes || 0) + '</b> fontes</span></div></div>';
+
+  // ---- fila (lista à direita) ----
+  let lista = '';
+  itens.forEach(function(o, i){
+    lista += '<div class="ritem" style="--c:' + sem(o.score) + '" data-act="op" data-i="' + i + '">' +
+      '<div class="rsc">' + esc(o.score) + '</div>' +
+      '<div class="rb"><div class="rtop"><span class="src">' + esc(o.fonte).toUpperCase() +
+      '</span><span class="rt">' + esc(o.titulo) + '</span></div>' +
+      '<div class="rm">' + esc(o.meta) + '</div></div>' +
+      '<div class="rdl ' + o.badge_cls + '"' +
+      (o.badge_tip ? ' title="' + esc(o.badge_tip) + '"' : '') + '>' + esc(o.badge_txt) + '</div></div>';
+  });
+  if (d.ocultos > 0) {
+    lista += '<div class="rv-mais">+ ' + d.ocultos + ' na fila · aprove ou descarte para ver as próximas</div>';
+  }
+  if (!itens.length) {
+    lista = '<div class="rv-vazio"><div class="ic">🛰️</div>' +
+      '<div><b>Nenhuma oportunidade nova no momento</b></div>' +
+      '<div style="font-size:12.5px;color:var(--dim,#6B7688);margin-top:6px">O radar roda todo dia às 06:00 ' +
+      'e coloca aqui os editais que passam no filtro.</div></div>';
+  }
+
+  root.innerHTML = '<div class="radar-layout">' + scope +
+    '<div class="rlist">' + lista + '</div></div>';
+  parentElement.appendChild(root);
+
+  root.addEventListener('click', function(e){
+    const el = e.target.closest('[data-act]');
+    if (!el) { return; }
+    setTriggerValue('acao', {t: el.dataset.act, i: +el.dataset.i, n: Date.now()});
+  });
+  return function(){ root.remove(); };
+}
+"""
+
+_radar_v2 = components_v2.component("pfc_radar", css=_SCOPE_V2_CSS + _RADAR_V2_CSS,
+                                    js=_RADAR_V2_JS)
+
+_RADAR_MAX_LISTA = 30  # itens visíveis na fila (o restante fica indicado no rodapé)
+
+
 def page_radar():
-    st.markdown(
-        '<div class="phead"><h1>Radar de oportunidades</h1>'
-        '<p>fila real gravada pelo radar automático · aprove para virar Edital na base</p></div>',
-        unsafe_allow_html=True,
-    )
+    _mostrar_resultado(st.session_state.pop("radar_msg", None))
+    if not modo_conectado:
+        st.caption(HINT_ESCRITA + " — aprovar/descartar grava na aba Novidades_pendentes.")
 
     fila = sorted(dados.carregar_novidades_pendentes(), key=_score_novidade, reverse=True)
-    total = len(fila)
+    ops = [_op_de_novidade(nv) for nv in fila]
+    visiveis = ops[:_RADAR_MAX_LISTA]
+    n_fontes = _n_fontes_radar()
+    encerrando = sum(1 for o in ops if _prazo_confiavel(o["dias"]) and 0 <= o["dias"] <= 7)
 
-    col_fila, col_lado = st.columns([1.6, 1])
-    with col_fila:
-        cap = f"{total} nova(s) · aprove ou descarte" if total else "sem novidades pendentes"
-        st.markdown(
-            '<div class="card-h" style="border:1px solid var(--line);border-bottom:none;'
-            'border-radius:16px 16px 0 0;background:var(--surface)"><div><h2>Fila de revisão</h2>'
-            f'<div class="cap">{esc(cap)}</div></div></div>',
-            unsafe_allow_html=True,
-        )
-        _mostrar_resultado(st.session_state.pop("radar_msg", None))
-        if not modo_conectado:
-            st.caption(HINT_ESCRITA + " — aprovar/descartar grava na aba Novidades_pendentes.")
+    def _badge(o):
+        """'X DIAS' só com data confiável; estimada vira 'prazo a confirmar'."""
+        dias, tem_prazo = o["dias"], bool(str(o["prazo"]).strip())
+        if _prazo_confiavel(dias):
+            if dias < 0:
+                return "VENCIDA", "u", f"prazo encerrou há {-dias} dia(s)"
+            return f"{dias} DIAS", ("u" if dias <= 7 else "s"), ""
+        if tem_prazo:
+            return "PRAZO A CONFIRMAR", "n", "data possivelmente estimada — confira na página oficial"
+        return "SEM PRAZO", "n", ""
 
-        if not fila:
-            st.markdown(
-                '<div class="lead" style="text-align:center;padding:26px 18px">'
-                '<div style="font-size:26px;margin-bottom:6px">🛰️</div>'
-                '<div class="ttl">Nenhuma oportunidade nova no momento</div>'
-                '<div class="why">O radar roda todo dia às 06:00 e coloca aqui os editais '
-                'que passam no filtro. Volte mais tarde.</div></div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            for i, nv in enumerate(fila):
-                fonte = str(nv.get("Fonte", "")).strip() or "Fonte"
-                titulo = str(nv.get("Título", "")).strip() or "(sem título)"
-                desc = str(nv.get("Descrição", "")).strip()
-                desc_trunc = (desc[:200].rstrip() + "…") if len(desc) > 200 else desc
-                prazo = str(nv.get("Prazo", "")).strip()
-                valor = str(nv.get("Valor estimado", "")).strip()
-                link = str(nv.get("Link da fonte", "")).strip()
-                sc = _score_novidade(nv)
-                cls = "hi" if sc >= 70 else "mid" if sc >= 45 else "lo"
+    def _meta_radar(o):
+        partes = []
+        if o["valor"]:
+            partes.append(f"valor: {o['valor']}")
+        if _prazo_confiavel(o["dias"]) and o["dias"] >= 0:
+            partes.append(f"encerra {_fmt_prazo(o['prazo'])}")
+        return " · ".join(partes) or "sem valor informado"
 
-                metas = [f"<b>Fonte:</b> {esc(fonte)}"]
-                if prazo:
-                    metas.append(f"<b>Prazo:</b> {esc(prazo)}")
-                if valor:
-                    metas.append(f"<b>Valor:</b> {esc(valor)}")
-                link_html = (f'<a class="srclink" href="{esc(link)}" target="_blank" '
-                             f'rel="noopener">↗ {esc(link)}</a>') if link.startswith("http") else ""
-                desc_html = f'<div class="why">{esc(desc_trunc)}</div>' if desc_trunc else ""
+    itens = []
+    for o in visiveis:
+        txt, cls, tip = _badge(o)
+        itens.append({"score": o["score"], "fonte": o["fonte"], "titulo": o["titulo"],
+                      "meta": _meta_radar(o), "badge_txt": txt, "badge_cls": cls,
+                      "badge_tip": tip})
 
-                st.markdown(
-                    f'<div class="lead"><div class="lead-top">'
-                    f'<span class="src">{esc(fonte)}</span>'
-                    f'<span class="fit {cls}">score {int(sc)}</span></div>'
-                    f'<div class="ttl">{esc(titulo)}</div>{desc_html}'
-                    f'<div class="meta">{" · ".join(metas)}</div>{link_html}</div>',
-                    unsafe_allow_html=True,
-                )
-                b1, b2, _sp = st.columns([1.3, 1, 1.7])
-                with b1:
-                    if st.button("✓ Aprovar (vira Edital)", key=f"rad_ok_{i}",
-                                 type="primary", disabled=not modo_conectado):
-                        res = dados.aprovar_novidade(nv)
-                        st.session_state["radar_msg"] = res
-                        st.toast(res["mensagem"], icon="✅" if res["sucesso"] else "⚠️")
-                        st.rerun()
-                with b2:
-                    if st.button("Descartar", key=f"rad_no_{i}", disabled=not modo_conectado):
-                        res = dados.descartar_novidade(nv)
-                        st.session_state["radar_msg"] = res
-                        st.toast(res["mensagem"], icon="🗑️" if res["sucesso"] else "⚠️")
-                        st.rerun()
-
-    with col_lado:
-        fontes = ["Prosas", "ABCR", "Obs. 3º Setor", "Mapa OSC (IPEA)", "CNPq", "FAPESP",
-                  "Finep", "Fund. Banco do Brasil", "Itaú Social", "Inst. Unibanco",
-                  "Fund. Telefônica", "Fund. Lemann", "Inst. Ayrton Senna", "Inst. CPFL",
-                  "GIFE", "Fund. Bradesco", "Fund. Roberto Marinho", "Parque Tec. Sorocaba"]
-        chips = "".join(f'<span class="src-tag">{esc(f)}</span>' for f in fontes)
-        st.markdown(
-            f"""
-            <div class="card"><div class="card-h"><div><h2>Fontes monitoradas</h2>
-              <div class="cap">{len(fontes)} fontes · varredura diária às 06:00</div></div></div>
-              <div class="pad">{chips}<div class="note">O radar vigia fontes conhecidas e estáveis —
-              nada de varrer a internet inteira. Você decide o que entra na base.</div></div></div>
-            <div class="card"><div class="card-h"><div><h2>Sua fila agora</h2>
-              <div class="cap">itens aguardando revisão</div></div></div>
-              <div class="pad">
-                <div class="statline"><span style="color:var(--muted)">Pendentes de revisão</span>
-                  <b style="color:var(--green)">{total}</b></div>
-                <div class="note">Aprovar cria um card em <b>Edital</b> no Funil/Ranking;
-                descartar apenas remove da fila.</div>
-              </div></div>
-            """,
-            unsafe_allow_html=True,
-        )
+    res = _radar_v2(data={"itens": itens, "ocultos": max(0, len(ops) - len(visiveis)),
+                          "max_blips": 14,
+                          "foot": {"fila": len(ops), "encerrando": encerrando,
+                                   "fontes": n_fontes}},
+                    key="radar_v2", on_acao_change=lambda: None)
+    ac = getattr(res, "acao", None)
+    if isinstance(ac, dict) and ac.get("t") == "op":
+        i = ac.get("i")
+        if isinstance(i, int) and 0 <= i < len(visiveis):
+            dlg_oportunidade(visiveis[i])
 
 
 # =========================================================================== #
