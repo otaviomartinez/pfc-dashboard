@@ -51,10 +51,10 @@ except Exception:
 # Configuração da página
 # --------------------------------------------------------------------------- #
 st.set_page_config(
-    page_title="PFC · Inteligência de Captação",
+    page_title="PFC · Captação Privada",
     page_icon="🔭",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 # --------------------------------------------------------------------------- #
@@ -82,36 +82,36 @@ PAGE_ICONS = {"Visão geral": "📊", "Ranking": "📋", "Radar": "📡",
 # --------------------------------------------------------------------------- #
 CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap');
 :root{
-  /* superfícies neutras — o contraste vem do espaço, não da cor */
-  --bg:#080B14; --surface:#141820; --surface-2:#1B202A; --surface-3:#232A35; --raise:#1B202A;
-  --glass:rgba(20,24,32,.60);
-  --line:rgba(255,255,255,.05); --line-2:rgba(255,255,255,.10); --line-3:rgba(255,255,255,.20);
-  --text:#E9EBEE; --text-2:#C2C7CE; --muted:#828A94; --dim:#565E68; --white:#FFFFFF;
-  /* cores reservadas só para destaques semânticos (status, ações, alertas) */
-  --orange:#E89A3C; --orange-2:#F0B264; --orange-soft:rgba(232,154,60,.12);
-  --green:#5FB137; --green-2:#9FD27F; --green-soft:rgba(95,177,55,.12);
-  --blue:#5B9BD5; --blue-2:#8FBDE6; --blue-soft:rgba(91,155,213,.12);
-  --red:#E2574A; --red-2:#EE8076; --red-soft:rgba(226,87,74,.12);
-  /* acentos de marca (KPIs e destaques "de grife") */
-  --acc-white:#FFFFFF; --acc-orange:#F2911E; --acc-blue:#3B8BD0; --acc-green:#5FB137;
-  --acc-orange-soft:rgba(242,145,30,.14); --acc-blue-soft:rgba(59,139,208,.14); --acc-green-soft:rgba(95,177,55,.14);
-  /* escala de espaçamento e raios */
-  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px;
-  --r-sm:8px; --r:10px; --r-lg:14px; --r-xl:18px;
+  /* ==== DESIGN SYSTEM (maquete pfc_app_v3) ==== */
+  --bg:#0E1116; --surface:#161A21; --surface2:#1C222B; --hover:#222834;
+  --line:rgba(255,255,255,.06); --line2:rgba(255,255,255,.12);
+  --ink:#F5F7FA; --muted:#A4AEBF; --dim:#6B7688;
+  --accent:#E8873A; --accent-dim:rgba(232,135,58,.12);
+  --sem-high:#4ADE80; --sem-mid:#E8B54A; --sem-low:#7C8698;
+  --sem-urgent:#F0663F; --sem-info:#5B9BD5;
+  --mono:'JetBrains Mono',monospace;
+  --body:'Inter',system-ui,sans-serif; --disp:'Inter',system-ui,sans-serif;
+  --r-sm:9px; --r:11px; --r-lg:16px; --r-xl:16px;
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:22px; --sp-6:32px;
   --sh-1:0 1px 2px rgba(0,0,0,.16); --sh-2:0 24px 70px rgba(0,0,0,.50);
-  --ease:cubic-bezier(.22,.61,.36,1);
-  --disp:'Space Grotesk',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif;
+  --ease:cubic-bezier(.16,1,.3,1);
+  /* ==== aliases legados: as telas atuais herdam a paleta nova sem retrabalho ==== */
+  --surface-2:var(--surface2); --surface-3:var(--hover); --raise:var(--surface2);
+  --glass:rgba(22,26,33,.78);
+  --line-2:var(--line2); --line-3:rgba(255,255,255,.20);
+  --text:var(--ink); --text-2:#C9D2DF; --white:#FFFFFF;
+  --orange:var(--accent); --orange-2:#F0A869; --orange-soft:var(--accent-dim);
+  --green:var(--sem-high); --green-2:#86EBAC; --green-soft:rgba(74,222,128,.12);
+  --blue:var(--sem-info); --blue-2:#8FBDE6; --blue-soft:rgba(91,155,213,.12);
+  --red:var(--sem-urgent); --red-2:#F58A6C; --red-soft:rgba(240,102,63,.12);
+  --acc-white:#FFFFFF; --acc-orange:var(--accent); --acc-blue:var(--sem-info); --acc-green:var(--sem-high);
+  --acc-orange-soft:var(--accent-dim); --acc-blue-soft:rgba(91,155,213,.14); --acc-green-soft:rgba(74,222,128,.14);
 }
 html, body, [class*="css"]{font-family:var(--body);line-height:1.6;}
-.stApp{
-  background:var(--bg);
-  background-image:
-    radial-gradient(1000px 560px at 82% -12%, rgba(59,139,208,.055), transparent 62%),
-    radial-gradient(760px 440px at 10% 110%, rgba(242,145,30,.03), transparent 65%),
-    radial-gradient(900px 520px at 50% -20%, rgba(255,255,255,.02), transparent 60%);
-}
+.mono{font-family:var(--mono)} .tnum{font-variant-numeric:tabular-nums}
+.stApp{background:var(--bg);}
 /* Neutraliza a barra fixa do Streamlit (que sobrepunha/cortava a logo) */
 [data-testid="stHeader"]{display:none;height:0;}
 #MainMenu, footer, [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"]{display:none!important;}
@@ -317,40 +317,12 @@ div[data-baseweb="select"]>div{background:var(--surface-2)!important;border-colo
 div[data-baseweb="select"]>div:focus-within{border-color:var(--blue)!important;}
 .stTextInput label, .stSelectbox label{color:var(--muted)!important;font-size:12.5px!important;}
 
-/* ============ fundo cósmico + superfícies táteis ============ */
-.stApp,[data-testid="stAppViewContainer"],[data-testid="stMain"],section.main,[data-testid="stHeader"]{background:transparent!important}
-body{background:#080B14;
-  background-image:
-    radial-gradient(1000px 560px at 82% -12%, rgba(59,139,208,.055), transparent 62%),
-    radial-gradient(760px 440px at 10% 110%, rgba(242,145,30,.03), transparent 65%),
-    radial-gradient(900px 520px at 50% -20%, rgba(255,255,255,.02), transparent 60%);
-  background-attachment:fixed}
-#pfc-cosmos-layer{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
-#pfc-stars{position:absolute;inset:0}
-.pfc-nebula{position:absolute;inset:-12%;
-  background:radial-gradient(60% 52% at 78% 12%, rgba(91,155,213,.07), transparent 60%),
-             radial-gradient(54% 46% at 10% 88%, rgba(232,154,60,.05), transparent 62%),
-             radial-gradient(60% 60% at 48% 50%, rgba(255,255,255,.018), transparent 72%);
-  animation:pfc-breathe 8s ease-in-out infinite}
-@keyframes pfc-breathe{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.05);opacity:1}}
-.pfc-spotlight{position:absolute;left:0;top:0;width:560px;height:560px;border-radius:50%;opacity:0;will-change:transform;
-  background:radial-gradient(circle,rgba(255,255,255,.03),rgba(255,255,255,.012) 42%,transparent 72%);transition:opacity .6s ease}
-.block-container{position:relative;z-index:1}
-.pfc-ink{position:absolute;border-radius:50%;background:rgba(255,255,255,.26);pointer-events:none;z-index:4}
-.kpi,.card,.lead,.caso{transform-style:preserve-3d;will-change:transform}
-.kpi::after,.card::after,.lead::after,.caso::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
-  background:radial-gradient(240px circle at var(--mx,50%) var(--my,50%),rgba(255,255,255,.09),transparent 55%);
-  opacity:0;transition:opacity .35s var(--ease)}
-.kpi:hover::after,.card:hover::after,.lead:hover::after,.caso:hover::after{opacity:1}
+/* ============ fundo (maquete: flat e sóbrio, sem camada cósmica) ============ */
+body{background:var(--bg)}
 .card,.kcol,.lead,.caso,.kpi{box-shadow:var(--sh-1),inset 0 0 0 1px rgba(255,255,255,.018)}
-.card:hover,.lead:hover,.caso:hover{box-shadow:0 18px 48px rgba(0,0,0,.5),inset 0 0 0 1px rgba(255,255,255,.06)}
-.brand svg,.avatar{will-change:transform}
+.card:hover,.lead:hover,.caso:hover{box-shadow:0 18px 48px rgba(0,0,0,.45),inset 0 0 0 1px rgba(255,255,255,.06)}
 .login-logo svg{transition:transform .4s var(--ease)}
-.login-logo:hover svg .orbit, .brand:hover svg .orbit{animation:spin 9s linear infinite}
-@media (prefers-reduced-motion:reduce){
-  .pfc-nebula{animation:none}.pfc-spotlight{display:none}
-  .kpi,.card,.lead,.caso{transform:none!important}
-}
+.login-logo:hover svg .orbit{animation:spin 9s linear infinite}
 
 /* ---------- aba Verificação ---------- */
 .vbar{height:10px;border-radius:6px;background:var(--line-2);overflow:hidden;margin:8px 0 2px}
@@ -399,91 +371,58 @@ body{background:#080B14;
 .st-key-filtro_cobertura div[data-baseweb="select"]>div{border-radius:999px!important;
   background:rgba(255,255,255,.02)!important;border-color:var(--line-2)!important}
 .st-key-filtro_cobertura div[data-baseweb="select"]>div:hover{border-color:var(--line-3)!important}
+
+/* ============ SIDEBAR (maquete pfc_app_v3) ============ */
+[data-testid="stSidebar"]{background:var(--surface)!important;border-right:1px solid var(--line);
+  width:250px!important;min-width:250px!important}
+[data-testid="stSidebar"]>div:first-child{padding:18px 14px 16px}
+[data-testid="stSidebar"] [data-testid="stVerticalBlock"]{gap:2px}
+.sb-brand{display:flex;align-items:center;gap:12px;padding:2px 8px 14px}
+.rings{width:36px;height:36px;position:relative;flex:none}
+.rings span{position:absolute;inset:0;border-radius:50%;border:1.7px solid;animation:spin 20s linear infinite}
+.rings span:nth-child(1){border-color:transparent var(--accent) transparent transparent}
+.rings span:nth-child(2){border-color:transparent transparent var(--sem-high) transparent;inset:6px;
+  animation-duration:13s;animation-direction:reverse}
+.rings span:nth-child(3){border-color:var(--sem-info) transparent transparent transparent;inset:12px;animation-duration:9s}
+.sb-brand .bt{font-weight:700;font-size:15.5px;letter-spacing:-.2px;line-height:1.1;color:var(--ink)}
+.sb-brand .bt small{display:block;font-family:var(--mono);font-size:10px;color:var(--accent);
+  letter-spacing:.5px;margin-top:4px;font-weight:500}
+.sb-sec{font-family:var(--mono);font-size:10.5px;letter-spacing:1.4px;color:var(--dim);
+  text-transform:uppercase;padding:16px 8px 7px}
+[data-testid="stSidebar"] .stButton>button{width:100%;display:flex;justify-content:flex-start;text-align:left;
+  background:transparent;border:none;color:var(--muted);font-size:14px;font-weight:500;
+  padding:10px 14px;border-radius:9px;position:relative;box-shadow:none;transition:.15s var(--ease)}
+[data-testid="stSidebar"] .stButton>button:hover{color:var(--ink);background:rgba(255,255,255,.03);transform:none}
+[data-testid="stSidebar"] .stButton>button[kind="primary"]{color:var(--ink);
+  background:rgba(255,255,255,.03);font-weight:600}
+[data-testid="stSidebar"] .stButton>button[kind="primary"]::before{content:"";position:absolute;
+  left:0;top:7px;bottom:7px;width:3px;border-radius:0 3px 3px 0;background:var(--accent)}
+.sb-foot{border-top:1px solid var(--line);margin-top:16px;padding:14px 8px 2px}
+.sf{font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;align-items:center;
+  gap:9px;margin-bottom:9px;letter-spacing:.3px}
+.sf .d{width:7px;height:7px;border-radius:50%;flex:none}
+.sf .d.g{background:var(--sem-high);box-shadow:0 0 8px var(--sem-high);animation:pulse2 2s infinite}
+.sf .d.o{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.sf .d.n{background:var(--dim)}
+@keyframes pulse2{50%{opacity:.4}}
+
+/* ============ TOP BAR (maquete) ============ */
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.topbar .cr{font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.8px;margin-bottom:6px}
+.topbar .cr b{color:var(--accent);font-weight:600}
+.topbar .hi{font-size:26px;font-weight:700;letter-spacing:-.6px;color:var(--ink);line-height:1.15}
+.topbar .tr-r{display:flex;align-items:center;gap:14px;flex:none}
+.live{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;color:var(--sem-high);
+  background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.22);padding:9px 14px;border-radius:9px}
+.live .d{width:7px;height:7px;border-radius:50%;background:var(--sem-high);
+  box-shadow:0 0 8px var(--sem-high);animation:pulse2 2s infinite}
+.live.off{color:var(--accent);background:var(--accent-dim);border-color:rgba(232,135,58,.3)}
+.avatar2{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;font-weight:700;
+  font-size:15px;color:#111;background:linear-gradient(135deg,var(--accent),#F0A869);flex:none}
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
 
-# --------------------------------------------------------------------------- #
-# Fundo cósmico + micro-interações (canvas de estrelas, nebulosa, estrela
-# cadente, spotlight do cursor, ripple, tilt 3D, magnetismo).
-# st.markdown remove <script>, então injetamos UM script no documento-pai via
-# components.html (mesma origem). Persiste entre reruns e degrada sem erro.
-# --------------------------------------------------------------------------- #
-_COSMOS_JS = r"""
-(function(){
-  if(window.__pfcCosmos){return;} window.__pfcCosmos=true;
-  var reduce=false; try{reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
-  var body=document.body;
-  var layer=document.createElement('div'); layer.id='pfc-cosmos-layer';
-  var neb=document.createElement('div'); neb.className='pfc-nebula'; layer.appendChild(neb);
-  var cv=document.createElement('canvas'); cv.id='pfc-stars'; layer.appendChild(cv);
-  var spot=document.createElement('div'); spot.className='pfc-spotlight'; layer.appendChild(spot);
-  body.insertBefore(layer, body.firstChild);
-  var ctx=cv.getContext('2d'); var W=0,H=0; var DPR=Math.min(window.devicePixelRatio||1,2);
-  function resize(){W=cv.width=Math.floor(innerWidth*DPR);H=cv.height=Math.floor(innerHeight*DPR);cv.style.width=innerWidth+'px';cv.style.height=innerHeight+'px';}
-  resize(); window.addEventListener('resize',resize);
-  var N=innerWidth<700?180:380, stars=[], seed=987654321;
-  function rnd(){seed=(seed*1664525+1013904223)>>>0; return seed/4294967296;}
-  for(var i=0;i<N;i++){stars.push({x:rnd(),y:rnd(),r:rnd()*1.2+0.25,ph:rnd()*6.28,sp:0.4+rnd()*1.1,base:0.22+rnd()*0.5});}
-  var shoot=null,lastShoot=0;
-  function draw(t){
-    ctx.clearRect(0,0,W,H);
-    for(var i=0;i<stars.length;i++){var s=stars[i];var op=s.base;if(!reduce){op+=Math.sin(t/1000*s.sp+s.ph)*0.35;}if(op<0.04){op=0.04;}if(op>1){op=1;}ctx.globalAlpha=op;ctx.beginPath();ctx.arc(s.x*W,s.y*H,s.r*DPR,0,6.2832);ctx.fillStyle=(i%23===0?'#9FBEDF':'#ffffff');ctx.fill();}
-    ctx.globalAlpha=1;
-    if(!reduce){
-      if(!shoot && t-lastShoot>(15000+rnd()*6000)){lastShoot=t;var fl=rnd()>0.5;shoot={x:rnd()*W*0.7,y:rnd()*H*0.35,vx:(fl?1:-1)*(7+rnd()*5)*DPR,vy:(3+rnd()*2)*DPR,life:0};}
-      if(shoot){var x2=shoot.x-shoot.vx*9,y2=shoot.y-shoot.vy*9;var g=ctx.createLinearGradient(shoot.x,shoot.y,x2,y2);g.addColorStop(0,'rgba(255,255,255,.95)');g.addColorStop(1,'rgba(255,255,255,0)');ctx.strokeStyle=g;ctx.lineWidth=1.8*DPR;ctx.beginPath();ctx.moveTo(shoot.x,shoot.y);ctx.lineTo(x2,y2);ctx.stroke();shoot.x+=shoot.vx*2.4;shoot.y+=shoot.vy*2.4;shoot.life++;if(shoot.life>46||shoot.x<-60||shoot.x>W+60||shoot.y>H+60){shoot=null;}}
-    }
-    requestAnimationFrame(draw);
-  }
-  requestAnimationFrame(draw);
-  if(!reduce){
-    var sx=innerWidth/2,sy=innerHeight/2,tx=sx,ty=sy;
-    window.addEventListener('mousemove',function(e){tx=e.clientX;ty=e.clientY;spot.style.opacity='1';},{passive:true});
-    (function loop(){sx+=(tx-sx)*0.12;sy+=(ty-sy)*0.12;spot.style.transform='translate('+(sx-280)+'px,'+(sy-280)+'px)';requestAnimationFrame(loop);})();
-  }
-  // ripple
-  if(!reduce){document.addEventListener('pointerdown',function(e){
-    var el=e.target.closest('button,[role="tab"],.stat,.src-tag,.mtag,[data-testid="stLinkButton"] a'); if(!el){return;}
-    var r=el.getBoundingClientRect();var sz=Math.max(r.width,r.height)*1.15;
-    var ink=document.createElement('span');ink.className='pfc-ink';
-    ink.style.width=ink.style.height=sz+'px';ink.style.left=(e.clientX-r.left-sz/2)+'px';ink.style.top=(e.clientY-r.top-sz/2)+'px';
-    ink.style.transform='scale(0)';ink.style.opacity='.5';ink.style.transition='transform .55s cubic-bezier(.22,.61,.36,1),opacity .6s ease';
-    var cs=getComputedStyle(el);if(cs.position==='static'){el.style.position='relative';}el.style.overflow='hidden';
-    el.appendChild(ink);requestAnimationFrame(function(){ink.style.transform='scale(2.4)';ink.style.opacity='0';});
-    setTimeout(function(){if(ink.parentNode){ink.parentNode.removeChild(ink);}},660);
-  },true);}
-  // tilt 3D + brilho que segue o mouse
-  var tiltEl=null;
-  if(!reduce){
-    document.addEventListener('mousemove',function(e){
-      var el=e.target.closest('.kpi,.card,.lead,.caso');
-      if(el!==tiltEl){if(tiltEl){tiltEl.style.transform='';}tiltEl=el;}
-      if(!el){return;}
-      var r=el.getBoundingClientRect();var px=(e.clientX-r.left)/r.width-0.5;var py=(e.clientY-r.top)/r.height-0.5;
-      el.style.transform='perspective(820px) rotateX('+(-py*5).toFixed(2)+'deg) rotateY('+(px*5).toFixed(2)+'deg) translateY(-3px)';
-      el.style.setProperty('--mx',((px+0.5)*100).toFixed(1)+'%');el.style.setProperty('--my',((py+0.5)*100).toFixed(1)+'%');
-    },{passive:true});
-    document.addEventListener('mouseout',function(e){if(tiltEl && !tiltEl.contains(e.relatedTarget)){tiltEl.style.transform='';tiltEl=null;}},true);
-  }
-  // magnetismo na logo e avatar
-  if(!reduce){window.addEventListener('mousemove',function(e){
-    var els=document.querySelectorAll('.brand svg, .avatar');
-    for(var i=0;i<els.length;i++){var el=els[i];var r=el.getBoundingClientRect();var cx=r.left+r.width/2,cy=r.top+r.height/2;
-      var dx=e.clientX-cx,dy=e.clientY-cy,d=Math.sqrt(dx*dx+dy*dy);
-      if(d<130){var f=(1-d/130)*0.4;el.style.transform='translate('+(dx*f).toFixed(1)+'px,'+(dy*f).toFixed(1)+'px)';}
-      else if(el.style.transform){el.style.transform='';}}
-  },{passive:true});}
-})();
-"""
-_COSMOS_BOOT = (
-    "<script>(function(){try{var P=window.parent;if(!P||!P.document){return;}"
-    "if(P.document.getElementById('pfc-cosmos-js')){return;}"
-    "var s=P.document.createElement('script');s.id='pfc-cosmos-js';"
-    "s.textContent=" + json.dumps(_COSMOS_JS) + ";"
-    "P.document.head.appendChild(s);}catch(e){}})();</script>"
-)
-components.html(_COSMOS_BOOT, height=0)
 
 LOGO_SVG = """
 <svg width="{size}" height="{size}" viewBox="0 0 42 42" aria-hidden="true">
@@ -781,61 +720,67 @@ HINT_ESCRITA = "🔒 Conecte ao Google Sheets para habilitar escrita."
 
 
 # --------------------------------------------------------------------------- #
-# Cabeçalho com logo, selo de modo e usuário logado
-# --------------------------------------------------------------------------- #
-def render_header():
-    if modo_conectado:
-        selo = '<span class="pill ok"><span class="dot"></span> 🟢 Conectado ao Google Sheets</span>'
-    else:
-        selo = '<span class="pill local">🟠 Modo local (CSV) — escrita desabilitada</span>'
-    col_a, col_b = st.columns([3, 2])
-    with col_a:
-        st.markdown(
-            f'<div class="brand">{LOGO_SVG.format(size=42)}'
-            '<div><div class="wm">Programa Futuro Cientista</div>'
-            '<div class="sub">Inteligência de Captação</div></div></div>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(f'<div class="selo-wrap">{selo}</div>', unsafe_allow_html=True)
-    with col_b:
-        st.markdown(
-            f'<div class="userbox"><div class="who">'
-            f'<div class="nm">{esc(USER["nome"])}</div>'
-            f'<div class="pf">{esc(USER["perfil"])}</div></div>'
-            f'<span class="avatar" style="background:{USER["bg"]};border:1px solid {USER["bd"]};'
-            f'color:{USER["tx"]}" title="{esc(USER["email"])}">{esc(USER["inicial"])}</span></div>',
-            unsafe_allow_html=True,
-        )
-        sub = st.columns([2, 1])
-        with sub[1]:
-            if st.button("🔓 Sair", key="logout", use_container_width=True):
-                for k in ("user", "page", "login_email", "login_senha"):
-                    st.session_state.pop(k, None)
-                st.rerun()
-    st.markdown('<div class="hr-line"></div>', unsafe_allow_html=True)
-
-
-render_header()
-
-# --------------------------------------------------------------------------- #
-# Barra de navegação (páginas) + breadcrumb
+# Sidebar de navegação (maquete pfc_app_v3) + top bar
 # --------------------------------------------------------------------------- #
 _n_naoverif = int((~df[COL_VERIF].apply(verificada_ok)).sum()) if TOTAL else 0
-nav_cols = st.columns(len(PAGES))
-for i, p in enumerate(PAGES):
+NAV_SECOES = [("Operação", ["Visão geral", "Radar", "Ranking", "Funil"]),
+              ("Dados", ["Metodologia", "Verificação"])]
+
+
+def _rotulo_nav(p: str) -> str:
     rotulo = f"{PAGE_ICONS[p]} {p}"
     if p == "Ranking":
-        rotulo += f" ({TOTAL})"
+        rotulo += f" · {TOTAL}"
     elif p == "Verificação" and _n_naoverif:
-        rotulo += f" ({_n_naoverif})"
-    nav_cols[i].button(
-        rotulo, key=f"nav_{p}", use_container_width=True,
-        type="primary" if st.session_state["page"] == p else "secondary",
-        on_click=ir_para, args=(p,),
+        rotulo += f" · {_n_naoverif}"
+    return rotulo
+
+
+def render_sidebar():
+    with st.sidebar:
+        st.markdown(
+            '<div class="sb-brand"><div class="rings"><span></span><span></span><span></span></div>'
+            '<div class="bt">Futuro Cientista<small>CAPTAÇÃO PRIVADA</small></div></div>',
+            unsafe_allow_html=True,
+        )
+        for secao, paginas in NAV_SECOES:
+            st.markdown(f'<div class="sb-sec">{secao}</div>', unsafe_allow_html=True)
+            for p in paginas:
+                st.button(_rotulo_nav(p), key=f"nav_{p}", use_container_width=True,
+                          type="primary" if st.session_state["page"] == p else "secondary",
+                          on_click=ir_para, args=(p,))
+        status = ('<div class="sf"><span class="d g"></span>SHEETS CONECTADO</div>'
+                  if modo_conectado else
+                  '<div class="sf"><span class="d o"></span>MODO LOCAL · CSV</div>')
+        st.markdown(f'<div class="sb-foot">{status}'
+                    '<div class="sf"><span class="d n"></span>ÚLTIMO SCAN · 06:00</div></div>',
+                    unsafe_allow_html=True)
+        if st.button("🔓 Sair", key="logout", use_container_width=True):
+            for k in ("user", "page", "login_email", "login_senha"):
+                st.session_state.pop(k, None)
+            st.rerun()
+
+
+def render_header():
+    hora = datetime.datetime.now().hour
+    saud = "Bom dia" if hora < 12 else "Boa tarde" if hora < 18 else "Boa noite"
+    primeiro = USER["nome"].split()[0]
+    live = ('<div class="live"><span class="d"></span>RADAR ATIVO</div>' if modo_conectado
+            else '<div class="live off">MODO LOCAL · CSV</div>')
+    st.markdown(
+        f'<div class="topbar"><div>'
+        f'<div class="cr"><b>CAPTAÇÃO PRIVADA</b> · {esc(st.session_state["page"].upper())}</div>'
+        f'<div class="hi">{saud}, {esc(primeiro)}</div></div>'
+        f'<div class="tr-r">{live}'
+        f'<span class="avatar2" title="{esc(USER["email"])}">{esc(USER["inicial"])}</span></div></div>'
+        '<div class="hr-line"></div>',
+        unsafe_allow_html=True,
     )
 
+
+render_sidebar()
+render_header()
 PAGINA = st.session_state["page"]
-breadcrumb("PFC", PAGINA)
 
 if df.empty:
     st.warning("Nenhuma organização encontrada na base. Verifique o CSV ou a planilha.")

@@ -1,11 +1,11 @@
-# Tema escuro minimalista do Dashboard de Captação (PFC)
-# Cinza neutro como base; cor só para destaques semânticos.
+# Tema do Dashboard de Captação (PFC) — paleta da maquete pfc_app_v3
+# Laranja como acento único; superfícies frias azuladas.
 [theme]
 base = "dark"
-primaryColor = "#5B9BD5"             # azul discreto (foco/seleção)
-backgroundColor = "#0A0C0F"          # fundo bem escuro
-secondaryBackgroundColor = "#141820" # superfície (1-2 tons acima)
-textColor = "#E9EBEE"                # texto cinza claro
+primaryColor = "#E8873A"             # laranja (acento da maquete)
+backgroundColor = "#0E1116"          # fundo
+secondaryBackgroundColor = "#161A21" # superfície (cards/sidebar)
+textColor = "#F5F7FA"                # texto principal
 font = "sans serif"
 
 [server]
