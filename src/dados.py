@@ -32,6 +32,8 @@ import streamlit as st
 # Configuração de colunas e caminhos
 # --------------------------------------------------------------------------- #
 CSV_PATH = Path(__file__).resolve().parent.parent / "data" / "empresas.csv"
+# Base de deputados do radar de Emendas (dados sensíveis, fora do git).
+DEPUTADOS_CSV = Path(__file__).resolve().parent.parent / "data" / "deputados_estaduais.csv"
 
 # Aba (worksheet) com a base de organizações dentro da planilha Google.
 ABA_DADOS = "empresas"
@@ -229,6 +231,21 @@ def carregar_empresas() -> tuple[pd.DataFrame, bool]:
 def _ler_base() -> pd.DataFrame:
     """Atalho interno para obter apenas o DataFrame."""
     return carregar_empresas()[0]
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def carregar_deputados() -> pd.DataFrame:
+    """Base de deputados estaduais (radar de Emendas), do CSV local.
+
+    Contém informação sensível de articulação (diálogos, contatos): o arquivo
+    fica fora do git e o painel só é acessível após login. Sem o arquivo,
+    devolve DataFrame vazio (o painel degrada para estado vazio).
+    """
+    try:
+        df = pd.read_csv(DEPUTADOS_CSV, dtype=str).fillna("")
+        return df.dropna(how="all")
+    except Exception:
+        return pd.DataFrame()
 
 
 @st.cache_data(ttl=60, show_spinner=False)

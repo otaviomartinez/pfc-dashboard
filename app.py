@@ -964,25 +964,466 @@ def render_hub():
         st.rerun()
 
 
-def render_emendas_placeholder():
-    """Tela provisória do radar de Emendas (a ser implementada)."""
-    st.markdown(_HUB_CHROME_CSS, unsafe_allow_html=True)
+# =========================================================================== #
+# RADAR 2 · EMENDAS PARLAMENTARES (maquete pfc_emendas_v2, identidade violeta)
+# ---------------------------------------------------------------------------
+# CRM de relacionamento com deputados (não é radar automático). Lê a base
+# local de deputados estaduais (dados.carregar_deputados). O campo "Diálogo"
+# é SENSÍVEL: só é renderizado para usuário logado (guard explícito), nunca
+# numa view pública.
+# =========================================================================== #
+_TEMP_ORDEM = ["Muito Quente", "Morno", "Frio", "Fechado"]
+_TEMP_COR = {"Muito Quente": "#EC6A8C", "Morno": "#E8B54A",
+             "Frio": "#5B9BD5", "Fechado": "#6B7688"}
+_TEMP_EMOJI = {"Muito Quente": "🔵", "Morno": "🟡", "Frio": "🔴", "Fechado": "⚫"}
+
+
+def _temp_nome(valor: str) -> str:
+    """Normaliza a temperatura (a planilha traz '🟡 Morno') para o rótulo puro."""
+    v = str(valor or "").lower()
+    if "quente" in v:
+        return "Muito Quente"
+    if "morno" in v:
+        return "Morno"
+    if "frio" in v:
+        return "Frio"
+    if "fechado" in v:
+        return "Fechado"
+    return "Frio"
+
+
+def _status_cor(status: str) -> str:
+    s = str(status or "").lower()
+    if "aprovada" in s or "andamento" in s:
+        return "#4ADE80"
+    if "reunião" in s or "reuniao" in s:
+        return "#8B7BF0"
+    if "não iniciado" in s or "nao iniciado" in s:
+        return "#6B7688"
+    return "#E8B54A"
+
+
+def _int0(v) -> int:
+    try:
+        return int(float(str(v).replace(",", ".")))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _deputados_ordenados():
+    dfd = dados.carregar_deputados()
+    if dfd.empty:
+        return []
+    deps = []
+    for _, r in dfd.iterrows():
+        nome = str(r.get("Deputado", "")).strip()
+        if not nome:
+            continue
+        temp = _temp_nome(r.get("Temperatura"))
+        deps.append({
+            "nome": nome, "partido": str(r.get("Partido", "")).strip() or "—",
+            "chance": _int0(r.get("Chance Emenda (0-100)")),
+            "ader": _int0(r.get("Aderência PFC (0-100)")),
+            "score": _int0(r.get("Score Integrado")),
+            "prioridade": str(r.get("Prioridade", "")).strip(),
+            "status": str(r.get("Status", "")).strip() or "—",
+            "temp": temp, "temp_cor": _TEMP_COR[temp], "temp_emoji": _TEMP_EMOJI[temp],
+            "status_cor": _status_cor(r.get("Status")),
+            "dialogo": str(r.get("Diálogo", "")).strip(),
+            "base": str(r.get("Base Regional", "")).strip(),
+            "gabinete": str(r.get("Gabinete ALESP", "")).strip(),
+            "telefones": str(r.get("Telefones", "")).strip(),
+            "whatsapp": str(r.get("WhatsApp", "")).strip(),
+            "email": str(r.get("Email", "")).strip(),
+            "instagram": str(r.get("Instagram", "")).strip(),
+            "emenda": str(r.get("Emenda/Ação", "")).strip(),
+            "valor": str(r.get("Valor", "")).strip(),
+            "estrategia": str(r.get("Estratégia PFC", "")).strip(),
+            "obs": str(r.get("Observações", "")).strip(),
+        })
+    deps.sort(key=lambda d: d["score"], reverse=True)
+    return deps
+
+
+@st.dialog("Dossiê do deputado", width="large")
+def dlg_deputado(dep: dict):
+    breadcrumb("Emendas", dep["nome"])
     st.markdown(
-        '<div style="min-height:80vh;display:flex;flex-direction:column;align-items:center;'
-        'justify-content:center;text-align:center;gap:16px;font-family:\'Space Grotesk\',sans-serif">'
-        '<div style="font-size:52px">🏛️</div>'
-        '<div style="font-family:\'JetBrains Mono\',monospace;font-size:12px;letter-spacing:4px;'
-        'text-transform:uppercase;color:#8B7BF5">Setor 02 · Recursos públicos</div>'
-        '<div style="font-size:34px;font-weight:700;letter-spacing:-1px;color:#EEF1F8">'
-        'Radar de Emendas Parlamentares</div>'
-        '<div style="font-size:15px;color:#9AA3B8;max-width:440px;line-height:1.6">'
-        'Este módulo será implementado em seguida. Ele vai monitorar emendas, '
-        'deputados e diálogos com o mesmo motor do radar de captação.</div></div>',
+        f'<div style="font-size:20px;font-weight:700;color:var(--ink)">{esc(dep["nome"])}</div>'
+        f'<div style="font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:6px">'
+        f'{esc(dep["partido"])} · ALESP · {esc(dep["base"]) or "base regional —"}</div>',
         unsafe_allow_html=True,
     )
-    if st.button("← Voltar à Central", key="emendas_voltar", use_container_width=True):
-        st.session_state["radar_escolhido"] = None
-        st.rerun()
+    c1, c2 = st.columns(2)
+    c1.markdown(
+        f'<div style="background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:16px">'
+        f'<div style="font-family:var(--mono);font-size:10px;letter-spacing:.8px;text-transform:uppercase;'
+        f'color:var(--dim);margin-bottom:8px">Chance de emenda</div>'
+        f'<div style="font-size:26px;font-weight:800;color:#8B7BF0">{dep["chance"]}%</div></div>',
+        unsafe_allow_html=True)
+    c2.markdown(
+        f'<div style="background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:16px">'
+        f'<div style="font-family:var(--mono);font-size:10px;letter-spacing:.8px;text-transform:uppercase;'
+        f'color:var(--dim);margin-bottom:8px">Aderência PFC</div>'
+        f'<div style="font-size:26px;font-weight:800;color:#4ADE80">{dep["ader"]}</div></div>',
+        unsafe_allow_html=True)
+
+    st.markdown(
+        f'<div style="margin-top:18px"><div style="font-family:var(--mono);font-size:11px;letter-spacing:1px;'
+        f'text-transform:uppercase;color:var(--dim);margin-bottom:8px">Status da negociação</div>'
+        f'<span class="stpill" style="background:{dep["status_cor"]}22;color:{dep["status_cor"]};'
+        f'font-size:12px;font-weight:600;padding:6px 13px;border-radius:20px">'
+        f'{dep["temp_emoji"]} {esc(dep["status"])} · {esc(dep["temp"])}</span></div>',
+        unsafe_allow_html=True)
+
+    # ---- DIÁLOGO (sensível) — só para usuário autenticado ----
+    st.markdown('<div style="font-family:var(--mono);font-size:11px;letter-spacing:1px;'
+                'text-transform:uppercase;color:var(--dim);margin:20px 0 8px">'
+                'Diálogo · andamento da negociação</div>', unsafe_allow_html=True)
+    if st.session_state.get("user"):
+        dlg = dep["dialogo"] or "Sem anotações de diálogo ainda."
+        st.markdown(
+            f'<div style="background:var(--surface2);border:1px solid var(--line);'
+            f'border-left:3px solid #8B7BF0;border-radius:0 10px 10px 0;padding:14px 16px;'
+            f'font-size:14px;line-height:1.6;color:var(--muted);font-style:italic">'
+            f'{esc(dlg)}</div>'
+            '<div style="font-size:11px;color:var(--dim);margin-top:7px">'
+            '🔒 Informação de articulação restrita · visível apenas para a equipe logada</div>',
+            unsafe_allow_html=True)
+    else:
+        st.markdown('<div style="font-size:13px;color:var(--dim)">🔒 Conteúdo restrito.</div>',
+                    unsafe_allow_html=True)
+
+    # ---- contato + estratégia ----
+    contatos = []
+    if dep["gabinete"]:
+        contatos.append(f"Gabinete ALESP: {esc(dep['gabinete'])}")
+    if dep["telefones"]:
+        contatos.append(f"Tel.: {esc(dep['telefones'])}")
+    if dep["whatsapp"]:
+        contatos.append(f"WhatsApp: {esc(dep['whatsapp'])}")
+    if dep["email"]:
+        contatos.append(f"E-mail: {esc(dep['email'])}")
+    if dep["instagram"]:
+        contatos.append(f"Instagram: {esc(dep['instagram'])}")
+    linhas = [("Contato", "<br>".join(contatos) or "—"),
+              ("Emenda / ação", esc(dep["emenda"]) or "—"),
+              ("Valor pretendido", esc(dep["valor"]) or "—"),
+              ("Estratégia PFC", esc(dep["estrategia"]) or "—")]
+    corpo = "".join(
+        f'<div style="margin-top:18px"><div style="font-family:var(--mono);font-size:11px;'
+        f'letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:7px">{lab}</div>'
+        f'<div style="font-size:14px;color:var(--ink);line-height:1.6">{val}</div></div>'
+        for lab, val in linhas)
+    st.markdown(corpo, unsafe_allow_html=True)
+    st.caption("ℹ️ Registrar novo contato/atualizar diálogo grava na planilha de deputados "
+               "(a ser conectada ao Google Sheets nesta rodada é somente leitura).")
+
+
+_EMENDAS_V2_CSS = """
+.em{display:flex;flex-direction:column;gap:22px;font-family:'Inter',system-ui,sans-serif;
+  color:var(--ink,#F5F7FA);animation:em-fade .4s ease;--accent:#8B7BF0;--accent-dim:rgba(139,123,240,.13)}
+@keyframes em-fade{from{opacity:0;transform:translateY(10px)}}
+.em .mono{font-family:'JetBrains Mono',monospace}
+.em .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:22px}
+@media (max-width:1000px){.em .hero{grid-template-columns:1fr}}
+.em .lead-card{background:linear-gradient(150deg,var(--surface2,#1C222B),var(--surface,#161A21));
+  border:1px solid var(--line,rgba(255,255,255,.06));border-radius:16px;padding:32px 34px;
+  display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden}
+.em .lead-card::after{content:"";position:absolute;top:-40%;right:-10%;width:300px;height:300px;
+  border-radius:50%;background:radial-gradient(circle,var(--accent-dim),transparent 70%)}
+.em .hl-label{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:1.2px;
+  text-transform:uppercase;color:var(--muted,#A4AEBF);margin-bottom:14px;position:relative;z-index:1}
+.em .hl-num{font-size:80px;font-weight:800;letter-spacing:-4px;line-height:.9;position:relative;z-index:1}
+.em .hl-num .u{font-size:26px;font-weight:600;color:var(--muted,#A4AEBF);letter-spacing:-1px;margin-left:6px}
+.em .hl-cap{font-size:15px;color:var(--muted,#A4AEBF);margin-top:10px;position:relative;z-index:1}
+.em .hl-headline{position:relative;z-index:1;margin-top:24px;padding-top:22px;
+  border-top:1px solid var(--line,rgba(255,255,255,.06))}
+.em .hh-lbl{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:1px;
+  text-transform:uppercase;color:var(--dim,#6B7688);margin-bottom:10px}
+.em .hh-row{display:flex;align-items:center;gap:14px;cursor:pointer}
+.em .hh-sc{font-weight:800;font-size:26px;color:#4ADE80;flex:none;font-variant-numeric:tabular-nums}
+.em .hh-t{font-size:16px;font-weight:600;line-height:1.3}
+.em .hh-m{font-size:12px;color:var(--dim,#6B7688);margin-top:4px}
+.em .hh-dl{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;
+  padding:8px 12px;border-radius:8px;flex:none;white-space:nowrap}
+.em .temp-card{background:var(--surface,#161A21);border:1px solid var(--line,rgba(255,255,255,.06));
+  border-radius:16px;padding:26px 28px;display:flex;flex-direction:column}
+.em .temp-card h3{font-size:16px;font-weight:600;margin:0 0 4px}
+.em .ts{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dim,#6B7688);
+  margin-bottom:22px;letter-spacing:.5px}
+.em .trow{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.em .trow:last-child{margin-bottom:0}
+.em .tdot{width:12px;height:12px;border-radius:50%;flex:none}
+.em .tn{flex:1;font-size:14px;color:var(--muted,#A4AEBF);font-weight:500}
+.em .tk{width:120px;height:9px;background:rgba(255,255,255,.05);border-radius:6px;overflow:hidden}
+.em .tf{height:100%;border-radius:6px;width:0;transition:width 1.1s cubic-bezier(.16,1,.3,1)}
+.em .tv{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;width:26px;text-align:right;flex:none}
+.em .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+@media (max-width:1000px){.em .kpis{grid-template-columns:1fr 1fr}}
+.em .kpi{position:relative;background:var(--surface,#161A21);border:1px solid var(--line,rgba(255,255,255,.06));
+  border-radius:16px;padding:22px 24px;overflow:hidden;--c:#8B7BF0}
+.em .kpi::before{content:"";position:absolute;inset:0;border-radius:16px;padding:1.5px;
+  background:linear-gradient(145deg,var(--c),transparent 55%);
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;opacity:.55}
+.em .kpi::after{content:"";position:absolute;top:-30%;right:-15%;width:130px;height:130px;border-radius:50%;
+  background:radial-gradient(circle,var(--c),transparent 70%);opacity:.10;pointer-events:none}
+.em .kic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;margin-bottom:14px;
+  position:relative;z-index:1;background:color-mix(in srgb,var(--c) 16%,transparent);
+  border:1px solid color-mix(in srgb,var(--c) 30%,transparent)}
+.em .kic svg{width:21px;height:21px;fill:none;stroke:var(--c);stroke-width:1.9}
+.em .kl{font-family:'JetBrains Mono',monospace;font-size:11.5px;letter-spacing:.8px;text-transform:uppercase;
+  color:var(--muted,#A4AEBF);position:relative;z-index:1}
+.em .kv{font-weight:800;font-size:38px;letter-spacing:-1.5px;margin-top:10px;
+  font-variant-numeric:tabular-nums;position:relative;z-index:1}
+.em .kf{font-size:13px;color:var(--dim,#6B7688);margin-top:8px;position:relative;z-index:1}
+.em .panel{background:var(--surface,#161A21);border:1px solid var(--line,rgba(255,255,255,.06));
+  border-radius:16px;overflow:hidden}
+.em .ph{padding:22px 26px 6px}
+.em .ph h3{font-size:16px;font-weight:600;margin:0}
+.em .psub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dim,#6B7688);
+  margin-top:4px;letter-spacing:.5px}
+.em .tr{display:grid;grid-template-columns:2.2fr 1fr 1fr 1.1fr .7fr auto;gap:16px;align-items:center;
+  padding:15px 26px;border-top:1px solid var(--line,rgba(255,255,255,.06));cursor:pointer;transition:.15s}
+.em .tr:hover{background:var(--hover,#222834)}
+.em .tr.head{cursor:default;font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:1px;
+  text-transform:uppercase;color:var(--dim,#6B7688)}
+.em .tr.head:hover{background:none}
+.em .dep{display:flex;align-items:center;gap:13px;min-width:0}
+.em .dep .tdot{width:9px;height:9px;border-radius:50%;flex:none}
+.em .dep .nm{font-weight:600;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.em .dep .sub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dim,#6B7688);margin-top:2px}
+.em .barcell{display:flex;align-items:center;gap:9px}
+.em .bk{flex:1;height:7px;background:rgba(255,255,255,.06);border-radius:5px;overflow:hidden;min-width:32px}
+.em .bf{height:100%;border-radius:5px;width:0;transition:width 1s cubic-bezier(.16,1,.3,1)}
+.em .bv{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;width:26px;flex:none;text-align:right}
+.em .stpill{font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:20px;width:fit-content;white-space:nowrap}
+.em .temp-ic{font-size:19px;text-align:center}
+.em .rarrow{color:var(--dim,#6B7688);transition:.2s}
+.em .tr:hover .rarrow{color:#8B7BF0;transform:translateX(3px)}
+.em .vazio{padding:40px 26px;text-align:center;color:var(--muted,#A4AEBF);font-size:14px}
+"""
+
+_EMENDAS_V2_JS = r"""
+export default function(component){
+  const {data, parentElement, setTriggerValue} = component;
+  const old = parentElement.querySelector('.em'); if (old) old.remove();
+  const d = data || {}, deps = d.deps || [];
+  const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const root = document.createElement('div'); root.className = 'em';
+
+  // hero
+  const h = d.hero || {}, top = h.top;
+  let topHtml = '';
+  if (top) {
+    topHtml = '<div class="hh-row" data-i="' + top.i + '"><span class="hh-sc">' + esc(top.score) +
+      '</span><div style="min-width:0"><div class="hh-t">' + esc(top.nome) + '</div>' +
+      '<div class="mono hh-m">' + esc(top.partido) + ' · ' + esc(top.status) + '</div></div>' +
+      '<span class="hh-dl" style="color:' + top.cor + ';background:' + top.cor + '1a;border:1px solid ' +
+      top.cor + '4d">' + esc(top.temp).toUpperCase() + '</span></div>';
+  }
+  const lead = '<div class="lead-card"><div><div class="hl-label">Deputados em articulação</div>' +
+    '<div class="hl-num tnum"><span data-c="' + (h.articulacao || 0) + '">0</span>' +
+    '<span class="u">de ' + (h.total || 0) + '</span></div>' +
+    '<div class="hl-cap">com contato iniciado · ' + (h.nao_abordados || 0) + ' ainda não abordados</div></div>' +
+    '<div class="hl-headline"><div class="hh-lbl">Negociação mais avançada</div>' + topHtml + '</div></div>';
+
+  // termômetro
+  let trows = '';
+  (d.temperatura || []).forEach(function(t){
+    trows += '<div class="trow"><span class="tdot" style="background:' + t.cor + '"></span>' +
+      '<span class="tn">' + t.emoji + ' ' + esc(t.nome) + '</span>' +
+      '<span class="tk"><span class="tf" data-w="' + t.pct + '" style="background:' + t.cor + '"></span></span>' +
+      '<span class="tv">' + t.n + '</span></div>';
+  });
+  const temp = '<div class="temp-card"><h3>Temperatura das negociações</h3>' +
+    '<div class="ts">' + (h.total || 0) + ' DEPUTADOS · ALESP</div>' + trows + '</div>';
+
+  root.innerHTML = '<div class="hero">' + lead + temp + '</div>';
+
+  // KPIs
+  const ICON = {
+    users: '<path d="M16 21v-2a4 4 0 0 0-8 0v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/>',
+    cal: '<path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/>',
+    check: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4 12 14.01l-3-3"/>',
+    money: '<path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'
+  };
+  let kpis = '';
+  (d.kpis || []).forEach(function(k){
+    const val = (k.suffix != null)
+      ? '<div class="kv">' + esc(k.val) + '<span style="font-size:20px;color:var(--muted,#A4AEBF)">' + k.suffix + '</span></div>'
+      : '<div class="kv tnum" data-c="' + k.val + '">0</div>';
+    kpis += '<div class="kpi" style="--c:' + k.c + '"><div class="kic"><svg viewBox="0 0 24 24">' +
+      (ICON[k.icon] || '') + '</svg></div><div class="kl">' + esc(k.lab) + '</div>' + val +
+      '<div class="kf"' + (k.foot_cor ? ' style="color:' + k.foot_cor + '"' : '') + '>' + esc(k.foot) + '</div></div>';
+  });
+  root.insertAdjacentHTML('beforeend', '<div class="kpis">' + kpis + '</div>');
+
+  // tabela
+  let rows = '';
+  deps.forEach(function(p, i){
+    rows += '<div class="tr" data-i="' + i + '">' +
+      '<div class="dep"><span class="tdot" style="background:' + p.temp_cor + ';box-shadow:0 0 8px ' + p.temp_cor +
+      '"></span><div style="min-width:0"><div class="nm">' + esc(p.nome) + '</div>' +
+      '<div class="sub">' + esc(p.partido) + (p.prioridade ? ' · ' + esc(p.prioridade) : '') + '</div></div></div>' +
+      '<div class="barcell"><span class="bk"><span class="bf" data-w="' + p.chance +
+      '" style="background:#8B7BF0"></span></span><span class="bv">' + p.chance + '</span></div>' +
+      '<div class="barcell"><span class="bk"><span class="bf" data-w="' + p.ader +
+      '" style="background:#4ADE80"></span></span><span class="bv">' + p.ader + '</span></div>' +
+      '<div><span class="stpill" style="background:' + p.status_cor + '22;color:' + p.status_cor + '">' +
+      esc(p.status) + '</span></div>' +
+      '<div class="temp-ic">' + p.temp_emoji + '</div><div class="rarrow">→</div></div>';
+  });
+  if (!deps.length) {
+    rows = '<div class="vazio">Base de deputados não encontrada. Confira <b>data/deputados_estaduais.csv</b>.</div>';
+  }
+  root.insertAdjacentHTML('beforeend',
+    '<div class="panel"><div class="ph"><h3>Deputados por prioridade</h3>' +
+    '<div class="psub">ORDENADOS POR SCORE INTEGRADO · CLIQUE PARA ABRIR O DOSSIÊ</div></div>' +
+    '<div class="tr head"><div>Deputado</div><div>Chance emenda</div><div>Aderência PFC</div>' +
+    '<div>Status</div><div>Temp.</div><div></div></div>' + rows + '</div>');
+
+  parentElement.appendChild(root);
+
+  root.addEventListener('click', function(e){
+    const el = e.target.closest('[data-i]');
+    if (!el) { return; }
+    setTriggerValue('acao', {i: +el.dataset.i, n: Date.now()});
+  });
+  // animações (setInterval/timeout — rAF-loop não roda no runtime v2)
+  root.querySelectorAll('[data-c]').forEach(function(el){
+    const alvo = +el.dataset.c; const t0 = Date.now(), dur = 900;
+    const iv = setInterval(function(){
+      const p = Math.min(1, (Date.now() - t0) / dur);
+      el.textContent = String(Math.round(alvo * (1 - Math.pow(1 - p, 3))));
+      if (p >= 1) { clearInterval(iv); }
+    }, 16);
+  });
+  setTimeout(function(){
+    root.querySelectorAll('.tf,.bf').forEach(function(f, i){
+      f.style.transitionDelay = (i * 40) + 'ms'; f.style.width = f.dataset.w + '%';
+    });
+  }, 60);
+  return function(){ root.remove(); };
+}
+"""
+
+_emendas_v2 = components_v2.component("pfc_emendas", css=_EMENDAS_V2_CSS, js=_EMENDAS_V2_JS)
+
+# CSS que reveste o chrome do Streamlit na identidade violeta de Emendas.
+_EMENDAS_CHROME_CSS = """
+<style>
+[data-testid="stSidebar"] .stButton>button[kind="primary"]::before{background:#8B7BF0!important}
+.em-brand .bt small{color:#8B7BF0!important}
+.em-rings span:nth-child(1){border-color:transparent #8B7BF0 transparent transparent!important}
+.em-rings span:nth-child(3){border-color:#5B9BD5 transparent transparent transparent!important}
+.topbar .cr b{color:#8B7BF0}
+.topbar .live{color:#8B7BF0;background:rgba(139,123,240,.12);border-color:rgba(139,123,240,.3)}
+.topbar .avatar2{background:linear-gradient(135deg,#8B7BF0,#c0b5ff)}
+.st-key-emenda_nav_ativo button{color:var(--ink)!important;background:rgba(255,255,255,.03)!important;font-weight:600!important}
+.st-key-emenda_nav_ativo button::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;
+  border-radius:0 3px 3px 0;background:#8B7BF0}
+</style>
+"""
+
+
+def render_sidebar_emendas():
+    with st.sidebar:
+        st.markdown(
+            '<div class="sb-brand em-brand"><div class="rings em-rings"><span></span><span></span><span></span></div>'
+            '<div class="bt">Futuro Cientista<small>EMENDAS PARLAMENTARES</small></div></div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown('<div class="sb-sec">Articulação</div>', unsafe_allow_html=True)
+        st.button("📊 Visão geral", key="emenda_nav_ativo", use_container_width=True,
+                  type="primary")
+        st.markdown('<div class="sb-sec">Escopo</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sf" style="padding:6px 14px"><span class="d o"></span>'
+                    'ESTADUAL · ALESP · 16</div>'
+                    '<div class="sf" style="padding:2px 14px;opacity:.5"><span class="d n"></span>'
+                    'FEDERAL · em breve</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sb-foot"><div class="sf"><span class="d o"></span>'
+                    '16 DEPUTADOS · ALESP</div></div>', unsafe_allow_html=True)
+        if st.button("🛰️ Trocar radar", key="emenda_trocar", use_container_width=True):
+            st.session_state["radar_escolhido"] = None
+            st.rerun()
+        if st.button("🔓 Sair", key="emenda_logout", use_container_width=True):
+            for k in ("user", "page", "login_email", "login_senha", "radar_escolhido"):
+                st.session_state.pop(k, None)
+            st.rerun()
+
+
+def render_emendas():
+    """Painel do radar de Emendas Parlamentares (CRM de deputados)."""
+    st.markdown(_EMENDAS_CHROME_CSS, unsafe_allow_html=True)
+    render_sidebar_emendas()
+
+    hora = datetime.datetime.now().hour
+    saud = "Bom dia" if hora < 12 else "Boa tarde" if hora < 18 else "Boa noite"
+    primeiro = USER["nome"].split()[0]
+    st.markdown(
+        f'<div class="topbar"><div>'
+        f'<div class="cr"><b>EMENDAS PARLAMENTARES</b> · ARTICULAÇÃO</div>'
+        f'<div class="hi">{saud}, {esc(primeiro)}</div></div>'
+        f'<div class="tr-r"><div class="live">ALESP · ESTADUAL</div>'
+        f'<span class="avatar2" title="{esc(USER["email"])}">{esc(USER["inicial"])}</span></div></div>'
+        '<div class="hr-line"></div>',
+        unsafe_allow_html=True,
+    )
+
+    deps = _deputados_ordenados()
+    total = len(deps)
+    if not total:
+        st.warning("Base de deputados não encontrada. Confira `data/deputados_estaduais.csv`.")
+        _emendas_v2(data={"deps": [], "hero": {}, "temperatura": [], "kpis": []},
+                    key="emendas_v2", on_acao_change=lambda: None)
+        return
+
+    nao_abordados = sum(1 for d in deps if "não iniciado" in d["status"].lower()
+                        or "nao iniciado" in d["status"].lower())
+    articulacao = total - nao_abordados
+    reunioes = sum(1 for d in deps if d["status"].lower().startswith("reunião")
+                   or d["status"].lower().startswith("reuniao"))
+    aprovadas = sum(1 for d in deps if "aprovada" in d["status"].lower())
+    chance_media = round(sum(d["chance"] for d in deps) / total) if total else 0
+
+    # temperatura mais quente + maior score = negociação mais avançada
+    ordem_temp = {t: i for i, t in enumerate(_TEMP_ORDEM)}
+    top = min(deps, key=lambda d: (ordem_temp.get(d["temp"], 9), -d["score"]))
+    top_i = deps.index(top)
+
+    cont_temp = {t: 0 for t in _TEMP_ORDEM}
+    for d in deps:
+        cont_temp[d["temp"]] += 1
+    temperatura = [{"nome": t, "emoji": _TEMP_EMOJI[t], "cor": _TEMP_COR[t],
+                    "n": cont_temp[t], "pct": round(cont_temp[t] / total * 100)}
+                   for t in _TEMP_ORDEM]
+
+    payload = {
+        "hero": {"articulacao": articulacao, "total": total, "nao_abordados": nao_abordados,
+                 "top": {"i": top_i, "nome": top["nome"], "partido": top["partido"],
+                         "status": top["status"], "score": top["score"],
+                         "temp": top["temp"], "cor": top["temp_cor"]}},
+        "temperatura": temperatura,
+        "kpis": [
+            {"c": "#8B7BF0", "icon": "users", "lab": "Deputados", "val": total,
+             "foot": "na base ALESP"},
+            {"c": "#E8B54A", "icon": "cal", "lab": "Reuniões ativas", "val": reunioes,
+             "foot": "solicitadas ou agendadas"},
+            {"c": "#4ADE80", "icon": "check", "lab": "Emendas aprovadas", "val": aprovadas,
+             "foot": "✓ primeira conquista" if aprovadas else "nenhuma ainda",
+             "foot_cor": "#4ADE80" if aprovadas else None},
+            {"c": "#EC6A8C", "icon": "money", "lab": "Chance média", "val": chance_media,
+             "suffix": "%", "foot": "de emenda no grupo"},
+        ],
+        "deps": deps,
+    }
+    res = _emendas_v2(data=payload, key="emendas_v2", on_acao_change=lambda: None)
+    ac = getattr(res, "acao", None)
+    if isinstance(ac, dict) and isinstance(ac.get("i"), int) and 0 <= ac["i"] < total:
+        dlg_deputado(deps[ac["i"]])
 
 
 
@@ -1011,7 +1452,7 @@ if st.session_state["radar_escolhido"] is None:
     render_hub()
     st.stop()
 if st.session_state["radar_escolhido"] == "emendas":
-    render_emendas_placeholder()
+    render_emendas()
     st.stop()
 
 

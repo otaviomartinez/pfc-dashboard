@@ -1,6 +1,11 @@
 # Segredos do Streamlit (NUNCA versionar)
 .streamlit/secrets.toml
 
+# Dados sensíveis de articulação política (diálogos de negociação, telefones
+# pessoais, nomes de assessores) — NUNCA versionar. O painel de Emendas lê
+# deste arquivo localmente; sem ele, degrada para estado vazio.
+data/deputados_estaduais.csv
+
 # Bancos locais
 *.db
 *.sqlite
