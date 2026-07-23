@@ -112,9 +112,18 @@ CSS = """
 html, body, [class*="css"]{font-family:var(--body);line-height:1.6;}
 .mono{font-family:var(--mono)} .tnum{font-variant-numeric:tabular-nums}
 .stApp{background:var(--bg);}
-/* Neutraliza a barra fixa do Streamlit (que sobrepunha/cortava a logo) */
-[data-testid="stHeader"]{display:none;height:0;}
-#MainMenu, footer, [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"]{display:none!important;}
+/* Header transparente e mínimo — mas SEM escondê-lo por completo, senão some
+   junto o botão nativo de reabrir a sidebar (stExpandSidebarButton), deixando
+   o usuário preso quando a sidebar recolhe. Escondemos só o que não interessa. */
+[data-testid="stHeader"]{background:transparent!important;box-shadow:none!important;}
+[data-testid="stToolbar"]{background:transparent!important;}
+#MainMenu, footer, [data-testid="stDecoration"], [data-testid="stStatusWidget"],
+[data-testid="stToolbarActions"], [data-testid="stMainMenu"]{display:none!important;}
+/* botão nativo de reabrir a sidebar: sempre visível e destacado quando ela recolhe */
+[data-testid="stExpandSidebarButton"]{display:flex!important;visibility:visible!important;
+  background:var(--surface)!important;border:1px solid var(--line-2)!important;border-radius:9px!important;}
+[data-testid="stExpandSidebarButton"] svg, [data-testid="stExpandSidebarButton"] span,
+[data-testid="stExpandSidebarButton"] [data-testid="stIconMaterial"]{color:var(--accent)!important;}
 [data-testid="stAppViewContainer"]{overflow:visible;}
 .block-container{max-width:1280px;padding-top:2.4rem!important;padding-bottom:3.4rem;margin:0 auto;}
 @media (min-width:1700px){.block-container{max-width:1380px;}}
@@ -389,7 +398,14 @@ body{background:var(--bg)}
 
 /* ============ SIDEBAR (maquete pfc_app_v3) ============ */
 [data-testid="stSidebar"]{background:var(--surface)!important;border-right:1px solid var(--line);
-  width:250px!important;min-width:250px!important}
+  width:250px!important;min-width:250px!important;
+  transform:none!important;margin-left:0!important;visibility:visible!important}
+/* garante que a sidebar NUNCA fique presa recolhida (transform -300 do colapso) */
+[data-testid="stSidebar"][aria-expanded="false"]{transform:none!important;margin-left:0!important}
+/* sidebar é fixa: escondemos o botão de recolher (senão vira affordance falsa,
+   já que o CSS acima a mantém sempre visível). O botão de reabrir continua
+   estilizado como rede de segurança caso algum estado residual a recolha. */
+[data-testid="stSidebarCollapseButton"]{display:none!important}
 [data-testid="stSidebar"]>div:first-child{padding:18px 14px 16px}
 [data-testid="stSidebar"] [data-testid="stVerticalBlock"]{gap:2px}
 .sb-brand{display:flex;align-items:center;gap:12px;padding:2px 8px 14px}
@@ -1329,7 +1345,38 @@ _EMENDAS_CHROME_CSS = """
 """
 
 
+# Garante que a sidebar apareça expandida ao entrar no painel. Vindo do hub, o
+# Streamlit deixa a sidebar recolhida (e initial_sidebar_state só vale na 1ª
+# carga da sessão, não em reruns): este script clica no botão nativo de expandir
+# até a sidebar ficar visível de fato. Roda no documento-pai (mesma origem).
+_SIDEBAR_FIX_JS = """
+<script>
+(function(){
+  var P = window.parent; if(!P || !P.document){ return; }
+  function visivel(){
+    var sb = P.document.querySelector('[data-testid="stSidebar"]');
+    if(!sb){ return false; }
+    var r = sb.getBoundingClientRect();
+    return r.left >= 0 && r.width > 100;
+  }
+  var n = 0;
+  var iv = setInterval(function(){
+    n++;
+    if(visivel() || n > 25){ clearInterval(iv); return; }
+    var btn = P.document.querySelector('[data-testid="stExpandSidebarButton"]');
+    if(btn){ btn.click(); }
+  }, 180);
+})();
+</script>
+"""
+
+
+def _forcar_sidebar_visivel():
+    components.html(_SIDEBAR_FIX_JS, height=0)
+
+
 def render_sidebar_emendas():
+    _forcar_sidebar_visivel()
     with st.sidebar:
         st.markdown(
             '<div class="sb-brand em-brand"><div class="rings em-rings"><span></span><span></span><span></span></div>'
@@ -1474,6 +1521,7 @@ def _rotulo_nav(p: str) -> str:
 
 
 def render_sidebar():
+    _forcar_sidebar_visivel()
     with st.sidebar:
         st.markdown(
             '<div class="sb-brand"><div class="rings"><span></span><span></span><span></span></div>'
