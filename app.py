@@ -125,8 +125,15 @@ html, body, [class*="css"]{font-family:var(--body);line-height:1.6;}
 [data-testid="stExpandSidebarButton"] svg, [data-testid="stExpandSidebarButton"] span,
 [data-testid="stExpandSidebarButton"] [data-testid="stIconMaterial"]{color:var(--accent)!important;}
 [data-testid="stAppViewContainer"]{overflow:visible;}
-.block-container{max-width:1280px;padding-top:2.4rem!important;padding-bottom:3.4rem;margin:0 auto;}
-@media (min-width:1700px){.block-container{max-width:1380px;}}
+/* Conteúdo: margens simétricas e uso equilibrado da largura. Como na maquete,
+   ocupa a área após a sidebar com padding lateral fixo; o max-width alto só
+   evita linhas longas demais em monitores muito largos (aí centraliza). O
+   padding lateral do Streamlit (80px) é sobrescrito — era ele que empurrava
+   o conteúdo e deixava o vão entre a sidebar e os cards. */
+.block-container, [data-testid="stMainBlockContainer"]{
+  max-width:1680px!important;margin-left:auto!important;margin-right:auto!important;
+  padding-left:36px!important;padding-right:36px!important;
+  padding-bottom:3.4rem!important;}
 h1,h2,h3,h4{font-family:var(--disp);letter-spacing:-.01em;color:var(--text);}
 
 /* ---------- header ---------- */
