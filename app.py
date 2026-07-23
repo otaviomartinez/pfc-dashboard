@@ -424,10 +424,17 @@ body{background:var(--bg)}
   background:transparent;border:none;color:var(--muted);font-size:14px;font-weight:500;
   padding:10px 14px;border-radius:9px;position:relative;box-shadow:none;transition:.15s var(--ease)}
 [data-testid="stSidebar"] .stButton>button:hover{color:var(--ink);background:rgba(255,255,255,.03);transform:none}
+/* item ATIVO: fundo na cor do acento + barra lateral grossa — "você está aqui" bem claro */
 [data-testid="stSidebar"] .stButton>button[kind="primary"]{color:var(--ink);
-  background:rgba(255,255,255,.03);font-weight:600}
+  background:color-mix(in srgb,var(--accent) 15%,transparent);font-weight:600;
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 26%,transparent)}
+[data-testid="stSidebar"] .stButton>button[kind="primary"]:hover{
+  background:color-mix(in srgb,var(--accent) 22%,transparent)}
 [data-testid="stSidebar"] .stButton>button[kind="primary"]::before{content:"";position:absolute;
-  left:0;top:7px;bottom:7px;width:3px;border-radius:0 3px 3px 0;background:var(--accent)}
+  left:0;top:6px;bottom:6px;width:3px;border-radius:0 3px 3px 0;background:var(--accent);
+  box-shadow:0 0 10px var(--accent)}
+/* escopo desabilitado (Federal/Senadores em breve): visível mas claramente inativo */
+[data-testid="stSidebar"] .stButton>button:disabled{opacity:.4;cursor:not-allowed}
 .sb-foot{border-top:1px solid var(--line);margin-top:16px;padding:14px 8px 2px}
 .sf{font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;align-items:center;
   gap:9px;margin-bottom:9px;letter-spacing:.3px}
@@ -1219,68 +1226,47 @@ _EMENDAS_V2_CSS = """
 .em .rarrow{color:var(--dim,#6B7688);transition:.2s}
 .em .tr:hover .rarrow{color:#8B7BF0;transform:translateX(3px)}
 .em .vazio{padding:40px 26px;text-align:center;color:var(--muted,#A4AEBF);font-size:14px}
+/* cabeçalho de sub-tela + funil de negociação (kanban por temperatura) */
+.em .em-head h2{font-size:20px;font-weight:700;letter-spacing:-.5px;color:var(--ink,#F5F7FA)}
+.em .em-head p{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.5px;
+  color:var(--dim,#6B7688);margin-top:4px}
+.em .kanban{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:start}
+@media (max-width:1000px){.em .kanban{grid-template-columns:1fr 1fr}}
+.em .kcol{background:rgba(255,255,255,.02);border:1px solid var(--line,rgba(255,255,255,.06));
+  border-radius:14px;padding:14px;display:flex;flex-direction:column}
+.em .khead{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.5px;
+  text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+.em .kct{color:var(--dim,#6B7688)}
+.em .kbody{display:flex;flex-direction:column;gap:9px;min-height:60px}
+.em .kcard{position:relative;background:var(--surface,#161A21);border:1px solid var(--line,rgba(255,255,255,.06));
+  border-radius:11px;padding:12px 12px 12px 15px;cursor:pointer;overflow:hidden;--c:#8B7BF0;
+  transition:transform .15s cubic-bezier(.16,1,.3,1),border-color .15s}
+.em .kcard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c)}
+.em .kcard:hover{border-color:var(--line2,rgba(255,255,255,.12));transform:translateY(-2px)}
+.em .kcard .kn{font-size:13.5px;font-weight:600;margin-bottom:3px}
+.em .kcard .km{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--dim,#6B7688)}
+.em .kvazio{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dim,#6B7688);
+  text-align:center;padding:10px;border:1px dashed var(--line2,rgba(255,255,255,.12));border-radius:9px}
 """
 
 _EMENDAS_V2_JS = r"""
 export default function(component){
   const {data, parentElement, setTriggerValue} = component;
   const old = parentElement.querySelector('.em'); if (old) old.remove();
-  const d = data || {}, deps = d.deps || [];
+  const d = data || {}, deps = d.deps || [], modo = d.modo || 'visao';
   const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const root = document.createElement('div'); root.className = 'em';
 
-  // hero
-  const h = d.hero || {}, top = h.top;
-  let topHtml = '';
-  if (top) {
-    topHtml = '<div class="hh-row" data-i="' + top.i + '"><span class="hh-sc">' + esc(top.score) +
-      '</span><div style="min-width:0"><div class="hh-t">' + esc(top.nome) + '</div>' +
-      '<div class="mono hh-m">' + esc(top.partido) + ' · ' + esc(top.status) + '</div></div>' +
-      '<span class="hh-dl" style="color:' + top.cor + ';background:' + top.cor + '1a;border:1px solid ' +
-      top.cor + '4d">' + esc(top.temp).toUpperCase() + '</span></div>';
-  }
-  const lead = '<div class="lead-card"><div><div class="hl-label">Deputados em articulação</div>' +
-    '<div class="hl-num tnum"><span data-c="' + (h.articulacao || 0) + '">0</span>' +
-    '<span class="u">de ' + (h.total || 0) + '</span></div>' +
-    '<div class="hl-cap">com contato iniciado · ' + (h.nao_abordados || 0) + ' ainda não abordados</div></div>' +
-    '<div class="hl-headline"><div class="hh-lbl">Negociação mais avançada</div>' + topHtml + '</div></div>';
-
-  // termômetro
-  let trows = '';
-  (d.temperatura || []).forEach(function(t){
-    trows += '<div class="trow"><span class="tdot" style="background:' + t.cor + '"></span>' +
-      '<span class="tn">' + t.emoji + ' ' + esc(t.nome) + '</span>' +
-      '<span class="tk"><span class="tf" data-w="' + t.pct + '" style="background:' + t.cor + '"></span></span>' +
-      '<span class="tv">' + t.n + '</span></div>';
-  });
-  const temp = '<div class="temp-card"><h3>Temperatura das negociações</h3>' +
-    '<div class="ts">' + (h.total || 0) + ' DEPUTADOS · ALESP</div>' + trows + '</div>';
-
-  root.innerHTML = '<div class="hero">' + lead + temp + '</div>';
-
-  // KPIs
   const ICON = {
     users: '<path d="M16 21v-2a4 4 0 0 0-8 0v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/>',
     cal: '<path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/>',
     check: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4 12 14.01l-3-3"/>',
     money: '<path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'
   };
-  let kpis = '';
-  (d.kpis || []).forEach(function(k){
-    const val = (k.suffix != null)
-      ? '<div class="kv">' + esc(k.val) + '<span style="font-size:20px;color:var(--muted,#A4AEBF)">' + k.suffix + '</span></div>'
-      : '<div class="kv tnum" data-c="' + k.val + '">0</div>';
-    kpis += '<div class="kpi" style="--c:' + k.c + '"><div class="kic"><svg viewBox="0 0 24 24">' +
-      (ICON[k.icon] || '') + '</svg></div><div class="kl">' + esc(k.lab) + '</div>' + val +
-      '<div class="kf"' + (k.foot_cor ? ' style="color:' + k.foot_cor + '"' : '') + '>' + esc(k.foot) + '</div></div>';
-  });
-  root.insertAdjacentHTML('beforeend', '<div class="kpis">' + kpis + '</div>');
 
-  // tabela
-  let rows = '';
-  deps.forEach(function(p, i){
-    rows += '<div class="tr" data-i="' + i + '">' +
+  function linhaDep(p, i){
+    return '<div class="tr" data-i="' + i + '">' +
       '<div class="dep"><span class="tdot" style="background:' + p.temp_cor + ';box-shadow:0 0 8px ' + p.temp_cor +
       '"></span><div style="min-width:0"><div class="nm">' + esc(p.nome) + '</div>' +
       '<div class="sub">' + esc(p.partido) + (p.prioridade ? ' · ' + esc(p.prioridade) : '') + '</div></div></div>' +
@@ -1291,15 +1277,83 @@ export default function(component){
       '<div><span class="stpill" style="background:' + p.status_cor + '22;color:' + p.status_cor + '">' +
       esc(p.status) + '</span></div>' +
       '<div class="temp-ic">' + p.temp_emoji + '</div><div class="rarrow">→</div></div>';
-  });
-  if (!deps.length) {
-    rows = '<div class="vazio">Base de deputados não encontrada. Confira <b>data/deputados_estaduais.csv</b>.</div>';
   }
-  root.insertAdjacentHTML('beforeend',
-    '<div class="panel"><div class="ph"><h3>Deputados por prioridade</h3>' +
-    '<div class="psub">ORDENADOS POR SCORE INTEGRADO · CLIQUE PARA ABRIR O DOSSIÊ</div></div>' +
-    '<div class="tr head"><div>Deputado</div><div>Chance emenda</div><div>Aderência PFC</div>' +
-    '<div>Status</div><div>Temp.</div><div></div></div>' + rows + '</div>');
+  function tabelaHTML(titulo, sub){
+    let rows = '';
+    deps.forEach(function(p, i){ rows += linhaDep(p, i); });
+    if (!deps.length) {
+      rows = '<div class="vazio">Base de deputados não encontrada. Confira <b>data/deputados_estaduais.csv</b>.</div>';
+    }
+    return '<div class="panel"><div class="ph"><h3>' + esc(titulo) + '</h3>' +
+      '<div class="psub">' + esc(sub) + '</div></div>' +
+      '<div class="tr head"><div>Deputado</div><div>Chance emenda</div><div>Aderência PFC</div>' +
+      '<div>Status</div><div>Temp.</div><div></div></div>' + rows + '</div>';
+  }
+  function kanbanHTML(){
+    let cols = '';
+    (d.temp_ordem || []).forEach(function(c){
+      const membros = deps.map(function(p, i){ return {p: p, i: i}; })
+        .filter(function(x){ return x.p.temp === c.nome; });
+      let cards = '';
+      membros.forEach(function(x){
+        cards += '<div class="kcard" data-i="' + x.i + '" style="--c:' + c.cor + '">' +
+          '<div class="kn">' + esc(x.p.nome) + '</div>' +
+          '<div class="km">' + esc(x.p.partido) + ' · chance ' + x.p.chance + '</div></div>';
+      });
+      if (!membros.length) { cards = '<div class="kvazio">nenhum</div>'; }
+      cols += '<div class="kcol"><div class="khead" style="color:' + c.cor + '">' +
+        '<span>' + c.emoji + ' ' + esc(c.nome) + '</span><span class="kct">' + membros.length + '</span></div>' +
+        '<div class="kbody">' + cards + '</div></div>';
+    });
+    return '<div class="em-head"><h2>Funil de negociação</h2>' +
+      '<p class="mono">DEPUTADOS POR TEMPERATURA · CLIQUE NUM CARD PARA O DOSSIÊ</p></div>' +
+      '<div class="kanban">' + cols + '</div>';
+  }
+
+  if (modo === 'visao') {
+    // hero
+    const h = d.hero || {}, top = h.top;
+    let topHtml = '';
+    if (top) {
+      topHtml = '<div class="hh-row" data-i="' + top.i + '"><span class="hh-sc">' + esc(top.score) +
+        '</span><div style="min-width:0"><div class="hh-t">' + esc(top.nome) + '</div>' +
+        '<div class="mono hh-m">' + esc(top.partido) + ' · ' + esc(top.status) + '</div></div>' +
+        '<span class="hh-dl" style="color:' + top.cor + ';background:' + top.cor + '1a;border:1px solid ' +
+        top.cor + '4d">' + esc(top.temp).toUpperCase() + '</span></div>';
+    }
+    const lead = '<div class="lead-card"><div><div class="hl-label">Deputados em articulação</div>' +
+      '<div class="hl-num tnum"><span data-c="' + (h.articulacao || 0) + '">0</span>' +
+      '<span class="u">de ' + (h.total || 0) + '</span></div>' +
+      '<div class="hl-cap">com contato iniciado · ' + (h.nao_abordados || 0) + ' ainda não abordados</div></div>' +
+      '<div class="hl-headline"><div class="hh-lbl">Negociação mais avançada</div>' + topHtml + '</div></div>';
+    let trows = '';
+    (d.temperatura || []).forEach(function(t){
+      trows += '<div class="trow"><span class="tdot" style="background:' + t.cor + '"></span>' +
+        '<span class="tn">' + t.emoji + ' ' + esc(t.nome) + '</span>' +
+        '<span class="tk"><span class="tf" data-w="' + t.pct + '" style="background:' + t.cor + '"></span></span>' +
+        '<span class="tv">' + t.n + '</span></div>';
+    });
+    const temp = '<div class="temp-card"><h3>Temperatura das negociações</h3>' +
+      '<div class="ts">' + (h.total || 0) + ' DEPUTADOS · ALESP</div>' + trows + '</div>';
+    root.innerHTML = '<div class="hero">' + lead + temp + '</div>';
+    let kpis = '';
+    (d.kpis || []).forEach(function(k){
+      const val = (k.suffix != null)
+        ? '<div class="kv">' + esc(k.val) + '<span style="font-size:20px;color:var(--muted,#A4AEBF)">' + k.suffix + '</span></div>'
+        : '<div class="kv tnum" data-c="' + k.val + '">0</div>';
+      kpis += '<div class="kpi" style="--c:' + k.c + '"><div class="kic"><svg viewBox="0 0 24 24">' +
+        (ICON[k.icon] || '') + '</svg></div><div class="kl">' + esc(k.lab) + '</div>' + val +
+        '<div class="kf"' + (k.foot_cor ? ' style="color:' + k.foot_cor + '"' : '') + '>' + esc(k.foot) + '</div></div>';
+    });
+    root.insertAdjacentHTML('beforeend', '<div class="kpis">' + kpis + '</div>');
+    root.insertAdjacentHTML('beforeend',
+      tabelaHTML('Deputados por prioridade', 'ORDENADOS POR SCORE INTEGRADO · CLIQUE PARA ABRIR O DOSSIÊ'));
+  } else if (modo === 'deputados') {
+    root.insertAdjacentHTML('beforeend',
+      tabelaHTML('Todos os deputados', (d.total || deps.length) + ' DEPUTADOS · ALESP · CLIQUE PARA ABRIR O DOSSIÊ'));
+  } else if (modo === 'funil') {
+    root.insertAdjacentHTML('beforeend', kanbanHTML());
+  }
 
   parentElement.appendChild(root);
 
@@ -1331,16 +1385,32 @@ _emendas_v2 = components_v2.component("pfc_emendas", css=_EMENDAS_V2_CSS, js=_EM
 # CSS que reveste o chrome do Streamlit na identidade violeta de Emendas.
 _EMENDAS_CHROME_CSS = """
 <style>
-[data-testid="stSidebar"] .stButton>button[kind="primary"]::before{background:#8B7BF0!important}
+/* item ativo da sidebar em violeta (sobrescreve o âmbar do tema global) */
+[data-testid="stSidebar"] .stButton>button[kind="primary"]{
+  background:rgba(139,123,240,.15)!important;
+  box-shadow:inset 0 0 0 1px rgba(139,123,240,.28)!important}
+[data-testid="stSidebar"] .stButton>button[kind="primary"]:hover{
+  background:rgba(139,123,240,.22)!important}
+[data-testid="stSidebar"] .stButton>button[kind="primary"]::before{
+  background:#8B7BF0!important;box-shadow:0 0 10px #8B7BF0!important}
 .em-brand .bt small{color:#8B7BF0!important}
 .em-rings span:nth-child(1){border-color:transparent #8B7BF0 transparent transparent!important}
 .em-rings span:nth-child(3){border-color:#5B9BD5 transparent transparent transparent!important}
 .topbar .cr b{color:#8B7BF0}
 .topbar .live{color:#8B7BF0;background:rgba(139,123,240,.12);border-color:rgba(139,123,240,.3)}
 .topbar .avatar2{background:linear-gradient(135deg,#8B7BF0,#c0b5ff)}
-.st-key-emenda_nav_ativo button{color:var(--ink)!important;background:rgba(255,255,255,.03)!important;font-weight:600!important}
-.st-key-emenda_nav_ativo button::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;
-  border-radius:0 3px 3px 0;background:#8B7BF0}
+/* itens de Escopo (informativos) */
+.esc-item{display:flex;align-items:center;gap:9px;padding:9px 14px;border-radius:9px;
+  font-size:13.5px;font-weight:500;margin-bottom:2px;position:relative}
+.esc-item .esc-leg{margin-left:auto;font-family:var(--mono);font-size:10px;
+  letter-spacing:.4px;text-transform:uppercase}
+.esc-item.esc-on{background:rgba(139,123,240,.13);color:var(--ink);
+  box-shadow:inset 0 0 0 1px rgba(139,123,240,.28)}
+.esc-item.esc-on::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:3px;
+  border-radius:0 3px 3px 0;background:#8B7BF0;box-shadow:0 0 10px #8B7BF0}
+.esc-item.esc-on .esc-leg{color:#8B7BF0}
+.esc-item.esc-off{color:var(--dim);opacity:.6}
+.esc-item.esc-off .esc-leg{color:var(--dim)}
 </style>
 """
 
@@ -1375,22 +1445,44 @@ def _forcar_sidebar_visivel():
     components.html(_SIDEBAR_FIX_JS, height=0)
 
 
+# Navegação do painel de Emendas (páginas próprias + escopo).
+EMENDA_PAGES = ["Visão geral", "Deputados", "Funil de negociação"]
+EMENDA_ICONS = {"Visão geral": "📊", "Deputados": "👤", "Funil de negociação": "🗂️"}
+EMENDA_ESCOPO = [("Estadual", "ALESP · 16", True), ("Federal", "em breve", False),
+                 ("Senadores", "em breve", False)]
+
+
+def ir_para_emenda(pagina: str):
+    st.session_state["emenda_page"] = pagina
+
+
 def render_sidebar_emendas():
     _forcar_sidebar_visivel()
+    atual = st.session_state.get("emenda_page", "Visão geral")
     with st.sidebar:
         st.markdown(
             '<div class="sb-brand em-brand"><div class="rings em-rings"><span></span><span></span><span></span></div>'
             '<div class="bt">Futuro Cientista<small>EMENDAS PARLAMENTARES</small></div></div>',
             unsafe_allow_html=True,
         )
+        # Articulação — páginas navegáveis, com destaque da atual (igual à Captação)
         st.markdown('<div class="sb-sec">Articulação</div>', unsafe_allow_html=True)
-        st.button("📊 Visão geral", key="emenda_nav_ativo", use_container_width=True,
-                  type="primary")
+        for p in EMENDA_PAGES:
+            rotulo = f"{EMENDA_ICONS[p]} {p}"
+            if p == "Deputados":
+                rotulo += " · 16"
+            st.button(rotulo, key=f"emnav_{p}", use_container_width=True,
+                      type="primary" if atual == p else "secondary",
+                      on_click=ir_para_emenda, args=(p,))
+        # Escopo — Estadual ativo; Federal/Senadores em breve. Markdown (não
+        # botões) porque não são navegáveis: só Estadual existe.
         st.markdown('<div class="sb-sec">Escopo</div>', unsafe_allow_html=True)
-        st.markdown('<div class="sf" style="padding:6px 14px"><span class="d o"></span>'
-                    'ESTADUAL · ALESP · 16</div>'
-                    '<div class="sf" style="padding:2px 14px;opacity:.5"><span class="d n"></span>'
-                    'FEDERAL · em breve</div>', unsafe_allow_html=True)
+        escopo_html = ""
+        for nome, legenda, ativo in EMENDA_ESCOPO:
+            cls, ic = ("esc-on", "📍") if ativo else ("esc-off", "🔒")
+            escopo_html += (f'<div class="esc-item {cls}">{ic} {esc(nome)}'
+                            f'<span class="esc-leg">{esc(legenda)}</span></div>')
+        st.markdown(escopo_html, unsafe_allow_html=True)
         st.markdown('<div class="sb-foot"><div class="sf"><span class="d o"></span>'
                     '16 DEPUTADOS · ALESP</div></div>', unsafe_allow_html=True)
         if st.button("🛰️ Trocar radar", key="emenda_trocar", use_container_width=True):
@@ -1405,15 +1497,22 @@ def render_sidebar_emendas():
 def render_emendas():
     """Painel do radar de Emendas Parlamentares (CRM de deputados)."""
     st.markdown(_EMENDAS_CHROME_CSS, unsafe_allow_html=True)
-    render_topnav("emendas", "ARTICULAÇÃO")
+    emenda_page = st.session_state.setdefault("emenda_page", "Visão geral")
+    modo = {"Visão geral": "visao", "Deputados": "deputados",
+            "Funil de negociação": "funil"}.get(emenda_page, "visao")
+    render_topnav("emendas", emenda_page.upper())
     render_sidebar_emendas()
 
     hora = datetime.datetime.now().hour
     saud = "Bom dia" if hora < 12 else "Boa tarde" if hora < 18 else "Boa noite"
     primeiro = USER["nome"].split()[0]
+    subttl = {"Visão geral": "Articulação política",
+              "Deputados": "Base de deputados · ALESP",
+              "Funil de negociação": "Negociações por temperatura"}.get(emenda_page, "")
     st.markdown(
         f'<div class="topbar"><div>'
-        f'<div class="hi">{saud}, {esc(primeiro)}</div></div>'
+        f'<div class="hi">{saud}, {esc(primeiro)}</div>'
+        f'<div class="cr" style="margin-top:6px">{esc(subttl)}</div></div>'
         f'<div class="tr-r"><div class="live">ALESP · ESTADUAL</div></div></div>'
         '<div class="hr-line"></div>',
         unsafe_allow_html=True,
@@ -1448,6 +1547,9 @@ def render_emendas():
                    for t in _TEMP_ORDEM]
 
     payload = {
+        "modo": modo, "total": total,
+        "temp_ordem": [{"nome": t, "cor": _TEMP_COR[t], "emoji": _TEMP_EMOJI[t]}
+                       for t in _TEMP_ORDEM],
         "hero": {"articulacao": articulacao, "total": total, "nao_abordados": nao_abordados,
                  "top": {"i": top_i, "nome": top["nome"], "partido": top["partido"],
                          "status": top["status"], "score": top["score"],
