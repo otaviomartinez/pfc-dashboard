@@ -2315,33 +2315,78 @@ def dlg_cobertura():
 
 
 # CSS do radar-scópio, compartilhado entre Visão Geral e Radar.
-_SCOPE_V2_CSS = """
-.scope-card{position:relative;background:var(--surface,#161A21);border:1px solid var(--line,rgba(255,255,255,.06));
-  border-radius:16px;padding:26px 28px;display:flex;flex-direction:column;overflow:hidden}
-.scope-card::before{content:"";position:absolute;inset:0;border-radius:16px;padding:1.5px;
-  background:linear-gradient(145deg,var(--sem-info,#5B9BD5),transparent 55%);
-  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
-  -webkit-mask-composite:xor;mask-composite:exclude;opacity:.4}
-.sc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;position:relative;z-index:1}
-.scope-card h3{font-size:16px;font-weight:600;margin:0}
-.sc-live{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--sem-high,#4ADE80);
-  display:flex;align-items:center;gap:6px}
-.sc-live .d{width:6px;height:6px;border-radius:50%;background:var(--sem-high,#4ADE80);
-  box-shadow:0 0 8px var(--sem-high,#4ADE80)}
-.sc-sub{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--dim,#6B7688);
-  letter-spacing:.5px;margin-bottom:14px;position:relative;z-index:1}
-.scopevis{flex:1;display:grid;place-items:center;min-height:0;position:relative;z-index:1}
-.scopevis svg{width:100%;height:auto;max-height:300px}
+# CSS do SELO de radar (mini-radar decorativo + resumo), compartilhado entre a
+# tela Radar e a Visão Geral. O radar deixa de ser ferramenta e vira selo de
+# identidade honesto: mostra só um resumo da fila.
+_SELO_V2_CSS = """
 .gr{stroke:rgba(255,255,255,.09);fill:none}
 .swf{transform-origin:center;animation:sw 4s linear infinite}
 .swl{transform-origin:center;animation:sw 4s linear infinite;stroke:var(--accent,#E8873A)}
 @keyframes sw{to{transform:rotate(360deg)}}
-.blip-hit{cursor:pointer}
-.scope-foot{display:flex;justify-content:space-between;gap:12px;margin-top:18px;padding-top:18px;
-  border-top:1px solid var(--line,rgba(255,255,255,.06));font-family:'JetBrains Mono',monospace;
-  font-size:11.5px;color:var(--muted,#A4AEBF);position:relative;z-index:1}
-.scope-foot b{font-weight:700}
+.radar-selo{position:relative;display:flex;align-items:center;gap:22px;overflow:hidden;
+  background:linear-gradient(150deg,var(--surface2,#1C222B),var(--surface,#161A21));
+  border:1px solid var(--line,rgba(255,255,255,.06));border-radius:16px;padding:20px 26px}
+.radar-selo::before{content:"";position:absolute;inset:0;border-radius:16px;padding:1.5px;
+  background:linear-gradient(145deg,var(--sem-info,#5B9BD5),transparent 55%);
+  -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;opacity:.4}
+.rs-mini{width:84px;height:84px;flex:none;position:relative;z-index:1}
+.rs-mini svg{width:100%;height:100%;display:block}
+.rs-main{position:relative;z-index:1;min-width:0}
+.rs-live{display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;
+  font-size:10px;letter-spacing:.5px;color:var(--sem-high,#4ADE80);background:rgba(74,222,128,.08);
+  border:1px solid rgba(74,222,128,.22);padding:3px 9px;border-radius:6px;margin-bottom:9px}
+.rs-live .d{width:6px;height:6px;border-radius:50%;background:var(--sem-high,#4ADE80);
+  box-shadow:0 0 8px var(--sem-high,#4ADE80)}
+.rs-num{font-size:34px;font-weight:800;letter-spacing:-1.5px;line-height:1;font-variant-numeric:tabular-nums}
+.rs-num b{color:var(--accent,#E8873A)}
+.rs-num .u{font-size:15px;font-weight:600;color:var(--muted,#A4AEBF);letter-spacing:-.5px;margin-left:7px}
+.rs-cap{font-size:13.5px;color:var(--muted,#A4AEBF);margin-top:7px}
+.rs-stats{margin-left:auto;display:flex;gap:26px;position:relative;z-index:1;flex:none}
+.rs-stat{text-align:center}
+.rs-stat .n{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.rs-stat .l{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.6px;
+  text-transform:uppercase;color:var(--dim,#6B7688);margin-top:4px}
+@media (max-width:820px){.rs-stats{display:none}}
 """
+
+# Corpo JS reutilizável: desenha o mini-radar (decorativo, não clicável) a
+# partir dos scores reais, e monta o selo com o resumo da fila.
+_SELO_JS_FN = r"""
+  function miniRadar(scores){
+    let dots = '';
+    (scores || []).slice(0, 16).forEach(function(sc, i){
+      const ang = i * 2.399963;
+      const r = 52 - Math.max(0, Math.min(100, sc)) * 0.42;
+      const cx = (60 + r * Math.cos(ang)).toFixed(1);
+      const cy = (60 + r * Math.sin(ang)).toFixed(1);
+      const cor = sem(sc);
+      dots += '<circle cx="' + cx + '" cy="' + cy + '" r="2.1" fill="' + cor + '"/>';
+    });
+    return '<svg viewBox="0 0 120 120" aria-hidden="true">' +
+      '<defs><radialGradient id="rsg"><stop offset="0" stop-color="rgba(232,135,58,.32)"/>' +
+      '<stop offset="1" stop-color="rgba(232,135,58,0)"/></radialGradient></defs>' +
+      '<circle class="gr" cx="60" cy="60" r="56"/><circle class="gr" cx="60" cy="60" r="37"/>' +
+      '<circle class="gr" cx="60" cy="60" r="18"/>' +
+      '<line class="gr" x1="60" y1="4" x2="60" y2="116"/><line class="gr" x1="4" y1="60" x2="116" y2="60"/>' +
+      '<path class="swf" d="M60 60 L60 4 A56 56 0 0 1 100 22 Z" fill="url(#rsg)"/>' +
+      '<line class="swl" x1="60" y1="60" x2="60" y2="4" stroke-width="1.6"/>' +
+      '<circle cx="60" cy="60" r="2.6" fill="var(--accent,#E8873A)"/>' + dots + '</svg>';
+  }
+  function seloHTML(d){
+    const f = d.foot || {};
+    return '<div class="radar-selo"><div class="rs-mini">' + miniRadar(d.scores) + '</div>' +
+      '<div class="rs-main"><span class="rs-live"><span class="d"></span>RADAR AO VIVO</span>' +
+      '<div class="rs-num"><b>' + (f.fila || 0) + '</b><span class="u">na fila</span></div>' +
+      '<div class="rs-cap">oportunidades distribuídas por aderência ao PFC</div></div>' +
+      '<div class="rs-stats">' +
+      '<div class="rs-stat"><div class="n" style="color:var(--sem-urgent,#F0663F)">' + (f.encerrando || 0) +
+      '</div><div class="l">encerrando</div></div>' +
+      '<div class="rs-stat"><div class="n">' + (f.fontes || 0) + '</div><div class="l">fontes</div></div>' +
+      '</div></div>';
+  }
+"""
+
 
 _VISAO_V2_CSS = """
 .vw{display:flex;flex-direction:column;gap:22px;font-family:'Inter',system-ui,sans-serif;
@@ -2370,6 +2415,9 @@ _VISAO_V2_CSS = """
 .hl-cap{font-size:15px;color:var(--muted,#A4AEBF);margin-top:10px}
 .hl-headline{position:relative;z-index:1;margin-top:24px;padding-top:22px;
   border-top:1px solid var(--line,rgba(255,255,255,.06))}
+/* card "mais aderente" isolado (o número da fila migrou para o selo) */
+.lead-solo{padding:24px 30px}
+.lead-solo .hl-headline{margin-top:0;padding-top:0;border-top:none}
 .hh-lbl{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:1px;
   text-transform:uppercase;color:var(--dim,#6B7688);margin-bottom:10px}
 .hh-row{display:flex;align-items:center;gap:14px;cursor:pointer}
@@ -2456,6 +2504,7 @@ export default function(component){
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const sem = s => s >= 60 ? 'var(--sem-high,#4ADE80)' : s >= 50 ? 'var(--sem-mid,#E8B54A)'
     : 'var(--sem-low,#7C8698)';
+__SELO_FN__
   const ICONES = {
     org: '<path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-3"/>',
     pros: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
@@ -2479,44 +2528,12 @@ export default function(component){
       '<div class="mono hh-m">' + esc(t.meta) + '</div></div>' + dl + '</div></div>';
   }
 
-  // ---- scope: blips por aderência ----
-  let blips = '';
-  (d.blips || []).forEach(function(b, i){
-    const ang = i * 2.399963;                       // ângulo áureo: espalha sem colidir
-    const r = 140 - Math.max(0, Math.min(100, b.score)) * 1.2;  // + score = + perto do centro
-    const cx = (150 + r * Math.cos(ang)).toFixed(1);
-    const cy = (150 + r * Math.sin(ang)).toFixed(1);
-    const cor = sem(b.score);
-    const raio = (4 + b.score / 25).toFixed(1);
-    blips += '<circle cx="' + cx + '" cy="' + cy + '" r="' + raio + '" fill="' + cor +
-      '" class="blip-hit" data-act="blip" data-i="' + i + '" style="filter:drop-shadow(0 0 6px ' +
-      cor + ')"><title>' + esc(b.fonte) + ' · ' + esc(b.score) + '</title></circle>';
-  });
-  const f = d.foot || {};
-  const scope =
-    '<div class="scope-card"><div class="sc-head"><h3>Radar de oportunidades</h3>' +
-    '<div class="sc-live"><span class="d"></span>ao vivo</div></div>' +
-    '<div class="sc-sub">PROXIMIDADE DO CENTRO = MAIOR ADERÊNCIA · CLIQUE NUM PONTO</div>' +
-    '<div class="scopevis"><svg viewBox="0 0 300 300">' +
-    '<defs><radialGradient id="sfv"><stop offset="0" stop-color="rgba(232,135,58,.3)"/>' +
-    '<stop offset="1" stop-color="rgba(232,135,58,0)"/></radialGradient></defs>' +
-    '<circle class="gr" cx="150" cy="150" r="144"/><circle class="gr" cx="150" cy="150" r="98"/>' +
-    '<circle class="gr" cx="150" cy="150" r="52"/>' +
-    '<line class="gr" x1="150" y1="6" x2="150" y2="294"/><line class="gr" x1="6" y1="150" x2="294" y2="150"/>' +
-    '<path class="swf" d="M150 150 L150 6 A144 144 0 0 1 252 48 Z" fill="url(#sfv)"/>' +
-    '<line class="swl" x1="150" y1="150" x2="150" y2="6" stroke-width="2"/>' +
-    '<circle cx="150" cy="150" r="4" fill="var(--accent,#E8873A)"/>' + blips + '</svg></div>' +
-    '<div class="scope-foot"><span><b style="color:var(--accent,#E8873A)">' + (f.fila || 0) +
-    '</b> na fila</span><span><b style="color:var(--sem-urgent,#F0663F)">' + (f.encerrando || 0) +
-    '</b> encerrando</span><span><b>' + (f.fontes || 0) + '</b> fontes</span></div></div>';
-
-  root.innerHTML =
-    '<div class="hero"><div class="lead-card"><div class="hl-top">' +
-    '<div class="hl-label">Oportunidades no radar hoje</div>' +
-    '<div class="hl-num tnum"><span data-c="' + (h.num || 0) + '">0</span>' +
-    '<span class="u">novas</span></div>' +
-    '<div class="hl-cap">' + esc(h.cap || '') + '</div></div>' + topHtml + '</div>' +
-    scope + '</div>';
+  // ---- radar: agora um SELO compacto (o mini-radar é decorativo, não ferramenta) ----
+  // o número da fila e o resumo ficam no selo; abaixo, só a oportunidade-destaque.
+  const heroCard = h.top
+    ? '<div class="lead-card lead-solo">' + topHtml + '</div>'
+    : '';
+  root.innerHTML = seloHTML(d) + heroCard;
 
   // ---- glowcards ----
   let kpis = '';
@@ -2588,8 +2605,8 @@ export default function(component){
 }
 """
 
-_visao_v2 = components_v2.component("pfc_visao", css=_SCOPE_V2_CSS + _VISAO_V2_CSS,
-                                    js=_VISAO_V2_JS)
+_visao_v2 = components_v2.component("pfc_visao", css=_SELO_V2_CSS + _VISAO_V2_CSS,
+                                    js=_VISAO_V2_JS.replace("__SELO_FN__", _SELO_JS_FN))
 
 
 # =========================================================================== #
@@ -2613,7 +2630,6 @@ def page_visao():
     n_fontes = _n_fontes_radar()
     encerrando = sum(1 for o in ops if isinstance(o["dias"], int) and 0 <= o["dias"] <= 7)
 
-    blip_items = ops[:12]
     top = ops[0] if ops else None
 
     # prazos próximos: novidades com prazo CONFIÁVEL + editais da base (45 dias)
@@ -2646,7 +2662,7 @@ def page_visao():
                           "dias": (top["dias"] if _prazo_confiavel(top["dias"])
                                    and top["dias"] >= 0 else None),
                           "meta": _meta(top)} if top else None)},
-        "blips": [{"score": o["score"], "fonte": o["fonte"]} for o in blip_items],
+        "scores": [o["score"] for o in ops[:16]],
         "foot": {"fila": len(ops), "encerrando": encerrando, "fontes": n_fontes},
         "kpis": [
             {"k": "rk", "c": "var(--sem-info,#5B9BD5)", "icon": "org", "lab": "Organizações",
@@ -2684,8 +2700,6 @@ def page_visao():
                 dlg_cobertura()
         elif t == "hero" and top:
             dlg_oportunidade(top)
-        elif t == "blip" and isinstance(i, int) and 0 <= i < len(blip_items):
-            dlg_oportunidade(blip_items[i])
         elif t == "prazo" and isinstance(i, int) and 0 <= i < len(prazo_items):
             dlg_oportunidade(prazo_items[i])
         elif t == "stage" and k in STATUS_FUNIL:
@@ -2822,34 +2836,42 @@ def _score_novidade(nv) -> float:
 _RADAR_V2_CSS = """
 .rv{font-family:'Inter',system-ui,sans-serif;color:var(--ink,#F5F7FA);animation:rv-fade .4s ease}
 @keyframes rv-fade{from{opacity:0;transform:translateY(10px)}}
-.radar-layout{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}
-@media (max-width:1000px){.radar-layout{grid-template-columns:1fr}}
-.rlist{display:flex;flex-direction:column;gap:12px}
-.ritem{position:relative;background:var(--surface,#161A21);border:1px solid var(--line,rgba(255,255,255,.06));
-  border-radius:14px;padding:18px 20px;display:flex;gap:16px;align-items:center;cursor:pointer;
-  transition:.2s;overflow:hidden;--c:var(--sem-mid,#E8B54A)}
+.rlist{display:flex;flex-direction:column;gap:9px}
+.rlist-head{display:grid;grid-template-columns:54px 1fr 130px 128px 22px;gap:14px;align-items:center;
+  padding:2px 20px 6px;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.8px;
+  text-transform:uppercase;color:var(--dim,#6B7688)}
+.rlist-head .r{text-align:right}
+.ritem{position:relative;display:grid;grid-template-columns:54px 1fr 130px 128px 22px;gap:14px;
+  align-items:center;background:var(--surface,#161A21);border:1px solid var(--line,rgba(255,255,255,.06));
+  border-radius:13px;padding:15px 20px;cursor:pointer;overflow:hidden;transition:.16s cubic-bezier(.16,1,.3,1);
+  --c:var(--sem-mid,#E8B54A)}
 .ritem::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c)}
-.ritem:hover{border-color:var(--line2,rgba(255,255,255,.12));transform:translateX(3px)}
-.ritem .rsc{font-weight:800;font-size:24px;width:46px;text-align:center;flex:none;
-  font-variant-numeric:tabular-nums;color:var(--c)}
-.ritem .rb{flex:1;min-width:0}
-.ritem .rtop{display:flex;align-items:center;gap:10px;margin-bottom:4px;min-width:0}
-.ritem .src{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.8px;
-  color:var(--sem-info,#5B9BD5);background:rgba(91,155,213,.1);padding:4px 9px;border-radius:5px;
-  flex:none;white-space:nowrap}
-.ritem .rt{font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ritem .rm{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dim,#6B7688);margin-top:3px;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ritem .rdl{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;flex:none;
+.ritem:hover{border-color:var(--line2,rgba(255,255,255,.12));transform:translateX(3px);background:var(--hover,#222834)}
+.ri-sc{font-weight:800;font-size:25px;text-align:center;font-variant-numeric:tabular-nums;color:var(--c)}
+.ri-main{min-width:0}
+.ri-nome{font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+.ri-fonte{margin-top:5px}
+.ri-fonte .src{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.6px;
+  color:var(--sem-info,#5B9BD5);background:rgba(91,155,213,.1);padding:3px 8px;border-radius:5px}
+.ri-val{font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:600;color:var(--muted,#A4AEBF);
   text-align:right;white-space:nowrap}
-.ritem .rdl.u{color:var(--sem-urgent,#F0663F)}
-.ritem .rdl.s{color:var(--accent,#E8873A)}
-.ritem .rdl.n{color:var(--dim,#6B7688)}
-.rv-vazio{background:var(--surface,#161A21);border:1px solid var(--line,rgba(255,255,255,.06));
-  border-radius:14px;padding:28px 20px;text-align:center;color:var(--muted,#A4AEBF);font-size:14px}
-.rv-vazio .ic{font-size:26px;margin-bottom:8px}
+.ri-prazo{font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:600;text-align:right;
+  white-space:nowrap}
+.ri-prazo.u{color:var(--sem-urgent,#F0663F)}
+.ri-prazo.s{color:var(--accent,#E8873A)}
+.ri-prazo.n{color:var(--dim,#6B7688)}
+.ri-arrow{color:var(--dim,#6B7688);transition:.18s;text-align:center}
+.ritem:hover .ri-arrow{color:var(--accent,#E8873A);transform:translateX(3px)}
 .rv-mais{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--dim,#6B7688);
-  text-align:center;padding:10px;border:1px dashed var(--line2,rgba(255,255,255,.12));border-radius:10px}
+  text-align:center;padding:12px;border:1px dashed var(--line2,rgba(255,255,255,.12));border-radius:11px;margin-top:4px}
+.rv-vazio{background:var(--surface,#161A21);border:1px solid var(--line,rgba(255,255,255,.06));
+  border-radius:14px;padding:34px 20px;text-align:center;color:var(--muted,#A4AEBF);font-size:14px}
+.rv-vazio .ic{font-size:28px;margin-bottom:8px}
+@media (max-width:820px){
+  .rlist-head,.ritem{grid-template-columns:44px 1fr 96px}
+  .rlist-head .cval,.ritem .ri-val{display:none}
+  .ri-arrow{display:none}.rlist-head .carrow{display:none}
+}
 """
 
 _RADAR_V2_JS = r"""
@@ -2861,62 +2883,37 @@ export default function(component){
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const sem = s => s >= 60 ? 'var(--sem-high,#4ADE80)' : s >= 50 ? 'var(--sem-mid,#E8B54A)'
     : 'var(--sem-low,#7C8698)';
+__SELO_FN__
   const root = document.createElement('div'); root.className = 'rv';
 
-  // ---- scópio (mesma geometria da Visão Geral) ----
-  let blips = '';
-  itens.slice(0, d.max_blips || 14).forEach(function(o, i){
-    const ang = i * 2.399963;
-    const r = 140 - Math.max(0, Math.min(100, o.score)) * 1.2;
-    const cx = (150 + r * Math.cos(ang)).toFixed(1);
-    const cy = (150 + r * Math.sin(ang)).toFixed(1);
-    const cor = sem(o.score);
-    const raio = (4 + o.score / 25).toFixed(1);
-    blips += '<circle cx="' + cx + '" cy="' + cy + '" r="' + raio + '" fill="' + cor +
-      '" class="blip-hit" data-act="op" data-i="' + i + '" style="filter:drop-shadow(0 0 6px ' +
-      cor + ')"><title>' + esc(o.fonte) + ' · ' + esc(o.score) + '</title></circle>';
-  });
-  const f = d.foot || {};
-  const scope =
-    '<div class="scope-card"><div class="sc-head"><h3>Radar de oportunidades</h3>' +
-    '<div class="sc-live"><span class="d"></span>ao vivo</div></div>' +
-    '<div class="sc-sub">PROXIMIDADE DO CENTRO = MAIOR ADERÊNCIA · CLIQUE NUM PONTO</div>' +
-    '<div class="scopevis"><svg viewBox="0 0 300 300">' +
-    '<defs><radialGradient id="sfr"><stop offset="0" stop-color="rgba(232,135,58,.3)"/>' +
-    '<stop offset="1" stop-color="rgba(232,135,58,0)"/></radialGradient></defs>' +
-    '<circle class="gr" cx="150" cy="150" r="144"/><circle class="gr" cx="150" cy="150" r="98"/>' +
-    '<circle class="gr" cx="150" cy="150" r="52"/>' +
-    '<line class="gr" x1="150" y1="6" x2="150" y2="294"/><line class="gr" x1="6" y1="150" x2="294" y2="150"/>' +
-    '<path class="swf" d="M150 150 L150 6 A144 144 0 0 1 252 48 Z" fill="url(#sfr)"/>' +
-    '<line class="swl" x1="150" y1="150" x2="150" y2="6" stroke-width="2"/>' +
-    '<circle cx="150" cy="150" r="4" fill="var(--accent,#E8873A)"/>' + blips + '</svg></div>' +
-    '<div class="scope-foot"><span><b style="color:var(--accent,#E8873A)">' + (f.fila || 0) +
-    '</b> na fila</span><span><b style="color:var(--sem-urgent,#F0663F)">' + (f.encerrando || 0) +
-    '</b> encerrando</span><span><b>' + (f.fontes || 0) + '</b> fontes</span></div></div>';
-
-  // ---- fila (lista à direita) ----
+  // lista protagonista (ordenada por aderência)
   let lista = '';
   itens.forEach(function(o, i){
     lista += '<div class="ritem" style="--c:' + sem(o.score) + '" data-act="op" data-i="' + i + '">' +
-      '<div class="rsc">' + esc(o.score) + '</div>' +
-      '<div class="rb"><div class="rtop"><span class="src">' + esc(o.fonte).toUpperCase() +
-      '</span><span class="rt">' + esc(o.titulo) + '</span></div>' +
-      '<div class="rm">' + esc(o.meta) + '</div></div>' +
-      '<div class="rdl ' + o.badge_cls + '"' +
-      (o.badge_tip ? ' title="' + esc(o.badge_tip) + '"' : '') + '>' + esc(o.badge_txt) + '</div></div>';
+      '<div class="ri-sc">' + esc(o.score) + '</div>' +
+      '<div class="ri-main"><div class="ri-nome">' + esc(o.titulo) + '</div>' +
+      '<div class="ri-fonte"><span class="src">' + esc(o.fonte).toUpperCase() + '</span></div></div>' +
+      '<div class="ri-val">' + esc(o.valor || '—') + '</div>' +
+      '<div class="ri-prazo ' + o.badge_cls + '"' +
+      (o.badge_tip ? ' title="' + esc(o.badge_tip) + '"' : '') + '>' + esc(o.badge_txt) + '</div>' +
+      '<div class="ri-arrow">→</div></div>';
   });
   if (d.ocultos > 0) {
     lista += '<div class="rv-mais">+ ' + d.ocultos + ' na fila · aprove ou descarte para ver as próximas</div>';
   }
+  let corpo;
   if (!itens.length) {
-    lista = '<div class="rv-vazio"><div class="ic">🛰️</div>' +
+    corpo = '<div class="rv-vazio"><div class="ic">🛰️</div>' +
       '<div><b>Nenhuma oportunidade nova no momento</b></div>' +
       '<div style="font-size:12.5px;color:var(--dim,#6B7688);margin-top:6px">O radar roda todo dia às 06:00 ' +
       'e coloca aqui os editais que passam no filtro.</div></div>';
+  } else {
+    corpo = '<div class="rlist-head"><span>Score</span><span>Oportunidade · fonte</span>' +
+      '<span class="r cval">Valor</span><span class="r">Prazo</span><span class="carrow"></span></div>' +
+      '<div class="rlist">' + lista + '</div>';
   }
 
-  root.innerHTML = '<div class="radar-layout">' + scope +
-    '<div class="rlist">' + lista + '</div></div>';
+  root.innerHTML = seloHTML(d) + '<div style="height:22px"></div>' + corpo;
   parentElement.appendChild(root);
 
   root.addEventListener('click', function(e){
@@ -2926,12 +2923,12 @@ export default function(component){
   });
   return function(){ root.remove(); };
 }
-"""
+""".replace("__SELO_FN__", _SELO_JS_FN)
 
-_radar_v2 = components_v2.component("pfc_radar", css=_SCOPE_V2_CSS + _RADAR_V2_CSS,
+_radar_v2 = components_v2.component("pfc_radar", css=_SELO_V2_CSS + _RADAR_V2_CSS,
                                     js=_RADAR_V2_JS)
 
-_RADAR_MAX_LISTA = 30  # itens visíveis na fila (o restante fica indicado no rodapé)
+_RADAR_MAX_LISTA = 40  # itens visíveis na lista (o restante fica indicado no rodapé)
 
 
 def page_radar():
@@ -2951,28 +2948,19 @@ def page_radar():
         if _prazo_confiavel(dias):
             if dias < 0:
                 return "VENCIDA", "u", f"prazo encerrou há {-dias} dia(s)"
-            return f"{dias} DIAS", ("u" if dias <= 7 else "s"), ""
+            return f"{dias} dias", ("u" if dias <= 7 else "s"), ""
         if tem_prazo:
-            return "PRAZO A CONFIRMAR", "n", "data possivelmente estimada — confira na página oficial"
-        return "SEM PRAZO", "n", ""
-
-    def _meta_radar(o):
-        partes = []
-        if o["valor"]:
-            partes.append(f"valor: {o['valor']}")
-        if _prazo_confiavel(o["dias"]) and o["dias"] >= 0:
-            partes.append(f"encerra {_fmt_prazo(o['prazo'])}")
-        return " · ".join(partes) or "sem valor informado"
+            return "a confirmar", "n", "data possivelmente estimada — confira na página oficial"
+        return "sem prazo", "n", ""
 
     itens = []
     for o in visiveis:
         txt, cls, tip = _badge(o)
         itens.append({"score": o["score"], "fonte": o["fonte"], "titulo": o["titulo"],
-                      "meta": _meta_radar(o), "badge_txt": txt, "badge_cls": cls,
-                      "badge_tip": tip})
+                      "valor": o["valor"], "badge_txt": txt, "badge_cls": cls, "badge_tip": tip})
 
     res = _radar_v2(data={"itens": itens, "ocultos": max(0, len(ops) - len(visiveis)),
-                          "max_blips": 14,
+                          "scores": [o["score"] for o in ops[:16]],
                           "foot": {"fila": len(ops), "encerrando": encerrando,
                                    "fontes": n_fontes}},
                     key="radar_v2", on_acao_change=lambda: None)
