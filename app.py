@@ -1175,8 +1175,18 @@ _EMENDAS_V2_CSS = """
 .em .temp-card h3{font-size:16px;font-weight:600;margin:0 0 4px}
 .em .ts{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dim,#6B7688);
   margin-bottom:22px;letter-spacing:.5px}
-.em .trow{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.em .trow{display:flex;align-items:center;gap:14px;margin-bottom:18px;cursor:pointer;
+  padding:6px 8px;margin-left:-8px;margin-right:-8px;border-radius:9px;transition:.15s}
+.em .trow:hover{background:rgba(255,255,255,.04)}
+.em .trow:hover .tn{color:var(--ink,#F5F7FA)}
+.em .trow.on{background:rgba(139,123,240,.13);box-shadow:inset 0 0 0 1px rgba(139,123,240,.3)}
+.em .trow.on .tn{color:var(--ink,#F5F7FA);font-weight:600}
 .em .trow:last-child{margin-bottom:0}
+/* blocos clicáveis: herói de articulação e KPIs com detalhe */
+.em .hl-click{cursor:pointer;border-radius:10px;transition:.15s}
+.em .hl-click:hover{background:rgba(255,255,255,.03)}
+.em .kpi-click{cursor:pointer;transition:transform .18s cubic-bezier(.16,1,.3,1),border-color .18s}
+.em .kpi-click:hover{transform:translateY(-3px);border-color:var(--line2,rgba(255,255,255,.12))}
 .em .tdot{width:12px;height:12px;border-radius:50%;flex:none}
 .em .tn{flex:1;font-size:14px;color:var(--muted,#A4AEBF);font-weight:500}
 .em .tk{width:120px;height:9px;background:rgba(255,255,255,.05);border-radius:6px;overflow:hidden}
@@ -1315,33 +1325,38 @@ export default function(component){
     const h = d.hero || {}, top = h.top;
     let topHtml = '';
     if (top) {
-      topHtml = '<div class="hh-row" data-i="' + top.i + '"><span class="hh-sc">' + esc(top.score) +
+      topHtml = '<div class="hh-row" data-act="top"><span class="hh-sc">' + esc(top.score) +
         '</span><div style="min-width:0"><div class="hh-t">' + esc(top.nome) + '</div>' +
         '<div class="mono hh-m">' + esc(top.partido) + ' · ' + esc(top.status) + '</div></div>' +
         '<span class="hh-dl" style="color:' + top.cor + ';background:' + top.cor + '1a;border:1px solid ' +
         top.cor + '4d">' + esc(top.temp).toUpperCase() + '</span></div>';
     }
-    const lead = '<div class="lead-card"><div><div class="hl-label">Deputados em articulação</div>' +
+    const lead = '<div class="lead-card"><div class="hl-click" data-act="articulacao">' +
+      '<div class="hl-label">Deputados em articulação</div>' +
       '<div class="hl-num tnum"><span data-c="' + (h.articulacao || 0) + '">0</span>' +
       '<span class="u">de ' + (h.total || 0) + '</span></div>' +
       '<div class="hl-cap">com contato iniciado · ' + (h.nao_abordados || 0) + ' ainda não abordados</div></div>' +
       '<div class="hl-headline"><div class="hh-lbl">Negociação mais avançada</div>' + topHtml + '</div></div>';
     let trows = '';
     (d.temperatura || []).forEach(function(t){
-      trows += '<div class="trow"><span class="tdot" style="background:' + t.cor + '"></span>' +
+      const on = (d.filtro_temp === t.nome);
+      trows += '<div class="trow' + (on ? ' on' : '') + '" data-act="temp" data-t="' + esc(t.nome) +
+        '"><span class="tdot" style="background:' + t.cor + '"></span>' +
         '<span class="tn">' + t.emoji + ' ' + esc(t.nome) + '</span>' +
         '<span class="tk"><span class="tf" style="background:' + t.cor + ';width:' + t.pct + '%"></span></span>' +
         '<span class="tv">' + t.n + '</span></div>';
     });
     const temp = '<div class="temp-card"><h3>Temperatura das negociações</h3>' +
-      '<div class="ts">' + (h.total || 0) + ' DEPUTADOS · ALESP</div>' + trows + '</div>';
+      '<div class="ts">CLIQUE NUMA FAIXA PARA FILTRAR A TABELA</div>' + trows + '</div>';
     root.innerHTML = '<div class="hero">' + lead + temp + '</div>';
     let kpis = '';
     (d.kpis || []).forEach(function(k){
       const val = (k.suffix != null)
         ? '<div class="kv">' + esc(k.val) + '<span style="font-size:20px;color:var(--muted,#A4AEBF)">' + k.suffix + '</span></div>'
         : '<div class="kv tnum" data-c="' + k.val + '">0</div>';
-      kpis += '<div class="kpi" style="--c:' + k.c + '"><div class="kic"><svg viewBox="0 0 24 24">' +
+      kpis += '<div class="kpi' + (k.k ? ' kpi-click' : '') + '" style="--c:' + k.c + '"' +
+        (k.k ? ' data-act="kpi" data-k="' + k.k + '"' : '') +
+        '><div class="kic"><svg viewBox="0 0 24 24">' +
         (ICON[k.icon] || '') + '</svg></div><div class="kl">' + esc(k.lab) + '</div>' + val +
         '<div class="kf"' + (k.foot_cor ? ' style="color:' + k.foot_cor + '"' : '') + '>' + esc(k.foot) + '</div></div>';
     });
@@ -1358,9 +1373,15 @@ export default function(component){
   parentElement.appendChild(root);
 
   root.addEventListener('click', function(e){
+    const act = e.target.closest('[data-act]');
+    if (act) {
+      setTriggerValue('acao', {t: act.dataset.act, k: act.dataset.k || null,
+                               temp: act.dataset.t || null, n: Date.now()});
+      return;
+    }
     const el = e.target.closest('[data-i]');
     if (!el) { return; }
-    setTriggerValue('acao', {i: +el.dataset.i, n: Date.now()});
+    setTriggerValue('acao', {t: 'dep', i: +el.dataset.i, n: Date.now()});
   });
   // animações (setInterval/timeout — rAF-loop não roda no runtime v2)
   root.querySelectorAll('[data-c]').forEach(function(el){
@@ -1440,6 +1461,63 @@ _SIDEBAR_FIX_JS = """
 
 def _forcar_sidebar_visivel():
     components.html(_SIDEBAR_FIX_JS, height=0)
+
+
+def _cards_deputados(lista, extras=()):
+    """Cards de deputado para os dialogs. extras = [(rótulo, chave), ...]."""
+    html = ""
+    for d in lista:
+        linhas = "".join(
+            f'<div style="font-family:var(--mono);font-size:10px;letter-spacing:.6px;'
+            f'text-transform:uppercase;color:var(--dim);margin-top:10px">{lab}</div>'
+            f'<div style="font-size:13.5px;color:var(--ink);line-height:1.5">'
+            f'{esc(str(d.get(ch) or "—"))}</div>'
+            for lab, ch in extras)
+        html += (
+            f'<div style="background:var(--surface2);border:1px solid var(--line);'
+            f'border-left:3px solid {d["temp_cor"]};border-radius:0 12px 12px 0;'
+            f'padding:15px 17px;margin-bottom:11px">'
+            f'<div style="display:flex;align-items:center;gap:11px;flex-wrap:wrap">'
+            f'<span style="font-weight:700;font-size:15px">{esc(d["nome"])}</span>'
+            f'<span style="font-family:var(--mono);font-size:11px;color:var(--dim)">'
+            f'{esc(d["partido"])} · {d["temp_emoji"]} {esc(d["temp"])}</span>'
+            f'<span style="margin-left:auto;background:{d["status_cor"]}22;color:{d["status_cor"]};'
+            f'font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:20px;white-space:nowrap">'
+            f'{esc(d["status"])}</span></div>{linhas}</div>')
+    return html or '<div style="color:var(--muted);font-size:14px">Nenhum deputado nesta condição.</div>'
+
+
+@st.dialog("Emendas aprovadas", width="large")
+def dlg_emendas_aprovadas(lista):
+    breadcrumb("Emendas", "Aprovadas")
+    st.markdown(f'#### ✅ {len(lista)} emenda(s) aprovada(s)')
+    st.caption("Recurso já destinado — a conquista concreta da articulação até aqui.")
+    st.markdown(_cards_deputados(lista, [("Valor da emenda", "valor"),
+                                         ("Destino / ação", "emenda"),
+                                         ("Base regional", "base"),
+                                         ("Estratégia PFC", "estrategia")]),
+                unsafe_allow_html=True)
+
+
+@st.dialog("Reuniões ativas", width="large")
+def dlg_reunioes_ativas(lista):
+    breadcrumb("Emendas", "Reuniões ativas")
+    st.markdown(f'#### 📅 {len(lista)} reunião(ões) solicitada(s) ou agendada(s)')
+    st.caption("Onde a articulação está em movimento — acompanhe o retorno de cada gabinete.")
+    # o Diálogo é sensível: só para usuário logado (o painel já é autenticado)
+    extras = [("Diálogo · andamento", "dialogo")] if st.session_state.get("user") else []
+    extras += [("Emenda / ação pretendida", "emenda"), ("Contato", "telefones")]
+    st.markdown(_cards_deputados(lista, extras), unsafe_allow_html=True)
+
+
+@st.dialog("Deputados em articulação", width="large")
+def dlg_em_articulacao(lista):
+    breadcrumb("Emendas", "Em articulação")
+    st.markdown(f'#### 🤝 {len(lista)} deputado(s) com contato iniciado')
+    st.caption("Todos que já saíram do 'não iniciado' — ordenados por score integrado.")
+    extras = [("Diálogo · andamento", "dialogo")] if st.session_state.get("user") else []
+    extras += [("Emenda / ação pretendida", "emenda"), ("Base regional", "base")]
+    st.markdown(_cards_deputados(lista, extras), unsafe_allow_html=True)
 
 
 # Navegação do painel de Emendas (páginas próprias + escopo).
@@ -1543,32 +1621,77 @@ def render_emendas():
                     "n": cont_temp[t], "pct": round(cont_temp[t] / total * 100)}
                    for t in _TEMP_ORDEM]
 
+    # subconjuntos reais por trás de cada interação
+    em_articulacao = [d for d in deps if "iniciado" not in d["status"].lower()]
+    lista_reunioes = [d for d in deps if d["status"].lower().startswith(("reunião", "reuniao"))]
+    lista_aprovadas = [d for d in deps if "aprovada" in d["status"].lower()]
+
+    # filtro por temperatura (clique numa faixa do termômetro) — afeta só a tabela
+    filtro = st.session_state.get("emenda_filtro_temp")
+    deps_view = [d for d in deps if d["temp"] == filtro] if filtro else deps
+    if filtro:
+        c1, c2 = st.columns([3, 1])
+        c1.markdown(
+            f'<div style="display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--ink)">'
+            f'<span style="font-family:var(--mono);font-size:10.5px;letter-spacing:.6px;'
+            f'text-transform:uppercase;color:var(--dim)">Filtrando por</span>'
+            f'<span style="background:{_TEMP_COR[filtro]}22;color:{_TEMP_COR[filtro]};font-weight:600;'
+            f'padding:4px 12px;border-radius:20px">{_TEMP_EMOJI[filtro]} {esc(filtro)} · '
+            f'{len(deps_view)} deputado(s)</span></div>',
+            unsafe_allow_html=True)
+        if c2.button("✕ Limpar filtro", key="em_limpar_filtro", use_container_width=True):
+            st.session_state.pop("emenda_filtro_temp", None)
+            st.rerun()
+
     payload = {
-        "modo": modo, "total": total,
+        "modo": modo, "total": total, "filtro_temp": filtro,
         "temp_ordem": [{"nome": t, "cor": _TEMP_COR[t], "emoji": _TEMP_EMOJI[t]}
                        for t in _TEMP_ORDEM],
         "hero": {"articulacao": articulacao, "total": total, "nao_abordados": nao_abordados,
-                 "top": {"i": top_i, "nome": top["nome"], "partido": top["partido"],
+                 "top": {"nome": top["nome"], "partido": top["partido"],
                          "status": top["status"], "score": top["score"],
                          "temp": top["temp"], "cor": top["temp_cor"]}},
         "temperatura": temperatura,
         "kpis": [
             {"c": "#8B7BF0", "icon": "users", "lab": "Deputados", "val": total,
              "foot": "na base ALESP"},
-            {"c": "#E8B54A", "icon": "cal", "lab": "Reuniões ativas", "val": reunioes,
-             "foot": "solicitadas ou agendadas"},
-            {"c": "#4ADE80", "icon": "check", "lab": "Emendas aprovadas", "val": aprovadas,
-             "foot": "✓ primeira conquista" if aprovadas else "nenhuma ainda",
+            {"k": "reunioes", "c": "#E8B54A", "icon": "cal", "lab": "Reuniões ativas",
+             "val": reunioes, "foot": "solicitadas ou agendadas · ver quais"},
+            {"k": "aprovadas", "c": "#4ADE80", "icon": "check", "lab": "Emendas aprovadas",
+             "val": aprovadas,
+             "foot": "✓ ver a conquista" if aprovadas else "nenhuma ainda",
              "foot_cor": "#4ADE80" if aprovadas else None},
             {"c": "#EC6A8C", "icon": "money", "lab": "Chance média", "val": chance_media,
              "suffix": "%", "foot": "de emenda no grupo"},
         ],
-        "deps": deps,
+        "deps": deps_view,
     }
     res = _emendas_v2(data=payload, key="emendas_v2", on_acao_change=lambda: None)
     ac = getattr(res, "acao", None)
-    if isinstance(ac, dict) and isinstance(ac.get("i"), int) and 0 <= ac["i"] < total:
-        dlg_deputado(deps[ac["i"]])
+    if not isinstance(ac, dict):
+        return
+    if ac.get("n") == st.session_state.get("_emenda_nonce"):
+        return  # já processado neste ciclo
+    st.session_state["_emenda_nonce"] = ac.get("n")
+    t, i = ac.get("t"), ac.get("i")
+    if t == "dep" and isinstance(i, int) and 0 <= i < len(deps_view):
+        dlg_deputado(deps_view[i])
+    elif t == "top":
+        dlg_deputado(top)
+    elif t == "kpi" and ac.get("k") == "aprovadas":
+        dlg_emendas_aprovadas(lista_aprovadas)
+    elif t == "kpi" and ac.get("k") == "reunioes":
+        dlg_reunioes_ativas(lista_reunioes)
+    elif t == "articulacao":
+        dlg_em_articulacao(em_articulacao)
+    elif t == "temp" and ac.get("temp") in _TEMP_ORDEM:
+        novo = ac["temp"]
+        # clicar na faixa já ativa desliga o filtro
+        if st.session_state.get("emenda_filtro_temp") == novo:
+            st.session_state.pop("emenda_filtro_temp", None)
+        else:
+            st.session_state["emenda_filtro_temp"] = novo
+        st.rerun()
 
 
 
