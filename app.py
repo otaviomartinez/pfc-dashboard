@@ -673,7 +673,7 @@ def estilo_plotly(fig, altura=300, legenda=False):
 
 
 CORES_STATUS = {"Mapear": "#7C8698", "Prospectar": "#E8873A", "Monitorar": "#5B9BD5",
-                "Edital": "#E8B54A", "Ativo": "#4ADE80"}
+                "Edital": "#8B7BF0", "Ativo": "#4ADE80"}
 
 
 # --------------------------------------------------------------------------- #
@@ -1180,7 +1180,7 @@ _EMENDAS_V2_CSS = """
 .em .tdot{width:12px;height:12px;border-radius:50%;flex:none}
 .em .tn{flex:1;font-size:14px;color:var(--muted,#A4AEBF);font-weight:500}
 .em .tk{width:120px;height:9px;background:rgba(255,255,255,.05);border-radius:6px;overflow:hidden}
-.em .tf{height:100%;border-radius:6px;width:0;transition:width 1.1s cubic-bezier(.16,1,.3,1)}
+.em .tf{display:block;height:100%;border-radius:6px}
 .em .tv{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;width:26px;text-align:right;flex:none}
 .em .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
 @media (max-width:1000px){.em .kpis{grid-template-columns:1fr 1fr}}
@@ -1219,7 +1219,7 @@ _EMENDAS_V2_CSS = """
 .em .dep .sub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dim,#6B7688);margin-top:2px}
 .em .barcell{display:flex;align-items:center;gap:9px}
 .em .bk{flex:1;height:7px;background:rgba(255,255,255,.06);border-radius:5px;overflow:hidden;min-width:32px}
-.em .bf{height:100%;border-radius:5px;width:0;transition:width 1s cubic-bezier(.16,1,.3,1)}
+.em .bf{display:block;height:100%;border-radius:5px}
 .em .bv{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;width:26px;flex:none;text-align:right}
 .em .stpill{font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:20px;width:fit-content;white-space:nowrap}
 .em .temp-ic{font-size:19px;text-align:center}
@@ -1270,10 +1270,10 @@ export default function(component){
       '<div class="dep"><span class="tdot" style="background:' + p.temp_cor + ';box-shadow:0 0 8px ' + p.temp_cor +
       '"></span><div style="min-width:0"><div class="nm">' + esc(p.nome) + '</div>' +
       '<div class="sub">' + esc(p.partido) + (p.prioridade ? ' · ' + esc(p.prioridade) : '') + '</div></div></div>' +
-      '<div class="barcell"><span class="bk"><span class="bf" data-w="' + p.chance +
-      '" style="background:#8B7BF0"></span></span><span class="bv">' + p.chance + '</span></div>' +
-      '<div class="barcell"><span class="bk"><span class="bf" data-w="' + p.ader +
-      '" style="background:#4ADE80"></span></span><span class="bv">' + p.ader + '</span></div>' +
+      '<div class="barcell"><span class="bk"><span class="bf" style="background:#8B7BF0;width:' +
+      p.chance + '%"></span></span><span class="bv">' + p.chance + '</span></div>' +
+      '<div class="barcell"><span class="bk"><span class="bf" style="background:#4ADE80;width:' +
+      p.ader + '%"></span></span><span class="bv">' + p.ader + '</span></div>' +
       '<div><span class="stpill" style="background:' + p.status_cor + '22;color:' + p.status_cor + '">' +
       esc(p.status) + '</span></div>' +
       '<div class="temp-ic">' + p.temp_emoji + '</div><div class="rarrow">→</div></div>';
@@ -1330,7 +1330,7 @@ export default function(component){
     (d.temperatura || []).forEach(function(t){
       trows += '<div class="trow"><span class="tdot" style="background:' + t.cor + '"></span>' +
         '<span class="tn">' + t.emoji + ' ' + esc(t.nome) + '</span>' +
-        '<span class="tk"><span class="tf" data-w="' + t.pct + '" style="background:' + t.cor + '"></span></span>' +
+        '<span class="tk"><span class="tf" style="background:' + t.cor + ';width:' + t.pct + '%"></span></span>' +
         '<span class="tv">' + t.n + '</span></div>';
     });
     const temp = '<div class="temp-card"><h3>Temperatura das negociações</h3>' +
@@ -1371,11 +1371,8 @@ export default function(component){
       if (p >= 1) { clearInterval(iv); }
     }, 16);
   });
-  setTimeout(function(){
-    root.querySelectorAll('.tf,.bf').forEach(function(f, i){
-      f.style.transitionDelay = (i * 40) + 'ms'; f.style.width = f.dataset.w + '%';
-    });
-  }, 60);
+  // barras (termômetro/chance/aderência) já vêm com width no HTML; o "crescer"
+  // é keyframe scaleX (transition:width trava o computed no shadow DOM do v2).
   return function(){ root.remove(); };
 }
 """
@@ -2156,9 +2153,12 @@ EVENTOS = {"Iperó": "Feira de Ciências · ago/2026", "Tatuí": "Clube de Ciên
            "Mirassol": "Roda de mentoria · set/2026", "Dois Córregos": "Implantação · 2024",
            "Corumbataí": "Implantação · 2024"}
 
-CORES_ETAPA = {"Mapear": "var(--sem-low,#7C8698)", "Prospectar": "var(--accent,#E8873A)",
-               "Monitorar": "var(--sem-info,#5B9BD5)", "Edital": "var(--sem-mid,#E8B54A)",
-               "Ativo": "var(--sem-high,#4ADE80)"}
+# Cor semântica por etapa (hex direto — dentro dos componentes v2/shadow DOM,
+# hex é mais robusto que var()). Mapear=cinza · Prospectar=âmbar ·
+# Monitorar=azul · Edital=violeta · Ativo=verde (paleta da maquete).
+CORES_ETAPA = {"Mapear": "#7C8698", "Prospectar": "#E8873A",
+               "Monitorar": "#5B9BD5", "Edital": "#8B7BF0",
+               "Ativo": "#4ADE80"}
 
 
 def _n_fontes_radar() -> int:
@@ -2421,7 +2421,7 @@ _VISAO_V2_CSS = """
 .detail{display:grid;grid-template-columns:1.4fr 1fr;gap:22px}
 @media (max-width:1000px){.detail{grid-template-columns:1fr}}
 .panel{position:relative;background:var(--surface,#161A21);border:1px solid var(--line,rgba(255,255,255,.06));
-  border-radius:16px;padding:26px 28px}
+  border-radius:16px;padding:26px 28px;min-width:0}
 .panel h3{font-size:16px;font-weight:600;margin:0 0 4px}
 .panel .psub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dim,#6B7688);
   margin-bottom:22px;letter-spacing:.5px}
@@ -2430,8 +2430,8 @@ _VISAO_V2_CSS = """
 .fb:hover .n{color:var(--ink,#F5F7FA)}
 .fb:hover .tk{outline:1px solid var(--line2,rgba(255,255,255,.12));outline-offset:2px}
 .fb .n{font-size:14px;color:var(--muted,#A4AEBF);width:96px;flex:none;font-weight:500}
-.fb .tk{flex:1;height:11px;background:rgba(255,255,255,.05);border-radius:6px;overflow:hidden}
-.fb .fl{height:100%;border-radius:6px;width:0;transition:width 1.1s cubic-bezier(.16,1,.3,1)}
+.fb .tk{flex:1;min-width:0;height:11px;background:rgba(255,255,255,.05);border-radius:6px;overflow:hidden}
+.fb .fl{display:block;height:100%;border-radius:6px}
 .fb .v{font-size:16px;font-weight:700;width:34px;text-align:right;flex:none;font-variant-numeric:tabular-nums}
 .prazos .pr{display:flex;align-items:center;gap:14px;padding:14px 0;
   border-bottom:1px solid var(--line,rgba(255,255,255,.06));cursor:pointer}
@@ -2544,8 +2544,8 @@ export default function(component){
   (d.stages || []).forEach(function(s){
     fbs += '<div class="fb" data-act="stage" data-k="' + esc(s.nome) + '">' +
       '<span class="n">' + esc(s.nome) + '</span>' +
-      '<span class="tk"><span class="fl" data-w="' + s.pct + '" style="background:' + s.cor +
-      '"></span></span><span class="v tnum">' + s.n + '</span></div>';
+      '<span class="tk"><span class="fl" style="background:' + s.cor + ';width:' + s.pct +
+      '%"></span></span><span class="v tnum">' + s.n + '</span></div>';
   });
   let prs = '';
   (d.prazos || []).forEach(function(p, i){
@@ -2582,12 +2582,8 @@ export default function(component){
       if (p >= 1) { clearInterval(iv); }
     }, 16);
   });
-  setTimeout(function(){
-    root.querySelectorAll('.fl').forEach(function(fl, i){
-      fl.style.transitionDelay = (i * 90) + 'ms';
-      fl.style.width = fl.dataset.w + '%';
-    });
-  }, 60);
+  // barras já vêm com width no HTML; o "crescer" é feito por keyframe scaleX
+  // (transition:width trava o computed no shadow DOM do componente v2).
   return function(){ root.remove(); };
 }
 """
@@ -2992,7 +2988,7 @@ def page_radar():
 # =========================================================================== #
 # Cores das colunas do kanban (paleta da maquete pfc_app_v3).
 ACENTOS_HEX = {"Mapear": "#7C8698", "Prospectar": "#E8873A", "Monitorar": "#5B9BD5",
-               "Edital": "#E8B54A", "Ativo": "#4ADE80"}
+               "Edital": "#8B7BF0", "Ativo": "#4ADE80"}
 
 
 def _kanban_estatico():
@@ -3173,8 +3169,8 @@ _PESOS_V2_CSS = """
 .fb{display:flex;align-items:center;gap:16px;margin-bottom:18px}
 .fb:last-child{margin-bottom:0}
 .fb .n{font-size:14px;color:var(--muted,#A4AEBF);width:130px;flex:none;font-weight:500}
-.fb .tk{flex:1;height:11px;background:rgba(255,255,255,.05);border-radius:6px;overflow:hidden}
-.fb .fl{height:100%;border-radius:6px;width:0;transition:width 1.1s cubic-bezier(.16,1,.3,1)}
+.fb .tk{flex:1;min-width:0;height:11px;background:rgba(255,255,255,.05);border-radius:6px;overflow:hidden}
+.fb .fl{display:block;height:100%;border-radius:6px}
 .fb .v{font-size:16px;font-weight:700;width:44px;text-align:right;flex:none;font-variant-numeric:tabular-nums}
 """
 
@@ -3189,18 +3185,14 @@ export default function(component){
   let fbs = '';
   (d.rows || []).forEach(function(r){
     fbs += '<div class="fb"><span class="n">' + esc(r.n) + '</span>' +
-      '<span class="tk"><span class="fl" data-w="' + r.w + '" style="background:' + r.cor +
-      '"></span></span><span class="v">' + r.w + '%</span></div>';
+      '<span class="tk"><span class="fl" style="background:' + r.cor + ';width:' + r.w +
+      '%"></span></span><span class="v">' + r.w + '%</span></div>';
   });
   root.innerHTML = '<div class="panel"><h3>' + esc(d.titulo || '') + '</h3>' +
     '<div class="psub">' + esc(d.sub || '') + '</div>' + fbs + '</div>';
   parentElement.appendChild(root);
-  setTimeout(function(){
-    root.querySelectorAll('.fl').forEach(function(fl, i){
-      fl.style.transitionDelay = (i * 90) + 'ms';
-      fl.style.width = fl.dataset.w + '%';
-    });
-  }, 60);
+  // barras já vêm com width no HTML; o "crescer" é feito por keyframe scaleX
+  // (transition:width trava o computed no shadow DOM do componente v2).
   return function(){ root.remove(); };
 }
 """
