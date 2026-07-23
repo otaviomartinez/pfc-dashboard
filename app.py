@@ -1405,6 +1405,7 @@ def render_sidebar_emendas():
 def render_emendas():
     """Painel do radar de Emendas Parlamentares (CRM de deputados)."""
     st.markdown(_EMENDAS_CHROME_CSS, unsafe_allow_html=True)
+    render_topnav("emendas", "ARTICULAÇÃO")
     render_sidebar_emendas()
 
     hora = datetime.datetime.now().hour
@@ -1412,10 +1413,8 @@ def render_emendas():
     primeiro = USER["nome"].split()[0]
     st.markdown(
         f'<div class="topbar"><div>'
-        f'<div class="cr"><b>EMENDAS PARLAMENTARES</b> · ARTICULAÇÃO</div>'
         f'<div class="hi">{saud}, {esc(primeiro)}</div></div>'
-        f'<div class="tr-r"><div class="live">ALESP · ESTADUAL</div>'
-        f'<span class="avatar2" title="{esc(USER["email"])}">{esc(USER["inicial"])}</span></div></div>'
+        f'<div class="tr-r"><div class="live">ALESP · ESTADUAL</div></div></div>'
         '<div class="hr-line"></div>',
         unsafe_allow_html=True,
     )
@@ -1471,6 +1470,180 @@ def render_emendas():
     ac = getattr(res, "acao", None)
     if isinstance(ac, dict) and isinstance(ac.get("i"), int) and 0 <= ac["i"] < total:
         dlg_deputado(deps[ac["i"]])
+
+
+
+
+# =========================================================================== #
+# BARRA DE NAVEGAÇÃO SUPERIOR FIXA (global, sempre visível)
+# ---------------------------------------------------------------------------
+# Fica no topo de todas as telas, independente da sidebar — rede de segurança
+# para nunca ficar preso. Traz um seletor de radar estilo Linear/Notion:
+# mostra o radar atual e, ao clicar, abre um menu para trocar de radar, voltar
+# ao hub ou sair. Componente v2 bidirecional; as ações voltam ao Python.
+# Acento por área: âmbar (Captação) · violeta (Emendas).
+# =========================================================================== #
+TOPNAV_ALTURA = 54  # px — usado no padding-top do conteúdo e da sidebar
+
+_TOPNAV_CSS = """
+.tn{position:fixed;top:0;left:0;right:0;height:54px;z-index:1000;
+  display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 22px;
+  background:rgba(22,26,33,.86);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line,rgba(255,255,255,.06));
+  font-family:'Inter',system-ui,sans-serif;--acc:#E8873A;--acc-soft:rgba(232,135,58,.14)}
+.tn *{box-sizing:border-box}
+.tn-crumb{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.8px;
+  color:var(--dim,#6B7688);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tn-crumb b{color:var(--acc);font-weight:600}
+.tn-right{display:flex;align-items:center;gap:14px;flex:none}
+
+/* seletor (pill que abre o menu) */
+.tn-sel{position:relative}
+.tn-pill{display:flex;align-items:center;gap:10px;height:38px;padding:0 12px 0 13px;
+  background:var(--acc-soft);border:1px solid color-mix(in srgb,var(--acc) 34%,transparent);
+  border-radius:10px;cursor:pointer;transition:.18s cubic-bezier(.16,1,.3,1);
+  font-family:'Inter',system-ui,sans-serif;color:var(--ink,#F5F7FA)}
+.tn-pill:hover{background:color-mix(in srgb,var(--acc) 20%,transparent);
+  border-color:color-mix(in srgb,var(--acc) 55%,transparent)}
+.tn-dot{width:8px;height:8px;border-radius:50%;background:var(--acc);
+  box-shadow:0 0 8px var(--acc);flex:none}
+.tn-name{font-size:13.5px;font-weight:600;white-space:nowrap}
+.tn-chev{width:15px;height:15px;flex:none;fill:none;stroke:var(--muted,#A4AEBF);stroke-width:2;
+  transition:transform .2s}
+.tn.open .tn-chev{transform:rotate(180deg)}
+
+/* menu dropdown — controlado por display (visibility+transition tinha
+   comportamento anômalo no shadow DOM do componente v2) */
+.tn-menu{display:none;position:absolute;top:46px;right:0;width:248px;padding:7px;
+  background:#1C222B;border:1px solid var(--line2,rgba(255,255,255,.12));border-radius:13px;
+  box-shadow:0 24px 60px -18px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.05);
+  transform-origin:top right;z-index:1001}
+.tn.open .tn-menu{display:block;animation:tn-in .18s cubic-bezier(.16,1,.3,1)}
+@keyframes tn-in{from{opacity:0;transform:translateY(-6px) scale(.98)}to{opacity:1;transform:none}}
+.tn-lbl{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:1.2px;
+  text-transform:uppercase;color:var(--dim,#6B7688);padding:8px 10px 6px}
+.tn-item{display:flex;align-items:center;gap:11px;width:100%;padding:9px 10px;border:none;
+  background:none;border-radius:9px;cursor:pointer;color:var(--muted,#A4AEBF);
+  font-family:'Inter',system-ui,sans-serif;font-size:13.5px;font-weight:500;text-align:left;
+  transition:.14s}
+.tn-item:hover{background:rgba(255,255,255,.055);color:var(--ink,#F5F7FA)}
+.tn-item .rdot{width:8px;height:8px;border-radius:50%;flex:none}
+.tn-item .rdot.amber{background:#E8873A;box-shadow:0 0 7px rgba(232,135,58,.7)}
+.tn-item .rdot.violet{background:#8B7BF0;box-shadow:0 0 7px rgba(139,123,240,.7)}
+.tn-item .nm{flex:1}
+.tn-item .ck{width:15px;height:15px;flex:none;fill:none;stroke:var(--acc);stroke-width:2.4}
+.tn-item svg.ic{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8}
+.tn-item.cur{color:var(--ink,#F5F7FA);font-weight:600}
+.tn-item.danger:hover{background:rgba(240,102,63,.12);color:#F0663F}
+.tn-sep{height:1px;background:var(--line,rgba(255,255,255,.07));margin:6px 4px}
+
+.tn-avatar{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;
+  font-weight:700;font-size:13.5px;color:#15161F;flex:none;
+  background:linear-gradient(135deg,var(--acc),color-mix(in srgb,var(--acc) 40%,#ffffff))}
+"""
+
+_TOPNAV_JS = r"""
+export default function(component){
+  const {data, parentElement, setTriggerValue} = component;
+  const old = parentElement.querySelector('.tn'); if (old) old.remove();
+  const d = data || {}, radar = d.radar || 'captacao';
+  const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const acc = radar === 'emendas' ? '#8B7BF0' : '#E8873A';
+  const accSoft = radar === 'emendas' ? 'rgba(139,123,240,.14)' : 'rgba(232,135,58,.14)';
+  const nomeAtual = radar === 'emendas' ? 'Emendas Parlamentares' : 'Captação Privada';
+  const ck = '<svg class="ck" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>';
+  const chev = '<svg class="tn-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>';
+  const iHub = '<svg class="ic" viewBox="0 0 24 24"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>';
+  const iOut = '<svg class="ic" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>';
+
+  const root = document.createElement('div');
+  root.className = 'tn';
+  root.style.setProperty('--acc', acc);
+  root.style.setProperty('--acc-soft', accSoft);
+
+  function item(radarKey, label, cls){
+    const atual = radarKey === radar;
+    return '<button class="tn-item' + (atual ? ' cur' : '') + '" data-act="radar" data-v="' + radarKey + '">' +
+      '<span class="rdot ' + cls + '"></span><span class="nm">' + label + '</span>' +
+      (atual ? ck : '') + '</button>';
+  }
+
+  root.innerHTML =
+    '<div class="tn-crumb"><b>' + esc((nomeAtual || '').toUpperCase()) + '</b>' +
+    (d.crumb ? ' · ' + esc(d.crumb) : '') + '</div>' +
+    '<div class="tn-right"><div class="tn-sel">' +
+    '<button class="tn-pill" data-act="toggle"><span class="tn-dot"></span>' +
+    '<span class="tn-name">' + esc(nomeAtual) + '</span>' + chev + '</button>' +
+    '<div class="tn-menu">' +
+    '<div class="tn-lbl">Radar</div>' +
+    item('captacao', 'Captação Privada', 'amber') +
+    item('emendas', 'Emendas Parlamentares', 'violet') +
+    '<div class="tn-sep"></div>' +
+    '<button class="tn-item" data-act="hub">' + iHub + '<span class="nm">Voltar à Central</span></button>' +
+    '<button class="tn-item danger" data-act="sair">' + iOut + '<span class="nm">Sair</span></button>' +
+    '</div></div>' +
+    '<span class="tn-avatar" title="' + esc(d.email || '') + '">' + esc(d.inicial || '') + '</span>' +
+    '</div>';
+  parentElement.appendChild(root);
+
+  function fechar(){ root.classList.remove('open'); }
+  root.addEventListener('click', function(e){
+    const el = e.target.closest('[data-act]');
+    if (!el) { return; }
+    const act = el.dataset.act;
+    if (act === 'toggle') { root.classList.toggle('open'); return; }
+    fechar();
+    setTriggerValue('acao', {t: act, v: el.dataset.v || null, n: Date.now()});
+  });
+  // fecha ao clicar fora — composedPath() enxerga através do shadow DOM, senão o
+  // alvo chega ao document reapontado para o host e fecharíamos no próprio clique.
+  const onDoc = function(e){
+    const path = e.composedPath ? e.composedPath() : [];
+    if (path.indexOf(root) !== -1) { return; }  // clique dentro do componente
+    fechar();
+  };
+  document.addEventListener('click', onDoc, true);
+
+  return function(){ document.removeEventListener('click', onDoc, true); root.remove(); };
+}
+"""
+
+_topnav_v2 = components_v2.component("pfc_topnav", css=_TOPNAV_CSS, js=_TOPNAV_JS)
+
+# Empurra o conteúdo e a sidebar para baixo da barra fixa.
+_TOPNAV_OFFSET_CSS = f"""
+<style>
+[data-testid="stMainBlockContainer"], .block-container{{padding-top:calc({TOPNAV_ALTURA}px + 1.4rem)!important}}
+[data-testid="stSidebar"] > div:first-child{{padding-top:calc({TOPNAV_ALTURA}px + 14px)!important}}
+</style>
+"""
+
+
+def render_topnav(radar_atual: str, crumb: str = ""):
+    """Barra fixa no topo com o seletor de radar. Trata trocar/hub/sair."""
+    st.markdown(_TOPNAV_OFFSET_CSS, unsafe_allow_html=True)
+    res = _topnav_v2(
+        data={"radar": radar_atual, "crumb": crumb,
+              "inicial": USER.get("inicial", ""), "email": USER.get("email", "")},
+        key="topnav", on_acao_change=lambda: None)
+    ac = getattr(res, "acao", None)
+    if not isinstance(ac, dict):
+        return
+    if ac.get("n") == st.session_state.get("_topnav_nonce"):
+        return  # já processado (evita reprocessar no rerun seguinte)
+    st.session_state["_topnav_nonce"] = ac.get("n")
+    t = ac.get("t")
+    if t == "radar" and ac.get("v") in ("captacao", "emendas") and ac["v"] != radar_atual:
+        st.session_state["radar_escolhido"] = ac["v"]
+        st.rerun()
+    elif t == "hub":
+        st.session_state["radar_escolhido"] = None
+        st.rerun()
+    elif t == "sair":
+        for k in ("user", "page", "login_email", "login_senha", "radar_escolhido"):
+            st.session_state.pop(k, None)
+        st.rerun()
 
 
 
@@ -1550,6 +1723,8 @@ def render_sidebar():
 
 
 def render_header():
+    # Cabeçalho da página (rola com o conteúdo). Breadcrumb e avatar agora vivem
+    # na barra fixa superior (render_topnav), então aqui fica só a saudação + live.
     hora = datetime.datetime.now().hour
     saud = "Bom dia" if hora < 12 else "Boa tarde" if hora < 18 else "Boa noite"
     primeiro = USER["nome"].split()[0]
@@ -1557,15 +1732,14 @@ def render_header():
             else '<div class="live off">MODO LOCAL · CSV</div>')
     st.markdown(
         f'<div class="topbar"><div>'
-        f'<div class="cr"><b>CAPTAÇÃO PRIVADA</b> · {esc(st.session_state["page"].upper())}</div>'
         f'<div class="hi">{saud}, {esc(primeiro)}</div></div>'
-        f'<div class="tr-r">{live}'
-        f'<span class="avatar2" title="{esc(USER["email"])}">{esc(USER["inicial"])}</span></div></div>'
+        f'<div class="tr-r">{live}</div></div>'
         '<div class="hr-line"></div>',
         unsafe_allow_html=True,
     )
 
 
+render_topnav("captacao", st.session_state["page"].upper())
 render_sidebar()
 render_header()
 PAGINA = st.session_state["page"]
