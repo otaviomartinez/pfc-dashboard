@@ -870,6 +870,7 @@ export default function(component){
   const old = parentElement.querySelector('.hub'); if (old) old.remove();
   const d = data || {}, cap = d.captacao || {}, emd = d.emendas || {};
   const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const plural = (n, um, varios) => (Number(n) === 1 ? um : varios);
   const arrow = '<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
 
   function radarSVG(cls){
@@ -920,7 +921,9 @@ export default function(component){
     card('c1', 'captacao', cap.tag || 'Setor 01 · Recursos privados', 'Captação Privada',
          [[cap.orgs, 'orgs'], [cap.novas, 'novas'], [cap.fontes, 'fontes']]) +
     card('c2', 'emendas', emd.tag || 'Setor 02 · Recursos públicos', 'Emendas Parlamentares',
-         [[emd.deputados, 'deputados'], [emd.dialogos, 'diálogos'], [emd.aprovadas, 'aprovada']]) +
+         [[emd.deputados, plural(emd.deputados, 'deputado', 'deputados')],
+          [emd.reunioes, plural(emd.reunioes, 'reunião', 'reuniões')],
+          [emd.aprovadas, plural(emd.aprovadas, 'aprovada', 'aprovadas')]]) +
     '</div></div>';
   parentElement.appendChild(root);
 
@@ -992,13 +995,18 @@ def render_hub():
         n_fontes = len(_FA)
     except Exception:
         n_fontes = 31
+    # Emendas: os mesmos números do painel, pela mesma função de contagem.
+    # Sem a base de deputados (o CSV fica fora do git, então é o caso do deploy),
+    # zera em vez de inventar — número errado no hub queima a confiança no resto.
+    try:
+        em = _contagens_emendas(_deputados_ordenados())
+    except Exception:
+        em = {"deputados": 0, "reunioes": 0, "aprovadas": 0}
     payload = {
         "status": "SHEETS AO VIVO · 06:00" if modo_conectado else "MODO LOCAL · CSV",
         "captacao": {"orgs": TOTAL, "novas": novas, "fontes": n_fontes,
                      "tag": "Setor 01 · Recursos privados"},
-        # Emendas ainda não implementado — números ilustrativos do módulo futuro.
-        "emendas": {"deputados": 16, "dialogos": 4, "aprovadas": 1,
-                    "tag": "Setor 02 · Recursos públicos"},
+        "emendas": {**em, "tag": "Setor 02 · Recursos públicos"},
     }
     res = _hub_component(data=payload, key="hub", on_escolha_change=lambda: None)
     esc = getattr(res, "escolha", None)
@@ -1086,6 +1094,21 @@ def _deputados_ordenados():
         })
     deps.sort(key=lambda d: d["score"], reverse=True)
     return deps
+
+
+def _contagens_emendas(deps) -> dict:
+    """Contagens de Emendas — fonte única para o painel E para o card do hub.
+
+    Os critérios são os mesmos dos KPIs do painel, de propósito: se o hub e o
+    painel calculassem separado, voltariam a divergir (era o caso do antigo
+    "4 diálogos" fixo no código). Mexeu num critério aqui, mudou nos dois.
+    """
+    status = [str(d.get("status", "")).lower() for d in deps]
+    return {
+        "deputados": len(deps),
+        "reunioes": sum(1 for s in status if s.startswith(("reunião", "reuniao"))),
+        "aprovadas": sum(1 for s in status if "aprovada" in s),
+    }
 
 
 @st.dialog("Dossiê do deputado", width="large")
@@ -1624,9 +1647,8 @@ def render_emendas():
     nao_abordados = sum(1 for d in deps if "não iniciado" in d["status"].lower()
                         or "nao iniciado" in d["status"].lower())
     articulacao = total - nao_abordados
-    reunioes = sum(1 for d in deps if d["status"].lower().startswith("reunião")
-                   or d["status"].lower().startswith("reuniao"))
-    aprovadas = sum(1 for d in deps if "aprovada" in d["status"].lower())
+    cont = _contagens_emendas(deps)  # mesma contagem que alimenta o card do hub
+    reunioes, aprovadas = cont["reunioes"], cont["aprovadas"]
     chance_media = round(sum(d["chance"] for d in deps) / total) if total else 0
 
     # temperatura mais quente + maior score = negociação mais avançada
