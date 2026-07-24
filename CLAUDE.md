@@ -55,14 +55,14 @@ Duas frentes, escolhidas num **hub** de entrada:
 
 ## Fila de trabalho
 
-**Visual (pendente):**
-- Sidebar de Emendas: espaçamento entre itens e trocar emojis por ícones SVG
-- Esconder a toolbar nativa do Streamlit (botão "Deploy" sobrepõe a barra superior)
-- Botão visível de recolher/reexibir a sidebar nos dois painéis
-- Hub ainda mostra "4 diálogos" fixo no card de Emendas (deve ler o dado real)
+**Fase visual: encerrada.** A toolbar nativa, o card de Emendas do hub, a sidebar
+(espaçamento, ícones SVG) e o controle de recolher já entraram — ver o Design system
+para o modelo atual. Mudança visual nova daqui em diante é escopo novo, não fila:
+o trabalho voltou a ser de dados e confiabilidade.
 
-**Features, nesta ordem:**
-1. Acurácia das datas dos editais (protege a credibilidade do sistema)
+**Próximo trabalho — features, nesta ordem:**
+1. **Acurácia das datas dos editais** ← é aqui que estamos. Protege a credibilidade
+   do sistema: uma data errada é pior que nenhuma (regra 3 acima).
 2. Migrar deputados do CSV para o Google Sheets (destrava o deploy)
 3. Deputado federal e senador (aguardando as tabelas do Fábio)
 4. Relatório de Prioridades (botão que gera página/PDF do que está vencendo: instituição, data final, valor)
