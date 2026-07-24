@@ -506,14 +506,31 @@ body{background:var(--bg)}
 .st-key-filtro_cobertura div[data-baseweb="select"]>div:hover{border-color:var(--line-3)!important}
 
 /* ============ SIDEBAR (maquete pfc_app_v3) ============ */
+/* ATENÇÃO — leia antes de mexer nas regras abaixo.
+   As duas regras seguintes são o estado PADRÃO: a sidebar aberta e imune ao
+   colapso acidental do Streamlit (o bug de ela sumir na transição hub ->
+   painel). Elas NÃO significam mais que a barra é fixa: desde que existe o
+   botão de recolher, o recolhimento é INTENCIONAL e controlado pelo Python
+   (st.session_state["sidebar_recolhida"]).
+   Como o recolhimento acontece: _SIDEBAR_RECOLHIDA_CSS sobrescreve estas
+   regras, e só funciona porque é injetado DEPOIS (em _forcar_sidebar_visivel,
+   no render de cada sidebar) e repete os seletores para empatar a
+   especificidade do [aria-expanded="false"] abaixo.
+   Ou seja: a ordem de injeção faz parte do contrato. Quem mover essa
+   injeção para antes deste bloco, ou baixar a especificidade de lá, quebra o
+   botão de recolher sem nenhum erro aparecer — a barra simplesmente não some.
+   Ver: _SIDEBAR_RECOLHIDA_CSS, _forcar_sidebar_visivel, render_topnav. */
 [data-testid="stSidebar"]{background:var(--surface)!important;border-right:1px solid var(--line);
   width:250px!important;min-width:250px!important;
   transform:none!important;margin-left:0!important;visibility:visible!important}
-/* garante que a sidebar NUNCA fique presa recolhida (transform -300 do colapso) */
 [data-testid="stSidebar"][aria-expanded="false"]{transform:none!important;margin-left:0!important}
-/* sidebar é fixa: escondemos o botão de recolher (senão vira affordance falsa,
-   já que o CSS acima a mantém sempre visível). O botão de reabrir continua
-   estilizado como rede de segurança caso algum estado residual a recolha. */
+/* O botão nativo de recolher fica escondido porque quem recolhe é o nosso
+   controle na barra fixa superior (.tn-sb): ele vive fora da sidebar, então
+   continua clicável com ela recolhida — o nativo, não. Dois controles com
+   comportamentos diferentes só confundiriam.
+   O botão nativo de REABRIR (stExpandSidebarButton) continua visível e
+   estilizado mais abaixo: é a rede de segurança para quando o Streamlit
+   colapsa a barra por conta própria. */
 [data-testid="stSidebarCollapseButton"]{display:none!important}
 [data-testid="stSidebar"]>div:first-child{padding:18px 14px 16px}
 /* respiro entre itens: 2px deixava a lista com cara de bloco único */
@@ -1603,11 +1620,16 @@ _SIDEBAR_FIX_JS = """
 
 # Recolhida: zera a largura e desliza para fora — o MESMO mecanismo do colapso
 # nativo do Streamlit (min/max-width 0 + translateX), por isso o conteúdo reflui
-# sozinho e não brigamos com o layout dele. Precisa vir depois do CSS global,
-# que fixa width:250px!important; por isso é injetado no render da sidebar.
-# Os três seletores são de propósito: a regra global tem uma variante
-# [aria-expanded="false"] mais específica que fixa transform:none, e sem repetir
-# o atributo aqui ela venceria e a barra ficaria "recolhida" mas sem sair da tela.
+# sozinho e não brigamos com o layout dele.
+#
+# CONTRATO com o bloco SIDEBAR do CSS global (procure por "ATENÇÃO" lá):
+#   1. ORDEM — o CSS global fixa width/min-width:250px!important e
+#      transform:none!important. Estas regras só vencem porque são injetadas
+#      DEPOIS, no render de cada sidebar. Injetar antes = botão sem efeito.
+#   2. ESPECIFICIDADE — lá existe a variante [aria-expanded="false"], mais
+#      específica. Os três seletores abaixo repetem o atributo para empatar com
+#      ela; com um seletor só, a barra encolheria mas não sairia da tela.
+# Quebrar qualquer um dos dois não gera erro: a barra simplesmente não recolhe.
 _SIDEBAR_RECOLHIDA_CSS = """
 <style>
 [data-testid="stSidebar"],
