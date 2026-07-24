@@ -248,6 +248,31 @@ def carregar_deputados() -> pd.DataFrame:
         return pd.DataFrame()
 
 
+# Levantamento de emendas (tela "Descobrir"): rankings gerados por src/emendas.py.
+# São dados PÚBLICOS (transparência), versionados — não confundir com o CSV
+# sensível dos 16 deputados acima. Sem o arquivo, degrada para vazio.
+RANKING_TERRITORIO_CSV = Path(__file__).resolve().parent.parent / "data" / "emendas_ranking_pfc_territorio.csv"
+RANKING_EXPANSAO_CSV = Path(__file__).resolve().parent.parent / "data" / "emendas_ranking_pfc_expansao.csv"
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def carregar_ranking_territorio() -> pd.DataFrame:
+    """Seção 'Abordar já': deputados que já financiam edu/social nos municípios do PFC."""
+    try:
+        return pd.read_csv(RANKING_TERRITORIO_CSV).fillna("")
+    except Exception:
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def carregar_ranking_expansao() -> pd.DataFrame:
+    """Seção 'Cortejar': alinhados de fora, em camadas (prioritários / demais)."""
+    try:
+        return pd.read_csv(RANKING_EXPANSAO_CSV).fillna("")
+    except Exception:
+        return pd.DataFrame()
+
+
 @st.cache_data(ttl=60, show_spinner=False)
 def carregar_editais_privados() -> pd.DataFrame:
     """Lê a aba opcional 'Editais_Privados' (prazos). Vazio se não existir/CSV."""

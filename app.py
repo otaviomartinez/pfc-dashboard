@@ -106,6 +106,9 @@ ICONES = {
     "funil-negociacao": ("<rect x='3' y='4' width='5' height='16' rx='1'/>"
                          "<rect x='10' y='4' width='5' height='11' rx='1'/>"
                          "<rect x='17' y='4' width='5' height='7' rx='1'/>"),
+    # bússola: tela de planejamento "quem abordar" (descobrir/prospectar)
+    "descobrir": ("<circle cx='12' cy='12' r='9'/>"
+                  "<path d='M15.5 8.5l-2 5-5 2 2-5z'/>"),
     "trocar-radar": ("<path d='M16 3l4 4-4 4'/><path d='M20 7H8a4 4 0 0 0-4 4'/>"
                      "<path d='M8 21l-4-4 4-4'/><path d='M4 17h12a4 4 0 0 0 4-4'/>"),
     # mesmo traçado do "Sair" da barra superior — os dois falam a mesma língua
@@ -1785,11 +1788,13 @@ def dlg_em_articulacao(lista):
 
 
 # Navegação do painel de Emendas (páginas próprias + escopo).
-EMENDA_PAGES = ["Visão geral", "Deputados", "Funil de negociação"]
+# "Descobrir" é a tela de PLANEJAMENTO (quem abordar), separada do CRM dos 16.
+EMENDA_PAGES = ["Visão geral", "Deputados", "Descobrir", "Funil de negociação"]
 EMENDA_ESCOPO = [("Estadual", "ALESP · {n}", True), ("Federal", "em breve", False),
                  ("Senadores", "em breve", False)]
 # chave do botão -> ícone (a chave vira a classe st-key-<chave> que o CSS usa)
 EMENDA_ICONES = {"emnav_visao-geral": "visao-geral", "emnav_deputados": "deputados",
+                 "emnav_descobrir": "descobrir",
                  "emnav_funil-de-negociacao": "funil-negociacao",
                  "emenda_trocar": "trocar-radar", "emenda_logout": "sair"}
 # chave do botão -> nome no tooltip do modo ícone
@@ -1842,11 +1847,208 @@ def render_sidebar_emendas():
             st.rerun()
 
 
+# =========================================================================== #
+# TELA "DESCOBRIR DEPUTADOS" — planejamento de captação
+# ---------------------------------------------------------------------------
+# Lê o levantamento de emendas (rankings gerados por src/emendas.py) e mostra
+# quem abordar. NÃO é o CRM dos 16 do Fábio — é a lista de prospecção. Duas
+# seções: "Abordar já" (território) e "Cortejar" (expansão, em 2 camadas).
+# Regra dura: AUTORIZADO (proposta) e PAGO (execução) sempre separados e
+# rotulados — nunca somados. A ação de puxar pro CRM é o próximo passo (ainda
+# não existe aqui).
+# =========================================================================== #
+_DESCOBRIR_CSS = """
+<style>
+.dd-intro{font-size:13.5px;color:var(--muted);margin:2px 0 4px;max-width:70ch}
+.dd-legend{display:flex;gap:18px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);
+  margin:10px 0 16px;font-family:var(--mono);letter-spacing:.2px}
+.dd-legend span{display:flex;align-items:center;gap:6px}
+.dd-legend .sw{width:9px;height:9px;border-radius:3px;display:inline-block}
+.dd-sec{font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;
+  color:var(--dim);margin:20px 0 10px;display:flex;align-items:center;gap:10px}
+.dd-sec b{color:#b7abff;font-weight:600}
+.dd-sec .ln{flex:1;height:1px;background:var(--line)}
+/* linha-card violeta, clicável — estiliza o bloco horizontal do Streamlit */
+[data-testid="stHorizontalBlock"]:has(.dd-cell){
+  background:var(--surface);border:1px solid var(--line);border-left:3px solid #8B7BF0;
+  border-radius:12px;padding:8px 8px 8px 14px;margin-bottom:9px;align-items:center;min-height:60px;
+  transition:transform .16s var(--ease),border-color .16s var(--ease),background .16s var(--ease)}
+[data-testid="stHorizontalBlock"]:has(.dd-cell):hover{transform:translateX(3px);
+  border-color:rgba(139,123,240,.45);background:var(--hover)}
+.dd-cell{min-width:0}
+.dd-nome{font-weight:700;font-size:14.5px;color:var(--ink)}
+.dd-sub{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:4px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dd-fabio{font-size:9.5px;font-weight:600;padding:2px 8px;border-radius:20px;vertical-align:middle;
+  background:rgba(139,123,240,.16);color:#b7abff;margin-left:9px;letter-spacing:.3px}
+.dd-tag{font-family:var(--mono);font-size:9px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim)}
+.dd-score{font-family:var(--disp);font-weight:700;font-size:22px;line-height:1.1}
+.dd-val{font-size:12.5px;color:var(--text-2)} .dd-val b{font-family:var(--disp);color:var(--ink)}
+/* boxes do dossiê */
+.dd-box{background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:15px 16px}
+.dd-box.aut{border-left:3px solid #8B7BF0} .dd-box.pago{border-left:3px solid var(--sem-high)}
+.dd-box .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.7px;text-transform:uppercase;color:var(--dim)}
+.dd-box .v{font-family:var(--disp);font-size:23px;font-weight:800;margin-top:7px}
+.dd-box .n{font-size:11px;color:var(--muted);margin-top:4px}
+</style>
+"""
+
+
+def _cor_score(s: float) -> str:
+    """Cor semântica do score (mesma régua do design system: 60+, 50-59, <50)."""
+    return "var(--sem-high)" if s >= 60 else "var(--sem-mid)" if s >= 50 else "var(--sem-low)"
+
+
+def _bool_planilha(v) -> bool:
+    return str(v).strip().lower() in ("true", "1", "sim")
+
+
+def _linha_descobrir(row: dict, secao: str, idx) -> None:
+    """Uma linha-card clicável de deputado. secao ∈ {'territorio','expansao'}."""
+    score = float(row.get("score_pfc") or row.get("score_expansao") or 0)
+    if secao == "territorio":
+        aut, pago = row.get("autorizado_pfc", 0), row.get("pago_pfc", 0)
+        muns = str(row.get("municipios_pfc", "") or "")
+    else:
+        aut, pago = row.get("autorizado_geral_edusoc", 0), row.get("pago_geral_edusoc", 0)
+        diretos = str(row.get("municipios_pfc_diretos", "") or "")
+        vizinhos = str(row.get("municipios_vizinhos", "") or "")
+        muns = " · ".join(x for x in (
+            (f"direto: {diretos}" if diretos else ""),
+            (f"vizinho: {vizinhos}" if vizinhos else "")) if x) or "sem pé no território"
+    fatia = row.get("alinhamento_pct", 0)
+    c1, c2, c3, c4 = st.columns([3.3, 1.0, 2.5, 1.1])
+    c1.markdown(
+        f'<div class="dd-cell"><span class="dd-nome">{esc(row["deputado"])}</span>'
+        + ('<span class="dd-fabio">NO CRM</span>' if _bool_planilha(row.get("na_planilha_fabio")) else "")
+        + f'<div class="dd-sub">{esc(row.get("partido", ""))} · fatia edu/social {esc(fatia)}%</div></div>',
+        unsafe_allow_html=True)
+    c2.markdown(
+        f'<div class="dd-cell"><div class="dd-tag">score</div>'
+        f'<div class="dd-score" style="color:{_cor_score(score)}">{round(score)}</div></div>',
+        unsafe_allow_html=True)
+    c3.markdown(
+        f'<div class="dd-cell"><div class="dd-val">aut. <b>{brl_curto(aut)}</b>'
+        f'<span style="color:var(--dim)"> · </span>pago <b>{brl_curto(pago)}</b></div>'
+        f'<div class="dd-sub">{esc(muns)}</div></div>',
+        unsafe_allow_html=True)
+    if c4.button("Dossiê", key=f"dd_{secao}_{idx}", use_container_width=True):
+        dlg_descobrir_deputado(dict(row), secao)
+
+
+@st.dialog("Dossiê do deputado", width="large")
+def dlg_descobrir_deputado(row: dict, secao: str) -> None:
+    breadcrumb("Descobrir", str(row.get("deputado", "")))
+    score = float(row.get("score_pfc") or row.get("score_expansao") or 0)
+    no_crm = _bool_planilha(row.get("na_planilha_fabio"))
+    camada = row.get("camada", "") if secao == "expansao" else "No território"
+    st.markdown(
+        f'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+        f'<span style="font-size:20px;font-weight:700;color:var(--ink)">{esc(row.get("deputado",""))}</span>'
+        f'<span style="font-family:var(--mono);font-size:12px;color:var(--dim)">{esc(row.get("partido",""))} · ALESP</span>'
+        + (f'<span class="dd-fabio">JÁ NO CRM DO FÁBIO</span>' if no_crm else
+           '<span class="dd-fabio" style="background:rgba(124,134,152,.16);color:var(--muted)">FORA DO CRM</span>')
+        + f'</div>'
+        f'<div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:8px">'
+        f'{esc(camada)} · score <b style="color:{_cor_score(score)}">{("%.1f"%score).replace(".",",")}</b> '
+        f'· fatia educação/social {esc(row.get("alinhamento_pct",0))}%</div>',
+        unsafe_allow_html=True)
+
+    # ---- AUTORIZADO x PAGO — sempre separados e rotulados ----
+    if secao == "territorio":
+        aut, pago = row.get("autorizado_pfc", 0), row.get("pago_pfc", 0)
+        onde = "nos municípios do PFC"
+    else:
+        aut, pago = row.get("autorizado_geral_edusoc", 0), row.get("pago_geral_edusoc", 0)
+        onde = "em educação/social no estado"
+    c1, c2 = st.columns(2)
+    c1.markdown(f'<div class="dd-box aut"><div class="k">Autorizado · proposta</div>'
+                f'<div class="v" style="color:#b7abff">{brl(aut)}</div>'
+                f'<div class="n">{onde}</div></div>', unsafe_allow_html=True)
+    c2.markdown(f'<div class="dd-box pago"><div class="k">Pago · execução confirmada</div>'
+                f'<div class="v" style="color:var(--sem-high)">{brl(pago)}</div>'
+                f'<div class="n">{onde}</div></div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:11.5px;color:var(--dim);margin-top:8px">'
+                'Autorizado é <b>proposta</b>; pago é <b>execução confirmada</b>. São medidas '
+                'diferentes — nunca somadas.</div>', unsafe_allow_html=True)
+
+    # ---- pegada territorial ----
+    st.markdown('<div style="font-family:var(--mono);font-size:11px;letter-spacing:1px;'
+                'text-transform:uppercase;color:var(--dim);margin:20px 0 8px">'
+                'Municípios do PFC</div>', unsafe_allow_html=True)
+    if secao == "territorio":
+        _linha_mun("Onde atua (direto)", row.get("municipios_pfc", ""), "#8B7BF0")
+    else:
+        _linha_mun("Direto — no nosso município", row.get("municipios_pfc_diretos", ""), "#8B7BF0",
+                   valor=row.get("autorizado_direto", 0))
+        _linha_mun("Vizinho — mesma Região Imediata (IBGE)", row.get("municipios_vizinhos", ""),
+                   "#5B9BD5", valor=row.get("autorizado_vizinho", 0))
+
+    st.caption("Levantamento de execução (Transparência SP · Power BI 2023-2025). "
+               "Puxar este deputado para o CRM é o próximo passo — ainda não disponível.")
+
+
+def _linha_mun(rotulo: str, municipios, cor: str, valor=None) -> None:
+    txt = str(municipios or "").strip()
+    valor_txt = (f' · autorizado {brl_curto(valor)}' if valor and float(valor or 0) > 0 else "")
+    corpo = esc(txt) if txt else '<span style="color:var(--dim)">nenhum</span>'
+    st.markdown(
+        f'<div style="background:var(--surface2);border:1px solid var(--line);'
+        f'border-left:3px solid {cor};border-radius:0 10px 10px 0;padding:11px 14px;margin-bottom:8px">'
+        f'<div style="font-family:var(--mono);font-size:10px;letter-spacing:.5px;text-transform:uppercase;'
+        f'color:var(--dim)">{esc(rotulo)}{valor_txt}</div>'
+        f'<div style="font-size:13.5px;color:var(--ink);line-height:1.5;margin-top:5px">{corpo}</div></div>',
+        unsafe_allow_html=True)
+
+
+def render_descobrir() -> None:
+    st.markdown(_DESCOBRIR_CSS, unsafe_allow_html=True)
+    terr = dados.carregar_ranking_territorio()
+    exp = dados.carregar_ranking_expansao()
+    if terr.empty and exp.empty:
+        st.info("Levantamento ainda não gerado. Rode `python -m src.emendas` para "
+                "produzir os rankings em `data/`.")
+        return
+
+    st.markdown(
+        '<div class="dd-intro">Quem abordar para emendas de educação e assistência social. '
+        'Baseado na execução real de 2023-2025 (Transparência SP). '
+        'Esta é a lista de prospecção — separada do CRM dos 16 deputados.</div>'
+        '<div class="dd-legend">'
+        '<span><span class="sw" style="background:var(--sem-high)"></span>score 60+ · forte</span>'
+        '<span><span class="sw" style="background:var(--sem-mid)"></span>50–59 · médio</span>'
+        '<span><span class="sw" style="background:var(--sem-low)"></span>&lt;50 · fraco</span>'
+        '</div>', unsafe_allow_html=True)
+
+    aba1, aba2 = st.tabs([f"Abordar já · {len(terr)}", f"Cortejar · {len(exp)}"])
+    with aba1:
+        st.markdown('<div class="dd-intro">Já financiam educação/social <b>dentro</b> dos '
+                    'municípios do PFC. Ação imediata.</div>', unsafe_allow_html=True)
+        if terr.empty:
+            st.caption("Ninguém no território ainda.")
+        for i, row in terr.iterrows():
+            _linha_descobrir(row, "territorio", i)
+    with aba2:
+        st.markdown('<div class="dd-intro">Alto alinhamento e volume no estado, ainda '
+                    '<b>fora</b> dos nossos municípios (ou só de raspão). Alvo de cortejo — '
+                    'emenda se redireciona a cada ciclo.</div>', unsafe_allow_html=True)
+        pri = exp[exp["camada"] == "alvo prioritário"] if "camada" in exp else exp
+        dem = exp[exp["camada"] == "demais candidatos"] if "camada" in exp else exp.iloc[0:0]
+        st.markdown(f'<div class="dd-sec"><b>Alvos prioritários</b> · R$ 5 mi+ em edu/social '
+                    f'· {len(pri)}<span class="ln"></span></div>', unsafe_allow_html=True)
+        for i, row in pri.iterrows():
+            _linha_descobrir(row, "expansao", i)
+        st.markdown(f'<div class="dd-sec"><b>Demais candidatos</b> · {len(dem)}'
+                    f'<span class="ln"></span></div>', unsafe_allow_html=True)
+        for i, row in dem.iterrows():
+            _linha_descobrir(row, "expansao", i)
+
+
 def render_emendas():
     """Painel do radar de Emendas Parlamentares (CRM de deputados)."""
     st.markdown(_EMENDAS_CHROME_CSS, unsafe_allow_html=True)
     emenda_page = st.session_state.setdefault("emenda_page", "Visão geral")
-    modo = {"Visão geral": "visao", "Deputados": "deputados",
+    modo = {"Visão geral": "visao", "Deputados": "deputados", "Descobrir": "descobrir",
             "Funil de negociação": "funil"}.get(emenda_page, "visao")
     render_topnav("emendas", emenda_page.upper())
     render_sidebar_emendas()
@@ -1856,6 +2058,7 @@ def render_emendas():
     primeiro = USER["nome"].split()[0]
     subttl = {"Visão geral": "Articulação política",
               "Deputados": "Base de deputados · ALESP",
+              "Descobrir": "Levantamento de emendas · quem abordar",
               "Funil de negociação": "Negociações por temperatura"}.get(emenda_page, "")
     st.markdown(
         f'<div class="topbar"><div>'
@@ -1865,6 +2068,11 @@ def render_emendas():
         '<div class="hr-line"></div>',
         unsafe_allow_html=True,
     )
+
+    # Tela de PLANEJAMENTO (levantamento de emendas), separada do CRM dos 16.
+    if modo == "descobrir":
+        render_descobrir()
+        return
 
     deps = _deputados_ordenados()
     total = len(deps)
