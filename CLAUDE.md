@@ -33,11 +33,22 @@ Duas frentes, escolhidas num **hub** de entrada:
 - **Quase tudo deve ser clicável e levar a algo real** — KPIs, linhas, etapas do funil. Nada de tela morta nem clique que abre placeholder.
 - Ícones: SVG limpos. Não use emoji na interface.
 
+### Sidebar dos painéis — dois modos, nunca escondida
+
+- **Ícones (60px)** é o padrão: só os SVGs das telas, item ativo com fundo no acento do painel + barrinha lateral, e o nome aparecendo como tooltip no hover.
+- **Expandida (250px)** mostra os nomes. Alterna pelo botão `.tn-sb`, na barra fixa superior — que fica **fora** da sidebar de propósito, para continuar clicável em qualquer modo.
+- **Não existe modo "escondida".** Existiu por um commit e foi aposentado: menos estados, e nenhum caminho em que o usuário fique sem navegação. Se pedirem "recolher a sidebar de vez", lembre que isso reabre o risco de ficar preso.
+- Quem manda é o Python: `st.session_state["sidebar_expandida"]`, alternado em `render_topnav`. Ausente = modo ícone.
+- O rótulo de `st.button` é texto puro e **não aceita HTML** — por isso ícone e tooltip entram por CSS, via a classe `st-key-<chave>` que o Streamlit põe no container. Ver `css_icones_botoes`. Por isso também as chaves dos botões são slugs ASCII: chave com espaço ou acento não vira seletor válido.
+
 ## Armadilhas conhecidas deste projeto
 
 - **Custom Components v2 travam certas animações CSS.** `transition:visibility`, `transition:width` e `animation` com `scaleX` já congelaram elementos (largura ficou em zero, dropdown abrindo e fechando sozinho) — e `!important` inline foi ignorado. O padrão não está totalmente mapeado. **Solução:** use valores diretos no HTML, `display` em vez de `visibility`, ou anime via `setInterval`/`setTimeout` no JS (funciona). Se um elemento parecer "morto", suspeite disso primeiro.
 - `requestAnimationFrame` **não roda** no runtime dos componentes v2. Use timers.
-- **A sidebar some intermitentemente** (o Streamlit não monta o elemento na transição hub → painel). Mitigado pela barra de navegação superior fixa, que é independente da sidebar — é a rede de segurança para o usuário nunca ficar preso. O bug em si ainda não foi eliminado.
+- **A sidebar some intermitentemente** (o Streamlit não monta o elemento na transição hub → painel). Mitigado pela barra de navegação superior fixa, que é independente da sidebar — é a rede de segurança para o usuário nunca ficar preso. A recuperação automática (`_preparar_sidebar` → `_SIDEBAR_FIX_JS`, que clica no botão nativo de expandir até a barra aparecer) roda **em todo render, sem exceção**. Já houve uma versão em que ela era desligada quando o usuário recolhia de propósito; se voltar a existir um caso desses, esse desvio volta junto — evite. O bug em si ainda não foi eliminado.
+- **Dois pontos de CSS da sidebar quebram em silêncio** — nenhum dos dois gera erro, a interface só para de funcionar direito:
+  - **Ordem de injeção e especificidade** (`app.py:509`): o CSS global é o modo ícone (60px `!important`); o `_SIDEBAR_EXPANDIDA_CSS` só vence porque é injetado **depois**, em `_preparar_sidebar()`, e porque repete os seletores para empatar com a variante `[aria-expanded="false"]`. Mover a injeção para antes, ou baixar a especificidade, e o botão de expandir deixa de funcionar — parecendo bug no botão.
+  - **`overflow:visible` na cadeia da sidebar**: o tooltip do modo ícone é um `::after` que precisa vazar para fora dos 60px. Ele depende de `overflow:visible` declarado em **todos** os ancestrais (sidebar → container → `stVerticalBlock` → `stElementContainer` → `stButton`). Um `overflow:hidden` em qualquer um deles corta o balão. Se um dia a sidebar precisar de scroll próprio, esse tooltip precisa de outra solução (por exemplo `position:fixed` posicionado por JS).
 - **Três paletas paralelas de cor de etapa** (`CORES_ETAPA`, `CORES_STATUS`, `ACENTOS_HEX`) precisam ser mantidas em sincronia manualmente. Frágil — deveriam virar uma só.
 - `app.py` passou de 3.600 linhas (componentes v2 com CSS/JS como strings Python). Quebrar em módulos é desejável, mas **não durante uma fase de entrega**.
 - O CSV dos deputados está fora do git: **em deploy, o painel de Emendas aparece vazio.** Resolver migrando os deputados para uma aba do Google Sheets.
