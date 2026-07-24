@@ -1601,7 +1601,34 @@ _SIDEBAR_FIX_JS = """
 """
 
 
+# Recolhida: zera a largura e desliza para fora — o MESMO mecanismo do colapso
+# nativo do Streamlit (min/max-width 0 + translateX), por isso o conteúdo reflui
+# sozinho e não brigamos com o layout dele. Precisa vir depois do CSS global,
+# que fixa width:250px!important; por isso é injetado no render da sidebar.
+# Os três seletores são de propósito: a regra global tem uma variante
+# [aria-expanded="false"] mais específica que fixa transform:none, e sem repetir
+# o atributo aqui ela venceria e a barra ficaria "recolhida" mas sem sair da tela.
+_SIDEBAR_RECOLHIDA_CSS = """
+<style>
+[data-testid="stSidebar"],
+[data-testid="stSidebar"][aria-expanded="true"],
+[data-testid="stSidebar"][aria-expanded="false"]{
+  min-width:0!important;max-width:0!important;width:0!important;
+  transform:translateX(-260px)!important;overflow:hidden!important;
+  border-right:none!important}
+</style>
+"""
+
+
 def _forcar_sidebar_visivel():
+    """Recuperação automática do bug da sidebar não montada.
+
+    Só roda quando a barra DEVE estar aberta: se o usuário recolheu de propósito,
+    esta rotina reabriria a barra no rerun seguinte e o botão pareceria quebrado.
+    """
+    if st.session_state.get("sidebar_recolhida"):
+        st.markdown(_SIDEBAR_RECOLHIDA_CSS, unsafe_allow_html=True)
+        return
     components.html(_SIDEBAR_FIX_JS, height=0)
 
 
@@ -1859,6 +1886,16 @@ _TOPNAV_CSS = """
   border-bottom:1px solid var(--line,rgba(255,255,255,.06));
   font-family:'Inter',system-ui,sans-serif;--acc:#E8873A;--acc-soft:rgba(232,135,58,.14)}
 .tn *{box-sizing:border-box}
+.tn-left{display:flex;align-items:center;gap:13px;min-width:0}
+/* controle da sidebar: mora na barra fixa de propósito — é o único lugar que
+   continua visível com a sidebar recolhida (e sobrevive ao bug dela sumir). */
+.tn-sb{display:flex;align-items:center;justify-content:center;width:34px;height:34px;flex:none;
+  background:var(--acc-soft);border:1px solid color-mix(in srgb,var(--acc) 30%,transparent);
+  border-radius:9px;cursor:pointer;padding:0;transition:.16s cubic-bezier(.16,1,.3,1)}
+.tn-sb:hover{background:color-mix(in srgb,var(--acc) 22%,transparent);
+  border-color:color-mix(in srgb,var(--acc) 55%,transparent)}
+.tn-sb svg{width:18px;height:18px;fill:none;stroke:var(--acc);stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
 .tn-crumb{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.8px;
   color:var(--dim,#6B7688);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tn-crumb b{color:var(--acc);font-weight:600}
@@ -1936,9 +1973,18 @@ export default function(component){
       (atual ? ck : '') + '</button>';
   }
 
+  // ícone do controle da sidebar: o chevron aponta para onde a barra vai
+  const sbOff = !!d.sb_off;
+  const iSb = '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/>' +
+    '<path d="M9 4v16"/><path d="M' + (sbOff ? '13.8 9.5 16.3 12l-2.5 2.5' : '16.3 9.5 13.8 12l2.5 2.5') + '"/></svg>';
+  const sbTitulo = sbOff ? 'Reexibir a barra lateral' : 'Recolher a barra lateral';
+
   root.innerHTML =
+    '<div class="tn-left">' +
+    '<button class="tn-sb" data-act="sidebar" title="' + sbTitulo + '" aria-label="' + sbTitulo +
+    '" aria-expanded="' + (sbOff ? 'false' : 'true') + '">' + iSb + '</button>' +
     '<div class="tn-crumb"><b>' + esc((nomeAtual || '').toUpperCase()) + '</b>' +
-    (d.crumb ? ' · ' + esc(d.crumb) : '') + '</div>' +
+    (d.crumb ? ' · ' + esc(d.crumb) : '') + '</div></div>' +
     '<div class="tn-right"><div class="tn-sel">' +
     '<button class="tn-pill" data-act="toggle"><span class="tn-dot"></span>' +
     '<span class="tn-name">' + esc(nomeAtual) + '</span>' + chev + '</button>' +
@@ -1988,11 +2034,12 @@ _TOPNAV_OFFSET_CSS = f"""
 
 
 def render_topnav(radar_atual: str, crumb: str = ""):
-    """Barra fixa no topo com o seletor de radar. Trata trocar/hub/sair."""
+    """Barra fixa no topo com o seletor de radar. Trata trocar/hub/sair/sidebar."""
     st.markdown(_TOPNAV_OFFSET_CSS, unsafe_allow_html=True)
     res = _topnav_v2(
         data={"radar": radar_atual, "crumb": crumb,
-              "inicial": USER.get("inicial", ""), "email": USER.get("email", "")},
+              "inicial": USER.get("inicial", ""), "email": USER.get("email", ""),
+              "sb_off": bool(st.session_state.get("sidebar_recolhida"))},
         key="topnav", on_acao_change=lambda: None)
     ac = getattr(res, "acao", None)
     if not isinstance(ac, dict):
@@ -2006,6 +2053,11 @@ def render_topnav(radar_atual: str, crumb: str = ""):
         st.rerun()
     elif t == "hub":
         st.session_state["radar_escolhido"] = None
+        st.rerun()
+    elif t == "sidebar":
+        # o Python é o dono do estado: assim o rerun seguinte já sabe se deve
+        # aplicar o CSS de recolhida e se pode rodar a recuperação automática
+        st.session_state["sidebar_recolhida"] = not st.session_state.get("sidebar_recolhida")
         st.rerun()
     elif t == "sair":
         for k in ("user", "page", "login_email", "login_senha", "radar_escolhido"):
