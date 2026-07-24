@@ -1,0 +1,646 @@
+﻿municipio,id_municipio,regiao_imediata_id,regiao_imediata_nome
+Adamantina,3500105,350019,Adamantina - Lucélia
+Adolfo,3500204,350025,São José do Rio Preto
+Aguaí,3500303,350044,São João da Boa Vista
+Águas da Prata,3500402,350044,São João da Boa Vista
+Águas de Lindóia,3500501,350048,Amparo
+Águas de Santa Bárbara,3500550,350007,Avaré
+Águas de São Pedro,3500600,350040,Piracicaba
+Agudos,3500709,350009,Bauru
+Alambari,3500758,350006,Itapetininga
+Alfredo Marcondes,3500808,350018,Presidente Prudente
+Altair,3500907,350025,São José do Rio Preto
+Altinópolis,3501004,350031,Ribeirão Preto
+Alto Alegre,3501103,350023,Birigui - Penápolis
+Alumínio,3501152,350003,Sorocaba
+Álvares Florence,3501202,350027,Votuporanga
+Álvares Machado,3501301,350018,Presidente Prudente
+Álvaro de Carvalho,3501400,350013,Marília
+Alvinlândia,3501509,350013,Marília
+Americana,3501608,350038,Campinas
+Américo Brasiliense,3501707,350036,Araraquara
+Américo de Campos,3501806,350027,Votuporanga
+Amparo,3501905,350048,Amparo
+Analândia,3502002,350046,Rio Claro
+Andradina,3502101,350024,Andradina
+Angatuba,3502200,350006,Itapetininga
+Anhembi,3502309,350011,Botucatu
+Anhumas,3502408,350018,Presidente Prudente
+Aparecida,3502507,350052,Guaratinguetá
+Aparecida d'Oeste,3502606,350028,Jales
+Apiaí,3502705,350004,Itapeva
+Araçariguama,3502754,350003,Sorocaba
+Araçatuba,3502804,350022,Araçatuba
+Araçoiaba da Serra,3502903,350003,Sorocaba
+Aramina,3503000,350035,Ituverava
+Arandu,3503109,350007,Avaré
+Arapeí,3503158,350053,Cruzeiro
+Araraquara,3503208,350036,Araraquara
+Araras,3503307,350045,Araras
+Arco-Íris,3503356,350016,Tupã
+Arealva,3503406,350009,Bauru
+Areias,3503505,350053,Cruzeiro
+Areiópolis,3503604,350011,Botucatu
+Ariranha,3503703,350026,Catanduva
+Artur Nogueira,3503802,350038,Campinas
+Arujá,3503901,350001,São Paulo
+Aspásia,3503950,350028,Jales
+Assis,3504008,350014,Assis
+Atibaia,3504107,350041,Bragança Paulista
+Auriflama,3504206,350022,Araçatuba
+Avaí,3504305,350009,Bauru
+Avanhandava,3504404,350023,Birigui - Penápolis
+Avaré,3504503,350007,Avaré
+Bady Bassitt,3504602,350025,São José do Rio Preto
+Balbinos,3504701,350009,Bauru
+Bálsamo,3504800,350025,São José do Rio Preto
+Bananal,3504909,350053,Cruzeiro
+Barão de Antonina,3505005,350004,Itapeva
+Barbosa,3505104,350023,Birigui - Penápolis
+Bariri,3505203,350010,Jaú
+Barra Bonita,3505302,350010,Jaú
+Barra do Chapéu,3505351,350004,Itapeva
+Barra do Turvo,3505401,350005,Registro
+Barretos,3505500,350032,Barretos
+Barrinha,3505609,350031,Ribeirão Preto
+Barueri,3505708,350001,São Paulo
+Bastos,3505807,350016,Tupã
+Batatais,3505906,350031,Ribeirão Preto
+Bauru,3506003,350009,Bauru
+Bebedouro,3506102,350032,Barretos
+Bento de Abreu,3506201,350022,Araçatuba
+Bernardino de Campos,3506300,350015,Ourinhos
+Bertioga,3506359,350002,Santos
+Bilac,3506409,350023,Birigui - Penápolis
+Birigui,3506508,350023,Birigui - Penápolis
+Biritiba Mirim,3506607,350001,São Paulo
+Boa Esperança do Sul,3506706,350036,Araraquara
+Bocaina,3506805,350010,Jaú
+Bofete,3506904,350011,Botucatu
+Boituva,3507001,350003,Sorocaba
+Bom Jesus dos Perdões,3507100,350041,Bragança Paulista
+Bom Sucesso de Itararé,3507159,350004,Itapeva
+Borá,3507209,350014,Assis
+Boracéia,3507308,350010,Jaú
+Borborema,3507407,350036,Araraquara
+Borebi,3507456,350009,Bauru
+Botucatu,3507506,350011,Botucatu
+Bragança Paulista,3507605,350041,Bragança Paulista
+Braúna,3507704,350023,Birigui - Penápolis
+Brejo Alegre,3507753,350023,Birigui - Penápolis
+Brodowski,3507803,350031,Ribeirão Preto
+Brotas,3507902,350010,Jaú
+Buri,3508009,350004,Itapeva
+Buritama,3508108,350023,Birigui - Penápolis
+Buritizal,3508207,350035,Ituverava
+Cabrália Paulista,3508306,350009,Bauru
+Cabreúva,3508405,350039,Jundiaí
+Caçapava,3508504,350049,São José dos Campos
+Cachoeira Paulista,3508603,350053,Cruzeiro
+Caconde,3508702,350047,São José do Rio Pardo - Mococa
+Cafelândia,3508801,350012,Lins
+Caiabu,3508900,350018,Presidente Prudente
+Caieiras,3509007,350001,São Paulo
+Caiuá,3509106,350021,Presidente Epitácio-Presidente Venceslau
+Cajamar,3509205,350001,São Paulo
+Cajati,3509254,350005,Registro
+Cajobi,3509304,350032,Barretos
+Cajuru,3509403,350031,Ribeirão Preto
+Campina do Monte Alegre,3509452,350006,Itapetininga
+Campinas,3509502,350038,Campinas
+Campo Limpo Paulista,3509601,350039,Jundiaí
+Campos do Jordão,3509700,350050,Taubaté - Pindamonhangaba
+Campos Novos Paulista,3509809,350013,Marília
+Cananéia,3509908,350005,Registro
+Canas,3509957,350052,Guaratinguetá
+Cândido Mota,3510005,350014,Assis
+Cândido Rodrigues,3510104,350036,Araraquara
+Canitar,3510153,350015,Ourinhos
+Capão Bonito,3510203,350004,Itapeva
+Capela do Alto,3510302,350003,Sorocaba
+Capivari,3510401,350040,Piracicaba
+Caraguatatuba,3510500,350051,Caraguatatuba - Ubatuba - São Sebastião
+Carapicuíba,3510609,350001,São Paulo
+Cardoso,3510708,350027,Votuporanga
+Casa Branca,3510807,350044,São João da Boa Vista
+Cássia dos Coqueiros,3510906,350031,Ribeirão Preto
+Castilho,3511003,350024,Andradina
+Catanduva,3511102,350026,Catanduva
+Catiguá,3511201,350026,Catanduva
+Cedral,3511300,350025,São José do Rio Preto
+Cerqueira César,3511409,350007,Avaré
+Cerquilho,3511508,350003,Sorocaba
+Cesário Lange,3511607,350008,Tatuí
+Charqueada,3511706,350040,Piracicaba
+Clementina,3511904,350023,Birigui - Penápolis
+Colina,3512001,350032,Barretos
+Colômbia,3512100,350032,Barretos
+Conchal,3512209,350045,Araras
+Conchas,3512308,350011,Botucatu
+Cordeirópolis,3512407,350042,Limeira
+Coroados,3512506,350023,Birigui - Penápolis
+Coronel Macedo,3512605,350007,Avaré
+Corumbataí,3512704,350046,Rio Claro
+Cosmópolis,3512803,350038,Campinas
+Cosmorama,3512902,350027,Votuporanga
+Cotia,3513009,350001,São Paulo
+Cravinhos,3513108,350031,Ribeirão Preto
+Cristais Paulista,3513207,350033,Franca
+Cruzália,3513306,350014,Assis
+Cruzeiro,3513405,350053,Cruzeiro
+Cubatão,3513504,350002,Santos
+Cunha,3513603,350052,Guaratinguetá
+Descalvado,3513702,350037,São Carlos
+Diadema,3513801,350001,São Paulo
+Dirce Reis,3513850,350028,Jales
+Divinolândia,3513900,350047,São José do Rio Pardo - Mococa
+Dobrada,3514007,350036,Araraquara
+Dois Córregos,3514106,350010,Jaú
+Dolcinópolis,3514205,350028,Jales
+Dourado,3514304,350037,São Carlos
+Dracena,3514403,350020,Dracena
+Duartina,3514502,350009,Bauru
+Dumont,3514601,350031,Ribeirão Preto
+Echaporã,3514700,350013,Marília
+Eldorado,3514809,350005,Registro
+Elias Fausto,3514908,350038,Campinas
+Elisiário,3514924,350026,Catanduva
+Embaúba,3514957,350026,Catanduva
+Embu das Artes,3515004,350001,São Paulo
+Embu-Guaçu,3515103,350001,São Paulo
+Emilianópolis,3515129,350018,Presidente Prudente
+Engenheiro Coelho,3515152,350042,Limeira
+Espírito Santo do Pinhal,3515186,350044,São João da Boa Vista
+Espírito Santo do Turvo,3515194,350015,Ourinhos
+Estrela d'Oeste,3515202,350029,Fernandópolis
+Estrela do Norte,3515301,350018,Presidente Prudente
+Euclides da Cunha Paulista,3515350,350018,Presidente Prudente
+Fartura,3515400,350017,Piraju
+Fernandópolis,3515509,350029,Fernandópolis
+Fernando Prestes,3515608,350026,Catanduva
+Fernão,3515657,350013,Marília
+Ferraz de Vasconcelos,3515707,350001,São Paulo
+Flora Rica,3515806,350020,Dracena
+Floreal,3515905,350027,Votuporanga
+Flórida Paulista,3516002,350019,Adamantina - Lucélia
+Florínea,3516101,350014,Assis
+Franca,3516200,350033,Franca
+Francisco Morato,3516309,350001,São Paulo
+Franco da Rocha,3516408,350001,São Paulo
+Gabriel Monteiro,3516507,350023,Birigui - Penápolis
+Gália,3516606,350013,Marília
+Garça,3516705,350013,Marília
+Gastão Vidigal,3516804,350022,Araçatuba
+Gavião Peixoto,3516853,350036,Araraquara
+General Salgado,3516903,350022,Araçatuba
+Getulina,3517000,350013,Marília
+Glicério,3517109,350023,Birigui - Penápolis
+Guaiçara,3517208,350012,Lins
+Guaimbê,3517307,350013,Marília
+Guaíra,3517406,350032,Barretos
+Guapiaçu,3517505,350025,São José do Rio Preto
+Guapiara,3517604,350004,Itapeva
+Guará,3517703,350035,Ituverava
+Guaraçaí,3517802,350024,Andradina
+Guaraci,3517901,350032,Barretos
+Guarani d'Oeste,3518008,350029,Fernandópolis
+Guarantã,3518107,350012,Lins
+Guararapes,3518206,350022,Araçatuba
+Guararema,3518305,350001,São Paulo
+Guaratinguetá,3518404,350052,Guaratinguetá
+Guareí,3518503,350006,Itapetininga
+Guariba,3518602,350031,Ribeirão Preto
+Guarujá,3518701,350002,Santos
+Guarulhos,3518800,350001,São Paulo
+Guatapará,3518859,350031,Ribeirão Preto
+Guzolândia,3518909,350022,Araçatuba
+Herculândia,3519006,350016,Tupã
+Holambra,3519055,350038,Campinas
+Hortolândia,3519071,350038,Campinas
+Iacanga,3519105,350009,Bauru
+Iacri,3519204,350016,Tupã
+Iaras,3519253,350007,Avaré
+Ibaté,3519303,350037,São Carlos
+Ibirá,3519402,350025,São José do Rio Preto
+Ibirarema,3519501,350015,Ourinhos
+Ibitinga,3519600,350036,Araraquara
+Ibiúna,3519709,350003,Sorocaba
+Icém,3519808,350025,São José do Rio Preto
+Iepê,3519907,350018,Presidente Prudente
+Igaraçu do Tietê,3520004,350010,Jaú
+Igarapava,3520103,350035,Ituverava
+Igaratá,3520202,350049,São José dos Campos
+Iguape,3520301,350005,Registro
+Ilhabela,3520400,350051,Caraguatatuba - Ubatuba - São Sebastião
+Ilha Comprida,3520426,350005,Registro
+Ilha Solteira,3520442,350024,Andradina
+Indaiatuba,3520509,350038,Campinas
+Indiana,3520608,350018,Presidente Prudente
+Indiaporã,3520707,350029,Fernandópolis
+Inúbia Paulista,3520806,350019,Adamantina - Lucélia
+Ipaussu,3520905,350015,Ourinhos
+Iperó,3521002,350003,Sorocaba
+Ipeúna,3521101,350046,Rio Claro
+Ipiguá,3521150,350025,São José do Rio Preto
+Iporanga,3521200,350005,Registro
+Ipuã,3521309,350034,São Joaquim da Barra ¿ Orlândia
+Iracemápolis,3521408,350042,Limeira
+Irapuã,3521507,350025,São José do Rio Preto
+Irapuru,3521606,350020,Dracena
+Itaberá,3521705,350004,Itapeva
+Itaí,3521804,350007,Avaré
+Itajobi,3521903,350026,Catanduva
+Itaju,3522000,350010,Jaú
+Itanhaém,3522109,350002,Santos
+Itaoca,3522158,350004,Itapeva
+Itapecerica da Serra,3522208,350001,São Paulo
+Itapetininga,3522307,350006,Itapetininga
+Itapeva,3522406,350004,Itapeva
+Itapevi,3522505,350001,São Paulo
+Itapira,3522604,350043,Mogi Guaçu
+Itapirapuã Paulista,3522653,350004,Itapeva
+Itápolis,3522703,350036,Araraquara
+Itaporanga,3522802,350004,Itapeva
+Itapuí,3522901,350010,Jaú
+Itapura,3523008,350024,Andradina
+Itaquaquecetuba,3523107,350001,São Paulo
+Itararé,3523206,350004,Itapeva
+Itariri,3523305,350002,Santos
+Itatiba,3523404,350039,Jundiaí
+Itatinga,3523503,350011,Botucatu
+Itirapina,3523602,350037,São Carlos
+Itirapuã,3523701,350033,Franca
+Itobi,3523800,350047,São José do Rio Pardo - Mococa
+Itu,3523909,350003,Sorocaba
+Itupeva,3524006,350039,Jundiaí
+Ituverava,3524105,350035,Ituverava
+Jaborandi,3524204,350032,Barretos
+Jaboticabal,3524303,350031,Ribeirão Preto
+Jacareí,3524402,350049,São José dos Campos
+Jaci,3524501,350025,São José do Rio Preto
+Jacupiranga,3524600,350005,Registro
+Jaguariúna,3524709,350038,Campinas
+Jales,3524808,350028,Jales
+Jambeiro,3524907,350049,São José dos Campos
+Jandira,3525003,350001,São Paulo
+Jardinópolis,3525102,350031,Ribeirão Preto
+Jarinu,3525201,350039,Jundiaí
+Jaú,3525300,350010,Jaú
+Jeriquara,3525409,350033,Franca
+Joanópolis,3525508,350041,Bragança Paulista
+João Ramalho,3525607,350018,Presidente Prudente
+José Bonifácio,3525706,350025,São José do Rio Preto
+Júlio Mesquita,3525805,350013,Marília
+Jumirim,3525854,350003,Sorocaba
+Jundiaí,3525904,350039,Jundiaí
+Junqueirópolis,3526001,350020,Dracena
+Juquiá,3526100,350005,Registro
+Juquitiba,3526209,350001,São Paulo
+Lagoinha,3526308,350050,Taubaté - Pindamonhangaba
+Laranjal Paulista,3526407,350040,Piracicaba
+Lavínia,3526506,350024,Andradina
+Lavrinhas,3526605,350053,Cruzeiro
+Leme,3526704,350045,Araras
+Lençóis Paulista,3526803,350009,Bauru
+Limeira,3526902,350042,Limeira
+Lindóia,3527009,350048,Amparo
+Lins,3527108,350012,Lins
+Lorena,3527207,350052,Guaratinguetá
+Lourdes,3527256,350023,Birigui - Penápolis
+Louveira,3527306,350039,Jundiaí
+Lucélia,3527405,350019,Adamantina - Lucélia
+Lucianópolis,3527504,350009,Bauru
+Luís Antônio,3527603,350031,Ribeirão Preto
+Luiziânia,3527702,350023,Birigui - Penápolis
+Lupércio,3527801,350013,Marília
+Lutécia,3527900,350014,Assis
+Macatuba,3528007,350009,Bauru
+Macaubal,3528106,350025,São José do Rio Preto
+Macedônia,3528205,350029,Fernandópolis
+Magda,3528304,350022,Araçatuba
+Mairinque,3528403,350003,Sorocaba
+Mairiporã,3528502,350001,São Paulo
+Manduri,3528601,350007,Avaré
+Marabá Paulista,3528700,350021,Presidente Epitácio-Presidente Venceslau
+Maracaí,3528809,350014,Assis
+Marapoama,3528858,350026,Catanduva
+Mariápolis,3528908,350019,Adamantina - Lucélia
+Marília,3529005,350013,Marília
+Marinópolis,3529104,350028,Jales
+Martinópolis,3529203,350018,Presidente Prudente
+Matão,3529302,350036,Araraquara
+Mauá,3529401,350001,São Paulo
+Mendonça,3529500,350025,São José do Rio Preto
+Meridiano,3529609,350029,Fernandópolis
+Mesópolis,3529658,350028,Jales
+Miguelópolis,3529708,350035,Ituverava
+Mineiros do Tietê,3529807,350010,Jaú
+Miracatu,3529906,350005,Registro
+Mira Estrela,3530003,350029,Fernandópolis
+Mirandópolis,3530102,350024,Andradina
+Mirante do Paranapanema,3530201,350018,Presidente Prudente
+Mirassol,3530300,350025,São José do Rio Preto
+Mirassolândia,3530409,350025,São José do Rio Preto
+Mococa,3530508,350047,São José do Rio Pardo - Mococa
+Mogi das Cruzes,3530607,350001,São Paulo
+Mogi Guaçu,3530706,350043,Mogi Guaçu
+Mogi Mirim,3530805,350043,Mogi Guaçu
+Mombuca,3530904,350040,Piracicaba
+Monções,3531001,350022,Araçatuba
+Mongaguá,3531100,350002,Santos
+Monte Alegre do Sul,3531209,350048,Amparo
+Monte Alto,3531308,350031,Ribeirão Preto
+Monte Aprazível,3531407,350025,São José do Rio Preto
+Monte Azul Paulista,3531506,350032,Barretos
+Monte Castelo,3531605,350020,Dracena
+Monteiro Lobato,3531704,350049,São José dos Campos
+Monte Mor,3531803,350038,Campinas
+Morro Agudo,3531902,350034,São Joaquim da Barra ¿ Orlândia
+Morungaba,3532009,350039,Jundiaí
+Motuca,3532058,350036,Araraquara
+Murutinga do Sul,3532108,350024,Andradina
+Nantes,3532157,350018,Presidente Prudente
+Narandiba,3532207,350018,Presidente Prudente
+Natividade da Serra,3532306,350050,Taubaté - Pindamonhangaba
+Nazaré Paulista,3532405,350041,Bragança Paulista
+Neves Paulista,3532504,350025,São José do Rio Preto
+Nhandeara,3532603,350027,Votuporanga
+Nipoã,3532702,350025,São José do Rio Preto
+Nova Aliança,3532801,350025,São José do Rio Preto
+Nova Campina,3532827,350004,Itapeva
+Nova Canaã Paulista,3532843,350030,Santa Fé do Sul
+Nova Castilho,3532868,350022,Araçatuba
+Nova Europa,3532900,350036,Araraquara
+Nova Granada,3533007,350025,São José do Rio Preto
+Nova Guataporanga,3533106,350020,Dracena
+Nova Independência,3533205,350024,Andradina
+Novais,3533254,350026,Catanduva
+Nova Luzitânia,3533304,350022,Araçatuba
+Nova Odessa,3533403,350038,Campinas
+Novo Horizonte,3533502,350025,São José do Rio Preto
+Nuporanga,3533601,350034,São Joaquim da Barra ¿ Orlândia
+Ocauçu,3533700,350013,Marília
+Óleo,3533809,350007,Avaré
+Olímpia,3533908,350032,Barretos
+Onda Verde,3534005,350025,São José do Rio Preto
+Oriente,3534104,350013,Marília
+Orindiúva,3534203,350025,São José do Rio Preto
+Orlândia,3534302,350034,São Joaquim da Barra ¿ Orlândia
+Osasco,3534401,350001,São Paulo
+Oscar Bressane,3534500,350013,Marília
+Osvaldo Cruz,3534609,350019,Adamantina - Lucélia
+Ourinhos,3534708,350015,Ourinhos
+Ouroeste,3534757,350029,Fernandópolis
+Ouro Verde,3534807,350020,Dracena
+Pacaembu,3534906,350019,Adamantina - Lucélia
+Palestina,3535002,350025,São José do Rio Preto
+Palmares Paulista,3535101,350026,Catanduva
+Palmeira d'Oeste,3535200,350028,Jales
+Palmital,3535309,350014,Assis
+Panorama,3535408,350020,Dracena
+Paraguaçu Paulista,3535507,350014,Assis
+Paraibuna,3535606,350049,São José dos Campos
+Paraíso,3535705,350026,Catanduva
+Paranapanema,3535804,350007,Avaré
+Paranapuã,3535903,350028,Jales
+Parapuã,3536000,350016,Tupã
+Pardinho,3536109,350011,Botucatu
+Pariquera-Açu,3536208,350005,Registro
+Parisi,3536257,350027,Votuporanga
+Patrocínio Paulista,3536307,350033,Franca
+Paulicéia,3536406,350020,Dracena
+Paulínia,3536505,350038,Campinas
+Paulistânia,3536570,350009,Bauru
+Paulo de Faria,3536604,350025,São José do Rio Preto
+Pederneiras,3536703,350009,Bauru
+Pedra Bela,3536802,350041,Bragança Paulista
+Pedranópolis,3536901,350029,Fernandópolis
+Pedregulho,3537008,350033,Franca
+Pedreira,3537107,350038,Campinas
+Pedrinhas Paulista,3537156,350014,Assis
+Pedro de Toledo,3537206,350002,Santos
+Penápolis,3537305,350023,Birigui - Penápolis
+Pereira Barreto,3537404,350024,Andradina
+Pereiras,3537503,350008,Tatuí
+Peruíbe,3537602,350002,Santos
+Piacatu,3537701,350023,Birigui - Penápolis
+Piedade,3537800,350003,Sorocaba
+Pilar do Sul,3537909,350003,Sorocaba
+Pindamonhangaba,3538006,350050,Taubaté - Pindamonhangaba
+Pindorama,3538105,350026,Catanduva
+Pinhalzinho,3538204,350041,Bragança Paulista
+Piquerobi,3538303,350021,Presidente Epitácio-Presidente Venceslau
+Piquete,3538501,350052,Guaratinguetá
+Piracaia,3538600,350041,Bragança Paulista
+Piracicaba,3538709,350040,Piracicaba
+Piraju,3538808,350017,Piraju
+Pirajuí,3538907,350009,Bauru
+Pirangi,3539004,350026,Catanduva
+Pirapora do Bom Jesus,3539103,350001,São Paulo
+Pirapozinho,3539202,350018,Presidente Prudente
+Pirassununga,3539301,350037,São Carlos
+Piratininga,3539400,350009,Bauru
+Pitangueiras,3539509,350031,Ribeirão Preto
+Planalto,3539608,350025,São José do Rio Preto
+Platina,3539707,350014,Assis
+Poá,3539806,350001,São Paulo
+Poloni,3539905,350025,São José do Rio Preto
+Pompéia,3540002,350013,Marília
+Pongaí,3540101,350012,Lins
+Pontal,3540200,350031,Ribeirão Preto
+Pontalinda,3540259,350028,Jales
+Pontes Gestal,3540309,350027,Votuporanga
+Populina,3540408,350028,Jales
+Porangaba,3540507,350008,Tatuí
+Porto Feliz,3540606,350003,Sorocaba
+Porto Ferreira,3540705,350037,São Carlos
+Potim,3540754,350052,Guaratinguetá
+Potirendaba,3540804,350025,São José do Rio Preto
+Pracinha,3540853,350019,Adamantina - Lucélia
+Pradópolis,3540903,350031,Ribeirão Preto
+Praia Grande,3541000,350002,Santos
+Pratânia,3541059,350011,Botucatu
+Presidente Alves,3541109,350009,Bauru
+Presidente Bernardes,3541208,350018,Presidente Prudente
+Presidente Epitácio,3541307,350021,Presidente Epitácio-Presidente Venceslau
+Presidente Prudente,3541406,350018,Presidente Prudente
+Presidente Venceslau,3541505,350021,Presidente Epitácio-Presidente Venceslau
+Promissão,3541604,350012,Lins
+Quadra,3541653,350008,Tatuí
+Quatá,3541703,350018,Presidente Prudente
+Queiroz,3541802,350016,Tupã
+Queluz,3541901,350053,Cruzeiro
+Quintana,3542008,350013,Marília
+Rafard,3542107,350040,Piracicaba
+Rancharia,3542206,350018,Presidente Prudente
+Redenção da Serra,3542305,350050,Taubaté - Pindamonhangaba
+Regente Feijó,3542404,350018,Presidente Prudente
+Reginópolis,3542503,350009,Bauru
+Registro,3542602,350005,Registro
+Restinga,3542701,350033,Franca
+Ribeira,3542800,350004,Itapeva
+Ribeirão Bonito,3542909,350037,São Carlos
+Ribeirão Branco,3543006,350004,Itapeva
+Ribeirão Corrente,3543105,350033,Franca
+Ribeirão do Sul,3543204,350015,Ourinhos
+Ribeirão dos Índios,3543238,350018,Presidente Prudente
+Ribeirão Grande,3543253,350004,Itapeva
+Ribeirão Pires,3543303,350001,São Paulo
+Ribeirão Preto,3543402,350031,Ribeirão Preto
+Riversul,3543501,350004,Itapeva
+Rifaina,3543600,350033,Franca
+Rincão,3543709,350036,Araraquara
+Rinópolis,3543808,350016,Tupã
+Rio Claro,3543907,350046,Rio Claro
+Rio das Pedras,3544004,350040,Piracicaba
+Rio Grande da Serra,3544103,350001,São Paulo
+Riolândia,3544202,350027,Votuporanga
+Rosana,3544251,350018,Presidente Prudente
+Roseira,3544301,350052,Guaratinguetá
+Rubiácea,3544400,350022,Araçatuba
+Rubinéia,3544509,350030,Santa Fé do Sul
+Sabino,3544608,350012,Lins
+Sagres,3544707,350019,Adamantina - Lucélia
+Sales,3544806,350025,São José do Rio Preto
+Sales Oliveira,3544905,350034,São Joaquim da Barra ¿ Orlândia
+Salesópolis,3545001,350001,São Paulo
+Salmourão,3545100,350019,Adamantina - Lucélia
+Saltinho,3545159,350040,Piracicaba
+Salto,3545209,350003,Sorocaba
+Salto de Pirapora,3545308,350003,Sorocaba
+Salto Grande,3545407,350015,Ourinhos
+Sandovalina,3545506,350018,Presidente Prudente
+Santa Adélia,3545605,350026,Catanduva
+Santa Albertina,3545704,350028,Jales
+Santa Bárbara d'Oeste,3545803,350038,Campinas
+Santa Branca,3546009,350049,São José dos Campos
+Santa Clara d'Oeste,3546108,350030,Santa Fé do Sul
+Santa Cruz da Conceição,3546207,350045,Araras
+Santa Cruz da Esperança,3546256,350031,Ribeirão Preto
+Santa Cruz das Palmeiras,3546306,350044,São João da Boa Vista
+Santa Cruz do Rio Pardo,3546405,350015,Ourinhos
+Santa Ernestina,3546504,350031,Ribeirão Preto
+Santa Fé do Sul,3546603,350030,Santa Fé do Sul
+Santa Gertrudes,3546702,350046,Rio Claro
+Santa Isabel,3546801,350001,São Paulo
+Santa Lúcia,3546900,350036,Araraquara
+Santa Maria da Serra,3547007,350040,Piracicaba
+Santa Mercedes,3547106,350020,Dracena
+Santana da Ponte Pensa,3547205,350030,Santa Fé do Sul
+Santana de Parnaíba,3547304,350001,São Paulo
+Santa Rita d'Oeste,3547403,350030,Santa Fé do Sul
+Santa Rita do Passa Quatro,3547502,350037,São Carlos
+Santa Rosa de Viterbo,3547601,350031,Ribeirão Preto
+Santa Salete,3547650,350028,Jales
+Santo Anastácio,3547700,350018,Presidente Prudente
+Santo André,3547809,350001,São Paulo
+Santo Antônio da Alegria,3547908,350031,Ribeirão Preto
+Santo Antônio de Posse,3548005,350038,Campinas
+Santo Antônio do Aracanguá,3548054,350022,Araçatuba
+Santo Antônio do Jardim,3548104,350044,São João da Boa Vista
+Santo Antônio do Pinhal,3548203,350050,Taubaté - Pindamonhangaba
+Santo Expedito,3548302,350018,Presidente Prudente
+Santópolis do Aguapeí,3548401,350023,Birigui - Penápolis
+Santos,3548500,350002,Santos
+São Bento do Sapucaí,3548609,350050,Taubaté - Pindamonhangaba
+São Bernardo do Campo,3548708,350001,São Paulo
+São Caetano do Sul,3548807,350001,São Paulo
+São Carlos,3548906,350037,São Carlos
+São Francisco,3549003,350028,Jales
+São João da Boa Vista,3549102,350044,São João da Boa Vista
+São João das Duas Pontes,3549201,350029,Fernandópolis
+São João de Iracema,3549250,350029,Fernandópolis
+São João do Pau d'Alho,3549300,350020,Dracena
+São Joaquim da Barra,3549409,350034,São Joaquim da Barra ¿ Orlândia
+São José da Bela Vista,3549508,350033,Franca
+São José do Barreiro,3549607,350053,Cruzeiro
+São José do Rio Pardo,3549706,350047,São José do Rio Pardo - Mococa
+São José do Rio Preto,3549805,350025,São José do Rio Preto
+São José dos Campos,3549904,350049,São José dos Campos
+São Lourenço da Serra,3549953,350001,São Paulo
+São Luiz do Paraitinga,3550001,350050,Taubaté - Pindamonhangaba
+São Manuel,3550100,350011,Botucatu
+São Miguel Arcanjo,3550209,350006,Itapetininga
+São Paulo,3550308,350001,São Paulo
+São Pedro,3550407,350040,Piracicaba
+São Pedro do Turvo,3550506,350015,Ourinhos
+São Roque,3550605,350003,Sorocaba
+São Sebastião,3550704,350051,Caraguatatuba - Ubatuba - São Sebastião
+São Sebastião da Grama,3550803,350047,São José do Rio Pardo - Mococa
+São Simão,3550902,350031,Ribeirão Preto
+São Vicente,3551009,350002,Santos
+Sarapuí,3551108,350003,Sorocaba
+Sarutaiá,3551207,350017,Piraju
+Sebastianópolis do Sul,3551306,350027,Votuporanga
+Serra Azul,3551405,350031,Ribeirão Preto
+Serrana,3551504,350031,Ribeirão Preto
+Serra Negra,3551603,350048,Amparo
+Sertãozinho,3551702,350031,Ribeirão Preto
+Sete Barras,3551801,350005,Registro
+Severínia,3551900,350032,Barretos
+Silveiras,3552007,350053,Cruzeiro
+Socorro,3552106,350041,Bragança Paulista
+Sorocaba,3552205,350003,Sorocaba
+Sud Mennucci,3552304,350024,Andradina
+Sumaré,3552403,350038,Campinas
+Suzano,3552502,350001,São Paulo
+Suzanápolis,3552551,350028,Jales
+Tabapuã,3552601,350026,Catanduva
+Tabatinga,3552700,350036,Araraquara
+Taboão da Serra,3552809,350001,São Paulo
+Taciba,3552908,350018,Presidente Prudente
+Taguaí,3553005,350007,Avaré
+Taiaçu,3553104,350032,Barretos
+Taiúva,3553203,350032,Barretos
+Tambaú,3553302,350044,São João da Boa Vista
+Tanabi,3553401,350025,São José do Rio Preto
+Tapiraí,3553500,350003,Sorocaba
+Tapiratiba,3553609,350047,São José do Rio Pardo - Mococa
+Taquaral,3553658,350032,Barretos
+Taquaritinga,3553708,350036,Araraquara
+Taquarituba,3553807,350007,Avaré
+Taquarivaí,3553856,350004,Itapeva
+Tarabai,3553906,350018,Presidente Prudente
+Tarumã,3553955,350014,Assis
+Tatuí,3554003,350008,Tatuí
+Taubaté,3554102,350050,Taubaté - Pindamonhangaba
+Tejupá,3554201,350017,Piraju
+Teodoro Sampaio,3554300,350018,Presidente Prudente
+Terra Roxa,3554409,350032,Barretos
+Tietê,3554508,350003,Sorocaba
+Timburi,3554607,350017,Piraju
+Torre de Pedra,3554656,350008,Tatuí
+Torrinha,3554706,350010,Jaú
+Trabiju,3554755,350036,Araraquara
+Tremembé,3554805,350050,Taubaté - Pindamonhangaba
+Três Fronteiras,3554904,350030,Santa Fé do Sul
+Tuiuti,3554953,350041,Bragança Paulista
+Tupã,3555000,350016,Tupã
+Tupi Paulista,3555109,350020,Dracena
+Turiúba,3555208,350023,Birigui - Penápolis
+Turmalina,3555307,350028,Jales
+Ubarana,3555356,350025,São José do Rio Preto
+Ubatuba,3555406,350051,Caraguatatuba - Ubatuba - São Sebastião
+Ubirajara,3555505,350009,Bauru
+Uchoa,3555604,350025,São José do Rio Preto
+União Paulista,3555703,350025,São José do Rio Preto
+Urânia,3555802,350028,Jales
+Uru,3555901,350012,Lins
+Urupês,3556008,350025,São José do Rio Preto
+Valentim Gentil,3556107,350027,Votuporanga
+Valinhos,3556206,350038,Campinas
+Valparaíso,3556305,350022,Araçatuba
+Vargem,3556354,350041,Bragança Paulista
+Vargem Grande do Sul,3556404,350044,São João da Boa Vista
+Vargem Grande Paulista,3556453,350001,São Paulo
+Várzea Paulista,3556503,350039,Jundiaí
+Vera Cruz,3556602,350013,Marília
+Vinhedo,3556701,350038,Campinas
+Viradouro,3556800,350032,Barretos
+Vista Alegre do Alto,3556909,350026,Catanduva
+Vitória Brasil,3556958,350028,Jales
+Votorantim,3557006,350003,Sorocaba
+Votuporanga,3557105,350027,Votuporanga
+Zacarias,3557154,350023,Birigui - Penápolis
+Chavantes,3557204,350015,Ourinhos
+Estiva Gerbi,3557303,350043,Mogi Guaçu

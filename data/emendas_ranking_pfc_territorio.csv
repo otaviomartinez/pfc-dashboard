@@ -1,0 +1,9 @@
+﻿posicao,deputado,partido,na_planilha_fabio,score_pfc,alinhamento_pct,autorizado_pfc,pago_pfc,volume_ponderado,presenca_ponderada,n_emendas_territorio,n_municipios_pfc,municipios_pfc,grupos
+1,Valdomiro Lopes,PSB,False,87.5,43.3,409297.41,409297.41,409297.41,1.0,7,1,MIRASSOL,Operação ativa
+2,Itamar Borges,MDB,False,78.5,31.8,400000.0,400000.0,400000.0,1.0,5,1,MIRASSOL,Operação ativa
+3,Beth Sahão,PT,False,71.4,24.7,380000.0,380000.0,380000.0,1.0,9,1,MIRASSOL,Operação ativa
+4,Caio França,PSB,True,70.5,18.1,300000.0,300000.0,300000.0,2.0,2,2,SALTO; IPERÓ,Operação ativa
+5,Professora Bebel,PT,True,69.8,30.2,500000.0,500000.0,280000.0,1.45,5,2,TATUÍ; RIO CLARO,"Compromisso assinado, não iniciado; Operação ativa"
+6,Capitão Telhada,PP,False,68.6,7.4,350000.0,350000.0,350000.0,2.0,2,2,RIO CLARO; CAPELA DO ALTO,Operação ativa
+7,Vitão do Cachorrão,PODE,True,61.0,12.3,250000.0,0.0,250000.0,2.0,2,2,IPERÓ; GUAREÍ,Operação ativa
+8,Rogério Nogueira,PSD,True,56.8,13.1,330000.0,330000.0,269500.0,1.45,3,2,SALTO; TATUÍ,"Compromisso assinado, não iniciado; Operação ativa"

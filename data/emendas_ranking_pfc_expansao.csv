@@ -1,0 +1,60 @@
+﻿posicao,deputado,partido,na_planilha_fabio,camada,score_expansao,score_sem_vizinhanca,alinhamento_pct,autorizado_geral_edusoc,pago_geral_edusoc,n_municipios_edusoc,proximidade_ponderada,prox_direto,prox_vizinho,autorizado_direto,autorizado_vizinho,municipios_pfc_diretos,municipios_vizinhos,posicao_sem_vizinhanca,posicao_global,subiu_por_vizinhanca
+1,Emídio de Souza,PT,False,alvo prioritário,84.0,84.0,25.9,8613020.13,6712757.51,20,300000.0,300000.0,0.0,300000.0,0.0,CESÁRIO LANGE,,1,1,0
+2,Leonardo Siqueira,NOVO,True,alvo prioritário,75.8,75.8,29.1,6860406.0,5722000.0,7,0.0,0.0,0.0,0.0,0.0,,,2,2,0
+3,Rafael Silva,PSD,False,alvo prioritário,74.8,74.8,24.3,7933439.0,7933439.0,17,0.0,0.0,0.0,0.0,0.0,,,3,3,0
+4,Paulo Fiorilo,PT,False,alvo prioritário,67.4,66.7,21.8,7034259.0,6274259.0,40,67500.0,0.0,67500.0,0.0,150000.0,,SÃO MIGUEL ARCANJO; REGISTRO,4,4,0
+5,Andréa Werner,PSB,True,alvo prioritário,67.1,64.9,24.9,5880000.0,4640000.0,24,200250.0,0.0,200250.0,0.0,445000.0,,SOROCABA; CAMPINA DO MONTE ALEGRE; MAIRINQUE,5,5,0
+6,Ana Perugini,PT,False,alvo prioritário,63.2,63.2,25.6,5366511.19,1546616.13,10,0.0,0.0,0.0,0.0,0.0,,,6,6,0
+7,Márcia Lia,PT,False,alvo prioritário,61.4,60.4,19.8,6360278.0,4830278.0,39,90000.0,0.0,90000.0,0.0,200000.0,,MAIRINQUE; PORTO FELIZ,7,7,0
+8,Ricardo Madalena,PL,False,alvo prioritário,61.3,60.3,19.1,6430120.0,6130120.0,44,140000.0,50000.0,90000.0,50000.0,200000.0,IPERÓ,REGISTRO; TIETÊ,8,8,0
+9,Barros Munhoz,PSD,False,alvo prioritário,59.4,59.4,19.3,6312398.0,6162398.0,9,0.0,0.0,0.0,0.0,0.0,,,9,9,0
+10,Delegada Graciela,PL,False,alvo prioritário,58.9,58.7,19.1,6210278.0,5260278.0,21,22500.0,0.0,22500.0,0.0,50000.0,,IRAPUÃ,10,10,0
+11,Carla Morando,PSD,False,alvo prioritário,57.7,57.4,21.9,5130000.0,5030000.0,15,72500.0,50000.0,22500.0,50000.0,50000.0,MIRASSOL,ARAÇOIABA DA SERRA,11,11,0
+12,Carlos Giannazi,PSOL,True,alvo prioritário,57.0,57.0,18.1,6170000.0,5170000.0,16,0.0,0.0,0.0,0.0,0.0,,,12,12,0
+13,Léo Oliveira,MDB,False,alvo prioritário,56.8,56.8,19.0,5866120.0,5066120.0,16,0.0,0.0,0.0,0.0,0.0,,,13,13,0
+14,Letícia Aguiar,PL,False,alvo prioritário,53.5,53.0,16.7,5650000.0,5360000.0,48,95000.0,50000.0,45000.0,50000.0,100000.0,MIRASSOL,POTIRENDABA,15,15,0
+15,Thainara Faria,PT,False,demais candidatos,56.0,56.0,22.2,4898060.0,4448060.0,25,0.0,0.0,0.0,0.0,0.0,,,14,14,0
+16,Luiz Claudio Marcolino,PT,False,demais candidatos,50.7,49.6,19.0,4500000.0,3750000.0,20,90000.0,0.0,90000.0,0.0,200000.0,,BADY BASSITT; CANANÉIA; PAULO DE FARIA,16,16,0
+17,Carlão Pignatari,PSD,False,demais candidatos,48.3,45.5,14.4,4925000.0,4925000.0,7,247500.0,0.0,247500.0,0.0,550000.0,,ADOLFO; MACAUBAL; MENDONÇA; SÃO JOSÉ DO RIO PRETO,20,17,3
+18,Lucas Bove,PL,False,demais candidatos,47.4,47.1,18.1,4270149.0,3270149.0,21,22500.0,0.0,22500.0,0.0,50000.0,,IBIÚNA,17,18,-1
+19,Dani Alonso,PL,False,demais candidatos,46.8,45.7,18.9,3800000.0,3700000.0,19,90000.0,0.0,90000.0,0.0,200000.0,,IBIRÁ,19,19,0
+20,Major Mecca,PL,False,demais candidatos,46.3,45.8,14.3,4887236.85,4787236.85,26,95000.0,50000.0,45000.0,50000.0,100000.0,RIO CLARO,SOROCABA,18,20,-2
+21,Marina Helou,PSB,True,demais candidatos,45.7,44.7,14.8,4660000.0,2860000.0,20,90000.0,0.0,90000.0,0.0,200000.0,,SOROCABA,21,21,0
+22,Delegado Olim,PP,False,demais candidatos,44.6,44.6,14.8,4667535.0,3917535.0,14,0.0,0.0,0.0,0.0,0.0,,,22,22,0
+23,Rogério Santos,MDB,False,demais candidatos,44.1,43.6,18.5,3500000.0,3300000.0,11,45000.0,0.0,45000.0,0.0,100000.0,,PIEDADE,23,23,0
+24,Maria Lúcia Amary,PSD,True,demais candidatos,43.4,28.4,9.0,3076278.0,2576278.0,10,1327500.0,0.0,1327500.0,0.0,2950000.0,,SÃO MIGUEL ARCANJO; SOROCABA; IBIÚNA; PIEDADE; PILAR DO SUL; SARAPUÍ; JUMIRIM; ANGATUBA; ITU,34,24,10
+25,Rafa Zimbaldi,UNIÃO,False,demais candidatos,41.8,41.8,14.3,4046278.0,4046278.0,8,100000.0,100000.0,0.0,100000.0,0.0,SALTO,,24,25,-1
+26,Mauro Bragato,PSD,True,demais candidatos,41.2,41.2,16.0,3696120.0,3596120.0,13,0.0,0.0,0.0,0.0,0.0,,,25,26,-1
+27,Monica Seixas do Movimento Pretas,PSOL,True,demais candidatos,39.3,36.8,11.7,3745337.5,1860000.0,14,325000.0,100000.0,225000.0,100000.0,500000.0,RIO CLARO,ITU; SOROCABA,27,27,0
+28,Marcelo Aguiar,PL,False,demais candidatos,37.7,37.7,21.0,1700000.0,1700000.0,7,0.0,0.0,0.0,0.0,0.0,,,26,28,-2
+29,Marcio Nakashima,PSD,False,demais candidatos,36.7,36.7,12.9,3650000.0,3500000.0,12,0.0,0.0,0.0,0.0,0.0,,,28,29,-1
+30,Ricardo França,PODE,False,demais candidatos,35.4,35.4,13.6,3200000.0,3100000.0,2,0.0,0.0,0.0,0.0,0.0,,,29,30,-1
+31,Dr. Eduardo Nóbrega,MDB,False,demais candidatos,35.1,30.0,11.5,2720000.0,2440000.0,8,450000.0,0.0,450000.0,0.0,1000000.0,,SOROCABA,31,31,0
+32,Tomé Abduch,REPUBLICANOS,False,demais candidatos,34.4,33.6,12.9,3050000.0,2460000.0,6,67500.0,0.0,67500.0,0.0,150000.0,,SOROCABA,30,32,-2
+33,Bruno Zambelli,PL,False,demais candidatos,31.5,29.5,11.3,2670120.0,2600000.0,3,180000.0,0.0,180000.0,0.0,400000.0,,SÃO JOSÉ DO RIO PRETO,32,33,-1
+34,Sebastião Santos,REPUBLICANOS,False,demais candidatos,29.7,29.2,9.7,3043660.0,3043660.0,5,45000.0,0.0,45000.0,0.0,100000.0,,SÃO JOSÉ DO RIO PRETO,33,34,-1
+35,Rodrigo Moraes,PL,True,demais candidatos,28.7,21.2,7.1,2200000.0,1700000.0,7,661500.0,0.0,661500.0,0.0,1470000.0,,ILHA COMPRIDA; ITU; IGUAPE,42,35,7
+36,Agente Federal Danilo Balas,PL,True,demais candidatos,27.5,19.9,6.3,2148620.0,2018620.0,12,678879.0,0.0,678879.0,0.0,1508620.0,RIO CLARO,PIEDADE; SOROCABA; ARAÇOIABA DA SERRA; SÃO MIGUEL ARCANJO; PILAR DO SUL; VOTORANTIM,46,36,10
+37,Guto Zacarias,MISSÃO,False,demais candidatos,26.9,25.4,9.9,2250000.0,2050000.0,6,135000.0,0.0,135000.0,0.0,300000.0,,SOROCABA,35,37,-2
+38,Analice Fernandes,PSD,False,demais candidatos,26.8,24.4,8.3,2480000.0,2180000.0,15,216000.0,0.0,216000.0,0.0,480000.0,,GUAPIAÇU; JOSÉ BONIFÁCIO; MIRASSOLÂNDIA,37,38,-1
+39,Clarice Ganem,PODE,False,demais candidatos,25.1,25.1,9.7,2250000.0,2250000.0,4,0.0,0.0,0.0,0.0,0.0,,,36,39,-3
+40,Enio Tatto,PT,False,demais candidatos,24.9,24.1,9.2,2200000.0,2000000.0,9,67500.0,0.0,67500.0,0.0,150000.0,,ILHA COMPRIDA,40,40,0
+41,Atila Jacomussi,PRD,False,demais candidatos,24.4,24.4,9.4,2212278.0,1076000.0,6,0.0,0.0,0.0,0.0,0.0,,,38,41,-3
+42,Guilherme Cortez,PSOL,False,demais candidatos,24.4,24.4,9.4,2198418.0,1798418.0,4,0.0,0.0,0.0,0.0,0.0,,,39,42,-3
+43,Fabiana Bolsonaro,PL,False,demais candidatos,23.4,23.4,9.1,2087398.0,1357398.0,8,0.0,0.0,0.0,0.0,0.0,,,41,43,-2
+44,Tenente Coimbra,PL,False,demais candidatos,21.5,19.0,6.8,1850000.0,1600000.0,17,225000.0,0.0,225000.0,0.0,500000.0,,IBIRÁ; ITAPETININGA; JOSÉ BONIFÁCIO; SÃO JOSÉ DO RIO PRETO,48,44,4
+45,Marta Costa,PSD,False,demais candidatos,21.3,20.1,6.5,2127319.0,1427319.0,19,112500.0,0.0,112500.0,0.0,250000.0,,IPEÚNA; JOSÉ BONIFÁCIO,44,45,-1
+46,Valeria Bolsonaro,PL,False,demais candidatos,21.2,20.8,8.9,1643659.5,1643659.5,10,36000.0,0.0,36000.0,0.0,80000.0,,SOROCABA,43,46,-3
+47,Edna Macedo,REPUBLICANOS,False,demais candidatos,20.0,20.0,6.6,2100000.0,2100000.0,7,0.0,0.0,0.0,0.0,0.0,,,45,47,-2
+48,Ana Carolina Serra,PSDB,False,demais candidatos,19.4,19.4,8.2,1550000.0,1050000.0,7,0.0,0.0,0.0,0.0,0.0,,,47,48,-1
+49,Donato,PT,False,demais candidatos,18.9,18.9,7.4,1690000.0,1590000.0,3,0.0,0.0,0.0,0.0,0.0,,,49,49,0
+50,Eduardo Suplicy,PT,False,demais candidatos,17.8,16.8,6.1,1450358.77,1450358.77,3,157500.0,67500.0,90000.0,150000.0,200000.0,TATUÍ,SOROCABA,51,50,1
+51,Felipe Franco,UNIÃO,False,demais candidatos,17.6,16.5,6.3,1500000.0,1300000.0,5,90000.0,0.0,90000.0,0.0,200000.0,,SETE BARRAS,52,51,1
+52,André do Prado,PL,True,demais candidatos,17.1,17.1,5.4,1850000.0,1450000.0,8,0.0,0.0,0.0,0.0,0.0,JUQUIÁ,,50,52,-2
+53,Dr. Elton,UNIÃO,False,demais candidatos,16.0,16.0,6.1,1450000.0,450000.0,3,0.0,0.0,0.0,0.0,0.0,,,53,53,0
+54,Leci Brandão,PCdoB,False,demais candidatos,15.1,15.1,4.8,1613319.0,1315000.0,6,0.0,0.0,0.0,0.0,0.0,,,54,54,0
+55,Paula da Bancada Feminista,PSOL,False,demais candidatos,15.0,13.5,5.2,1226000.0,300000.0,5,128700.0,0.0,128700.0,0.0,286000.0,,ELDORADO,55,55,0
+56,Paulo Correa Jr,REPUBLICANOS,False,demais candidatos,12.6,11.1,3.5,1200000.0,950000.0,6,135000.0,0.0,135000.0,0.0,300000.0,,PARIQUERA-AÇU,59,56,3
+57,Ediane Maria,PSOL,False,demais candidatos,12.6,12.6,4.8,1140000.0,1040000.0,5,0.0,0.0,0.0,0.0,0.0,,,56,57,-1
+58,Marcos Damasio,PL,False,demais candidatos,11.9,11.9,4.8,1015379.0,875379.0,5,0.0,0.0,0.0,0.0,0.0,,,57,58,-1
+59,Maurici,PT,False,demais candidatos,11.4,11.4,4.0,1140000.0,1140000.0,4,0.0,0.0,0.0,0.0,0.0,,,58,59,-1

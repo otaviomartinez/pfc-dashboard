@@ -1,0 +1,108 @@
+# =============================================================================
+# Configuração do ranking de deputados por alinhamento ao PFC
+# =============================================================================
+# ESTE É O ARQUIVO PARA EDITAR conforme o PFC expandir. O extrator
+# (src/emendas.py) lê tudo daqui — não é preciso mexer no código.
+#
+# Depois de editar, rode:  python -m src.emendas
+# =============================================================================
+
+# ---- Municípios do PFC, em grupos com pesos diferentes ----------------------
+# O `peso` de cada grupo multiplica o quanto uma emenda naquele município conta
+# no score (volume e presença territorial). Município fora desta lista não
+# entra no recorte do PFC.
+#
+# Para adicionar um município: coloque o nome no grupo certo (pode ser com ou
+# sem acento — o casamento ignora acento e maiúsculas). Para promover de grupo
+# (ex.: Tatuí começar a operar), mova o nome de um grupo para o outro.
+
+[[grupos]]
+nome = "Operação ativa"
+peso = 1.0
+# Cesário Lange começa neste semestre, por isso já entra como ativo.
+municipios = [
+    "Capela do Alto",
+    "Cesário Lange",
+    "Corumbataí",
+    "Guareí",
+    "Iperó",
+    "Juquiá",
+    "Mirassol",
+    "Rio Claro",
+    "Salto",
+    "São Roque",
+]
+
+[[grupos]]
+nome = "Compromisso assinado, não iniciado"
+# 0.45 = alvo de médio prazo (conta menos que a operação ativa em 1.0), mas NÃO
+# abaixo do teto do vizinho (fator_vizinho 0.45 x peso 1.0 = 0.45): assim uma
+# emenda DIRETA em Tatuí nunca vale menos que uma emenda vizinha. Sem exceção.
+peso = 0.45
+municipios = [
+    "Tatuí",
+]
+
+# =============================================================================
+# O ranking sai em DUAS seções, com lógicas diferentes — cada uma responde uma
+# pergunta de captação diferente. Os pesos de cada seção DEVEM somar 1.0.
+# =============================================================================
+
+# ---- SEÇÃO 1 — "No território" (abordar já) ---------------------------------
+# Quem JÁ destina educação/social nos municípios do PFC. É a lista de ação
+# imediata. Aqui o território pesa muito, de propósito.
+#
+#   alinhamento — fatia % das emendas do deputado que vão para educação/social
+#                 (orientação geral; não depende do território do PFC).
+#   volume      — R$ AUTORIZADO a educação/social NOS municípios do PFC,
+#                 ponderado pelo peso do grupo. "Quanto já destina ao nosso
+#                 território" — o sinal mais forte, por isso o maior peso.
+#   presenca    — em quantos municípios do PFC atua, cada um pelo peso do grupo.
+[score_territorio]
+peso_alinhamento = 0.30
+peso_volume      = 0.45
+peso_presenca    = 0.25
+# Mínimo de emendas edu/social NOS municípios do PFC para entrar na Seção 1.
+# Evita que uma única emenda infle o score (o caso "42% em uma emenda só").
+# Também separa as duas seções: quem fica ABAIXO deste mínimo é candidato à
+# Seção 2 (expansão), não à Seção 1.
+min_emendas = 2
+
+# ---- SEÇÃO 2 — "Expansão" (cortejar) ----------------------------------------
+# Quem tem ALTO alinhamento e ALTO volume GERAL de educação/social no estado,
+# mas ainda NÃO destina (ou destina pouco) para os municípios do PFC. Um
+# deputado que deu R$ 8 mi para educação no estado e ainda não olhou para as
+# nossas cidades é o MELHOR alvo de expansão — emenda se redireciona a cada ano.
+#
+#   alinhamento    — fatia % edu/social do deputado (mesma métrica da Seção 1).
+#   volume_geral   — R$ AUTORIZADO a edu/social em TODO o estado (a "potência"
+#                    de emenda dele em educação/social). Peso alto.
+#   proximidade    — FACILITADOR: o quanto ele já encostou na nossa região.
+#                    Medida em 3 níveis (ver `fator_vizinho` abaixo). Quem já
+#                    atua aqui ou ao lado é mais fácil de atrair — conta, mas
+#                    com o menor peso.
+[score_expansao]
+peso_alinhamento  = 0.40
+peso_volume_geral = 0.45
+peso_proximidade  = 0.15
+# Volume geral mínimo de edu/social (R$) para ser considerado alvo de expansão.
+# "Volume relevante": abaixo disto, não vale o esforço de cortejar.
+min_volume_geral  = 1000000
+
+# Proximidade em 3 níveis, do mais forte ao mais fraco:
+#   DIRETO  — emenda no próprio município do PFC. Peso cheio = o peso do grupo
+#             do município (1.0 para ativo, 0.45 para Tatuí).
+#   VIZINHO — emenda em outro município da MESMA Região Imediata (IBGE 2017) de
+#             um município do PFC. Ex.: forte em Sorocaba-cidade, colada em
+#             Iperó/Salto. Conta `fator_vizinho` do peso do direto daquela
+#             região (ancorado no maior peso de grupo dentro dela).
+#   LONGE   — fora disso — zero.
+# REGRA que não pode quebrar: para um mesmo município-âncora, o DIRETO sempre
+# pesa mais que o VIZINHO — por isso 0 < fator_vizinho < 1. A vizinhança é
+# empurrão, não atalho.
+fator_vizinho = 0.45
+
+# Camadas da lista de expansão (não corta ninguém, só organiza por força):
+# quem tem volume geral edu/social >= este valor é "alvo prioritário"; o resto,
+# "demais candidatos".
+camada_prioritaria_min = 5000000

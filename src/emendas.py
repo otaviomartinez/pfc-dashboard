@@ -53,8 +53,16 @@ from src import dados
 # --------------------------------------------------------------------------- #
 RAIZ = Path(__file__).resolve().parent.parent
 DIR_MANUAL = RAIZ / "data" / "emendas_manual"          # arquivos "Baixar os dados"
+CONFIG_PFC = RAIZ / "config" / "pfc_municipios.toml"   # grupos, pesos, mínimo — editável
+TITULARES_CSV = RAIZ / "data" / "deputados_alesp_titulares.csv"  # ALESP em exercício
+REGIOES_IBGE_CSV = RAIZ / "data" / "ibge_regioes_imediatas_sp.csv"  # Regiões Imediatas 2017
 SAIDA_BASE = RAIZ / "data" / "emendas_parlamentares.csv"
 SAIDA_REVISAO = RAIZ / "data" / "emendas_revisao_nomes.csv"
+SAIDA_RANKING = RAIZ / "data" / "emendas_ranking_deputados.csv"
+SAIDA_RANKING_TERRITORIO = RAIZ / "data" / "emendas_ranking_pfc_territorio.csv"  # Seção 1
+SAIDA_RANKING_EXPANSAO = RAIZ / "data" / "emendas_ranking_pfc_expansao.csv"      # Seção 2
+SAIDA_EXCLUIDOS = RAIZ / "data" / "emendas_ranking_excluidos.csv"
+SAIDA_MUN_SEM = RAIZ / "data" / "municipios_pfc_sem_emenda.csv"
 
 # Cluster e resourceKeys dos painéis (descobertos na sondagem). O resourceKey
 # pode ROTACIONAR se o painel for republicado — por isso a degradação p/ manual.
@@ -505,6 +513,506 @@ def construir_base(linhas: list[dict], curados: pd.DataFrame) -> dict:
 
 
 # --------------------------------------------------------------------------- #
+# Ranking dos 94 por alinhamento ao PFC
+# --------------------------------------------------------------------------- #
+_PARTICULAS = {"de", "da", "do", "das", "dos", "e"}
+
+
+def _titulo(nome: str) -> str:
+    """'AGENTE FEDERAL DANILO BALAS' -> 'Agente Federal Danilo Balas'."""
+    palavras = str(nome).strip().split()
+    return " ".join(p.capitalize() if _norm(p) not in _PARTICULAS else p.lower()
+                    for p in palavras)
+
+
+def gerar_ranking(linhas: list[dict], curados: pd.DataFrame) -> pd.DataFrame:
+    """Ranking de TODOS os parlamentares (não só os 16) por alinhamento ao PFC.
+
+    Alinhamento = quanto o deputado destinou a EDUCAÇÃO + ASSISTÊNCIA SOCIAL
+    (TRANSFERÊNCIA ESPECIAL fica de fora — não tem área). Autorizado e pago
+    andam separados. Ordena pelo autorizado no recorte (o "quanto destinou"),
+    e traz também a fatia % do total do deputado, para reordenar por proporção
+    se quiser. Marca quem já está na planilha do Fábio — os de fora que pontuam
+    alto são a descoberta.
+    """
+    indice = construir_indice_nomes(curados)
+    dep: dict[str, dict] = {}
+    for l in linhas:
+        nome = str(l["parlamentar"]).strip()
+        if not nome:
+            continue
+        te = _e_transferencia_especial(l["objeto"])
+        area = classificar_area(l["orgao"], te)
+        d = dep.setdefault(nome, {
+            "partidos": {}, "auto_geral": 0.0, "auto_te": 0.0,
+            "auto_pfc": 0.0, "pago_pfc": 0.0, "n_pfc": 0,
+            "mun_auto": {}})  # município -> autorizado no recorte PFC
+        if l["partido"]:
+            d["partidos"][l["partido"]] = d["partidos"].get(l["partido"], 0) + 1
+        pago = l["valor"] if _norm(l["estagio"]) == "pagas" else 0.0
+        if te:
+            d["auto_te"] += l["valor"]
+        else:
+            d["auto_geral"] += l["valor"]        # geral = fora de TE
+        if area in AREAS_PFC:
+            d["auto_pfc"] += l["valor"]
+            d["pago_pfc"] += pago
+            d["n_pfc"] += 1
+            if l["municipio"]:
+                d["mun_auto"][l["municipio"]] = d["mun_auto"].get(l["municipio"], 0) + l["valor"]
+
+    linhas_rk = []
+    for nome, d in dep.items():
+        canon, situacao = casar_parlamentar(nome, indice)
+        na_planilha = situacao in ("exato", "normalizado")
+        partido = max(d["partidos"], key=d["partidos"].get) if d["partidos"] else ""
+        muns = sorted(d["mun_auto"], key=d["mun_auto"].get, reverse=True)
+        top_mun = muns[0] if muns else ""
+        share = (d["auto_pfc"] / d["auto_geral"] * 100) if d["auto_geral"] else 0.0
+        linhas_rk.append({
+            "deputado": _titulo(nome),
+            "partido": partido,
+            "na_planilha_fabio": na_planilha,
+            "deputado_fabio": canon or "",
+            "autorizado_pfc": round(d["auto_pfc"], 2),
+            "pago_pfc": round(d["pago_pfc"], 2),
+            "fatia_pfc_pct": round(share, 1),
+            "n_emendas_pfc": d["n_pfc"],
+            "n_municipios_pfc": len(d["mun_auto"]),
+            "municipio_top": top_mun,
+            "autorizado_municipio_top": round(d["mun_auto"].get(top_mun, 0), 2),
+            "municipios_pfc": "; ".join(muns),
+            "autorizado_geral_sem_te": round(d["auto_geral"], 2),
+        })
+
+    rk = pd.DataFrame(linhas_rk)
+    if rk.empty:
+        return rk
+    rk = rk.sort_values("autorizado_pfc", ascending=False).reset_index(drop=True)
+    rk.insert(0, "posicao", rk.index + 1)
+    return rk
+
+
+# --------------------------------------------------------------------------- #
+# Ranking focado nos municípios do PFC (score composto + titulares)
+# --------------------------------------------------------------------------- #
+def carregar_config_pfc(caminho: Path = CONFIG_PFC) -> dict:
+    """Lê config/pfc_municipios.toml: municípios por peso, pesos do score, mínimo.
+
+    Devolve {"peso_por_municipio": {mun_norm: peso}, "grupo_por_municipio":
+    {mun_norm: nome_grupo}, "score": {...}, "grupos": [...]}.
+    """
+    import tomllib
+    with open(caminho, "rb") as f:
+        cfg = tomllib.load(f)
+    peso_por_mun, grupo_por_mun = {}, {}
+    for g in cfg.get("grupos", []):
+        for m in g.get("municipios", []):
+            peso_por_mun[_norm(m)] = float(g["peso"])
+            grupo_por_mun[_norm(m)] = g["nome"]
+
+    terr = cfg.get("score_territorio", {})
+    exp = cfg.get("score_expansao", {})
+    for nome, sec, chaves in (("score_territorio", terr,
+                               ("peso_alinhamento", "peso_volume", "peso_presenca")),
+                              ("score_expansao", exp,
+                               ("peso_alinhamento", "peso_volume_geral", "peso_proximidade"))):
+        soma = sum(sec.get(k, 0) for k in chaves)
+        if abs(soma - 1.0) > 1e-6:
+            raise ValueError(f"pesos de [{nome}] somam {soma}, deveriam somar 1.0 — "
+                             f"ajuste {caminho.name}")
+    fator = exp.get("fator_vizinho", 0.45)
+    if not 0 < fator < 1:
+        raise ValueError(f"fator_vizinho={fator} inválido: precisa de 0 < fator < 1 "
+                         f"(o vizinho é sempre uma fração do direto). Ajuste {caminho.name}")
+    return {"peso_por_municipio": peso_por_mun, "grupo_por_municipio": grupo_por_mun,
+            "score_territorio": terr, "score_expansao": exp, "grupos": cfg.get("grupos", [])}
+
+
+def carregar_titulares(caminho: Path = TITULARES_CSV) -> dict:
+    """Titulares em exercício da ALESP: {nome_norm: {"nome": ..., "partido": ...}}."""
+    if not caminho.exists():
+        return {}
+    df = pd.read_csv(caminho, dtype=str).fillna("")
+    return {_norm(r["nome_parlamentar"]): {"nome": r["nome_parlamentar"].strip(),
+                                           "partido": r.get("partido", "").strip()}
+            for _, r in df.iterrows()}
+
+
+def gerar_ranking_pfc(linhas: list[dict], titulares: dict, config: dict,
+                      curados: pd.DataFrame | None = None) -> dict:
+    """Ranking dos deputados por alinhamento ao PFC, restrito aos municípios do PFC.
+
+    Score composto (0-100), pesos vindos da config e normalizados pelo maior
+    valor entre os que qualificam:
+      alinhamento — fatia % das emendas do deputado em educação/social (geral);
+      volume      — R$ autorizado a edu/social nos municípios do PFC, ponderado
+                    pelo peso do grupo do município;
+      presença    — soma dos pesos dos municípios-PFC distintos onde atua.
+    Entra no ranking quem é TITULAR em exercício e tem pelo menos `min_emendas`
+    emendas de edu/social nos municípios do PFC (trava anti "42% em uma só").
+
+    Retorna {"ranking", "excluidos", "municipios_sem_emenda", "relatorio"}.
+    """
+    peso_mun = config["peso_por_municipio"]
+    grupo_mun = config["grupo_por_municipio"]
+    sc = config["score_territorio"]
+    min_emendas = int(sc.get("min_emendas", 2))
+    idx_curados = construir_indice_nomes(curados) if curados is not None else {}
+
+    def na_planilha(nome):
+        return casar_parlamentar(nome, idx_curados)[1] in ("exato", "normalizado")
+
+    # agrega por deputado; separa geral (p/ alinhamento) de território-PFC
+    dep: dict[str, dict] = {}
+    # cobertura por município do PFC (qualquer deputado) p/ o relatório de lacunas
+    mun_cobertura = {m: {"n": 0, "autorizado": 0.0, "deputados": set()} for m in peso_mun}
+
+    for l in linhas:
+        nome = str(l["parlamentar"]).strip()
+        if not nome:
+            continue
+        te = _e_transferencia_especial(l["objeto"])
+        area = classificar_area(l["orgao"], te)
+        pago = l["valor"] if _norm(l["estagio"]) == "pagas" else 0.0
+        d = dep.setdefault(nome, {"partidos": {}, "auto_geral": 0.0, "auto_pfc_edusoc": 0.0,
+                                  "pago_pfc": 0.0, "n_territorio": 0, "vol_ponderado": 0.0,
+                                  "mun_pesos": {}, "mun_auto": {}})
+        if l["partido"]:
+            d["partidos"][l["partido"]] = d["partidos"].get(l["partido"], 0) + 1
+        if not te:
+            d["auto_geral"] += l["valor"]
+        mnorm = _norm(l["municipio"])
+        no_pfc = mnorm in peso_mun
+        edusoc = area in AREAS_PFC
+        if no_pfc and edusoc and not te:
+            peso = peso_mun[mnorm]
+            d["auto_pfc_edusoc"] += l["valor"]
+            d["pago_pfc"] += pago
+            d["n_territorio"] += 1
+            d["vol_ponderado"] += l["valor"] * peso
+            d["mun_pesos"][l["municipio"]] = peso
+            d["mun_auto"][l["municipio"]] = d["mun_auto"].get(l["municipio"], 0) + l["valor"]
+            mc = mun_cobertura[mnorm]
+            mc["n"] += 1
+            mc["autorizado"] += l["valor"]
+            mc["deputados"].add(nome)
+
+    # candidatos = quem tem ao menos 1 emenda edu/social no território do PFC
+    candidatos = [(nome, d, titulares.get(_norm(nome)))
+                  for nome, d in dep.items() if d["n_territorio"] > 0]
+
+    # alinhamento = fatia edu/social GERAL do deputado (qualquer município), então
+    # somamos o edu/social geral numa passada dedicada.
+    geral_edusoc = {}
+    for l in linhas:
+        nome = str(l["parlamentar"]).strip()
+        if not nome:
+            continue
+        te = _e_transferencia_especial(l["objeto"])
+        if te:
+            continue
+        if classificar_area(l["orgao"], te) in AREAS_PFC:
+            geral_edusoc[nome] = geral_edusoc.get(nome, 0.0) + l["valor"]
+
+    qualificados = [(n, d, t) for (n, d, t) in candidatos
+                    if t is not None and d["n_territorio"] >= min_emendas]
+    # normalizadores (máximos entre os qualificados)
+    max_vol = max((d["vol_ponderado"] for _, d, _ in qualificados), default=0.0) or 1.0
+    max_pres = max((sum(d["mun_pesos"].values()) for _, d, _ in qualificados), default=0.0) or 1.0
+
+    def alinhamento_pct(nome, d):
+        base = d["auto_geral"]
+        return (geral_edusoc.get(nome, 0.0) / base * 100) if base else 0.0
+
+    max_alin = max((alinhamento_pct(n, d) for n, d, _ in qualificados), default=0.0) or 1.0
+
+    linhas_rk = []
+    for nome, d, tit in qualificados:
+        alin = alinhamento_pct(nome, d)
+        presenca = sum(d["mun_pesos"].values())
+        c_alin = alin / max_alin
+        c_vol = d["vol_ponderado"] / max_vol
+        c_pres = presenca / max_pres
+        score = 100 * (sc["peso_alinhamento"] * c_alin + sc["peso_volume"] * c_vol
+                       + sc["peso_presenca"] * c_pres)
+        muns = sorted(d["mun_auto"], key=d["mun_auto"].get, reverse=True)
+        grupos_atua = sorted({grupo_mun[_norm(m)] for m in d["mun_auto"]})
+        linhas_rk.append({
+            "deputado": tit["nome"], "partido": tit["partido"] or (
+                max(d["partidos"], key=d["partidos"].get) if d["partidos"] else ""),
+            "na_planilha_fabio": na_planilha(nome),
+            "score_pfc": round(score, 1),
+            "alinhamento_pct": round(alin, 1),
+            "autorizado_pfc": round(d["auto_pfc_edusoc"], 2),
+            "pago_pfc": round(d["pago_pfc"], 2),
+            "volume_ponderado": round(d["vol_ponderado"], 2),
+            "presenca_ponderada": round(presenca, 2),
+            "n_emendas_territorio": d["n_territorio"],
+            "n_municipios_pfc": len(d["mun_auto"]),
+            "municipios_pfc": "; ".join(muns),
+            "grupos": "; ".join(grupos_atua),
+        })
+    ranking = pd.DataFrame(linhas_rk)
+    if not ranking.empty:
+        ranking = ranking.sort_values("score_pfc", ascending=False).reset_index(drop=True)
+        ranking.insert(0, "posicao", ranking.index + 1)
+
+    # excluídos: quem tem atividade no território mas NÃO é titular em exercício
+    excl = []
+    for nome, d, tit in candidatos:
+        if tit is not None:
+            continue
+        muns = sorted(d["mun_auto"], key=d["mun_auto"].get, reverse=True)
+        excl.append({"nome_pbi": _titulo(nome),
+                     "motivo": "não é titular em exercício (ALESP)",
+                     "autorizado_pfc": round(d["auto_pfc_edusoc"], 2),
+                     "n_emendas_territorio": d["n_territorio"],
+                     "municipios_pfc": "; ".join(muns)})
+    excluidos = pd.DataFrame(excl).sort_values(
+        "autorizado_pfc", ascending=False).reset_index(drop=True) if excl else pd.DataFrame(
+        columns=["nome_pbi", "motivo", "autorizado_pfc", "n_emendas_territorio", "municipios_pfc"])
+
+    # relatório de lacuna: municípios do PFC sem NENHUMA emenda edu/social
+    nome_orig = {}
+    for g in config["grupos"]:
+        for m in g["municipios"]:
+            nome_orig[_norm(m)] = (m, g["nome"], g["peso"])
+    linhas_sem = []
+    for mnorm, mc in mun_cobertura.items():
+        m, grupo, peso = nome_orig.get(mnorm, (mnorm, "", 0))
+        linhas_sem.append({"municipio": m, "grupo": grupo, "peso": peso,
+                           "n_emendas_edu_social": mc["n"],
+                           "autorizado_total": round(mc["autorizado"], 2),
+                           "n_deputados": len(mc["deputados"])})
+    cobertura = pd.DataFrame(linhas_sem).sort_values(
+        ["n_emendas_edu_social", "municipio"]).reset_index(drop=True)
+    sem_emenda = cobertura[cobertura["n_emendas_edu_social"] == 0].reset_index(drop=True)
+
+    # titulares que qualificariam por atividade mas ficaram abaixo do mínimo,
+    # e titulares sem nenhuma atividade no território — para o relatório
+    titulares_sem_territorio = sorted(
+        t["nome"] for k, t in titulares.items()
+        if k not in {_norm(n) for n, d, _ in candidatos})
+    abaixo_min = sorted(
+        tit["nome"] for n, d, tit in candidatos
+        if tit is not None and d["n_territorio"] < min_emendas)
+
+    relatorio = {
+        "titulares_total": len(titulares),
+        "no_ranking": len(ranking),
+        "excluidos_nao_titulares": len(excluidos),
+        "titulares_abaixo_do_minimo": abaixo_min,
+        "titulares_sem_atividade_territorio": len(titulares_sem_territorio),
+        "municipios_pfc_total": len(peso_mun),
+        "municipios_pfc_sem_emenda": list(sem_emenda["municipio"]),
+        "min_emendas": min_emendas,
+    }
+    return {"ranking": ranking, "excluidos": excluidos, "cobertura": cobertura,
+            "municipios_sem_emenda": sem_emenda, "relatorio": relatorio}
+
+
+def carregar_regioes_ibge(caminho: Path = REGIOES_IBGE_CSV) -> dict:
+    """Regiões Geográficas Imediatas 2017 (IBGE): {municipio_norm: (ri_id, ri_nome)}
+    e {ri_id: set(municipio_norm)}."""
+    if not caminho.exists():
+        return {"por_municipio": {}, "por_regiao": {}}
+    df = pd.read_csv(caminho, dtype=str).fillna("")
+    por_mun, por_regiao = {}, {}
+    for _, r in df.iterrows():
+        mn = _norm(r["municipio"])
+        ri = (r["regiao_imediata_id"], r["regiao_imediata_nome"])
+        por_mun[mn] = ri
+        por_regiao.setdefault(r["regiao_imediata_id"], set()).add(mn)
+    return {"por_municipio": por_mun, "por_regiao": por_regiao}
+
+
+def mapear_vizinhos(config: dict, regioes: dict) -> dict:
+    """Municípios VIZINHOS dos do PFC (mesma Região Imediata), com peso-base.
+
+    base = maior peso de grupo entre os municípios do PFC que estão na mesma
+    Região Imediata do vizinho. Vizinho que também é do PFC não entra (é direto).
+    Devolve {municipio_norm_vizinho: base}.
+    """
+    peso_mun = config["peso_por_municipio"]
+    por_mun = regioes["por_municipio"]
+    por_regiao = regioes["por_regiao"]
+    # peso-base por Região Imediata = maior peso de grupo entre os PFC dela
+    base_por_ri: dict[str, float] = {}
+    for mn, peso in peso_mun.items():
+        ri = por_mun.get(mn)
+        if ri:
+            base_por_ri[ri[0]] = max(base_por_ri.get(ri[0], 0.0), peso)
+    vizinhos = {}
+    for ri_id, base in base_por_ri.items():
+        for mn in por_regiao.get(ri_id, set()):
+            if mn not in peso_mun:            # exclui os próprios municípios do PFC
+                vizinhos[mn] = max(vizinhos.get(mn, 0.0), base)
+    return vizinhos
+
+
+def _perfil_deputados(linhas: list[dict], peso_mun: dict, vizinhos: dict | None = None,
+                      fator_vizinho: float = 0.0) -> dict:
+    """Perfil por deputado usado nas duas seções: volume/alinhamento GERAL de
+    edu/social (estado todo), o pé DIRETO no território do PFC e o pé VIZINHO
+    (mesma Região Imediata). Proximidade em 3 níveis:
+        direto  = valor * peso_grupo               (peso cheio)
+        vizinho = valor * base_ri * fator_vizinho   (fração do direto da região)
+        longe   = 0
+    """
+    vizinhos = vizinhos or {}
+    perfil: dict[str, dict] = {}
+    for l in linhas:
+        nome = str(l["parlamentar"]).strip()
+        if not nome:
+            continue
+        te = _e_transferencia_especial(l["objeto"])
+        area = classificar_area(l["orgao"], te)
+        pago = l["valor"] if _norm(l["estagio"]) == "pagas" else 0.0
+        p = perfil.setdefault(nome, {
+            "partidos": {}, "auto_geral": 0.0,          # total non-TE (denominador da fatia)
+            "edusoc_auto": 0.0, "edusoc_pago": 0.0,     # edu/social no estado todo
+            "mun_edusoc": set(),                          # municípios (estado) c/ edu/social
+            "terr_auto": 0.0, "terr_pond": 0.0,          # DIRETO: R$ e peso no território
+            "terr_emendas": 0, "terr_mun": {},
+            "viz_auto": 0.0, "viz_pond": 0.0, "viz_mun": {}})  # VIZINHO
+        if l["partido"]:
+            p["partidos"][l["partido"]] = p["partidos"].get(l["partido"], 0) + 1
+        if te:
+            continue
+        p["auto_geral"] += l["valor"]
+        if area in AREAS_PFC:
+            p["edusoc_auto"] += l["valor"]
+            p["edusoc_pago"] += pago
+            mnorm = _norm(l["municipio"])
+            if l["municipio"]:
+                p["mun_edusoc"].add(mnorm)
+            if mnorm in peso_mun:                        # DIRETO
+                peso = peso_mun[mnorm]
+                p["terr_auto"] += l["valor"]
+                p["terr_pond"] += l["valor"] * peso
+                p["terr_emendas"] += 1
+                p["terr_mun"][l["municipio"]] = peso
+            elif mnorm in vizinhos:                      # VIZINHO
+                base = vizinhos[mnorm]
+                p["viz_auto"] += l["valor"]
+                p["viz_pond"] += l["valor"] * base * fator_vizinho
+                p["viz_mun"][l["municipio"]] = round(base * fator_vizinho, 3)
+    return perfil
+
+
+def gerar_ranking_expansao(linhas: list[dict], titulares: dict, config: dict,
+                           curados: pd.DataFrame | None = None,
+                           regioes: dict | None = None) -> dict:
+    """Seção 2 — "Expansão" (cortejar).
+
+    Alvos de MÉDIO prazo: titulares com alto alinhamento e alto volume GERAL de
+    educação/social no estado, que ainda NÃO destinam (ou destinam pouco) para
+    os municípios do PFC. O contrário de caso perdido — emenda se redireciona a
+    cada ciclo, e quem já financia educação pesado é o mais fácil de trazer.
+
+    Score composto (0-100), pesos de [score_expansao] normalizados pelo maior
+    valor entre os elegíveis:
+      alinhamento  — fatia % edu/social do deputado (orientação);
+      volume_geral — R$ autorizado a edu/social em TODO o estado (potência);
+      proximidade  — FACILITADOR em 3 níveis: DIRETO (município do PFC, peso do
+                     grupo) + VIZINHO (mesma Região Imediata, fração do direto)
+                     + LONGE (zero). Quem já atua aqui ou ao lado é mais fácil.
+
+    Elegível = TITULAR em exercício + volume geral edu/social >= min_volume_geral
+    + NÃO ser da Seção 1 (menos que `min_emendas` do território). As duas seções
+    particionam pelos mesmos deputados: quem já está no território sai daqui.
+    """
+    sc = config["score_expansao"]
+    peso_mun = config["peso_por_municipio"]
+    min_vol = float(sc.get("min_volume_geral", 0))
+    fator_viz = float(sc.get("fator_vizinho", 0.45))
+    camada_min = float(sc.get("camada_prioritaria_min", 5_000_000))
+    min_emendas_terr = int(config["score_territorio"].get("min_emendas", 2))
+    vizinhos = mapear_vizinhos(config, regioes) if regioes else {}
+    perfil = _perfil_deputados(linhas, peso_mun, vizinhos, fator_viz)
+    idx_curados = construir_indice_nomes(curados) if curados is not None else {}
+
+    elegiveis = []
+    for nome, p in perfil.items():
+        tit = titulares.get(_norm(nome))
+        if tit is None:
+            continue                                   # só titulares em exercício
+        if p["edusoc_auto"] < min_vol:
+            continue                                   # volume geral irrelevante
+        if p["terr_emendas"] >= min_emendas_terr:
+            continue                                   # já é da Seção 1 (no território)
+        elegiveis.append((nome, p, tit))
+
+    def alin_de(p):
+        return (p["edusoc_auto"] / p["auto_geral"] * 100) if p["auto_geral"] else 0.0
+
+    max_alin = max((alin_de(p) for _, p, _ in elegiveis), default=0.0) or 1.0
+    max_vol = max((p["edusoc_auto"] for _, p, _ in elegiveis), default=0.0) or 1.0
+    # proximidade = direto + vizinho. O MESMO normalizador vale para o score com
+    # e sem vizinhança, para os dois serem comparáveis (sem viz <= com viz sempre).
+    max_prox = max((p["terr_pond"] + p["viz_pond"] for _, p, _ in elegiveis), default=0.0) or 1.0
+
+    def score(p, prox_pond):
+        return 100 * (sc["peso_alinhamento"] * (alin_de(p) / max_alin)
+                      + sc["peso_volume_geral"] * (p["edusoc_auto"] / max_vol)
+                      + sc["peso_proximidade"] * (prox_pond / max_prox))
+
+    linhas_rk = []
+    for nome, p, tit in elegiveis:
+        prox_total = p["terr_pond"] + p["viz_pond"]
+        s_novo = score(p, prox_total)
+        s_antigo = score(p, p["terr_pond"])   # contrafactual: se vizinho não contasse
+        muns_terr = sorted(p["terr_mun"], key=lambda m: p["terr_mun"][m], reverse=True)
+        muns_viz = sorted(p["viz_mun"], key=lambda m: p["viz_mun"][m], reverse=True)
+        vol = p["edusoc_auto"]
+        linhas_rk.append({
+            "deputado": tit["nome"],
+            "partido": tit["partido"] or (max(p["partidos"], key=p["partidos"].get)
+                                          if p["partidos"] else ""),
+            "na_planilha_fabio": casar_parlamentar(nome, idx_curados)[1] in ("exato", "normalizado"),
+            "camada": "alvo prioritário" if vol >= camada_min else "demais candidatos",
+            "score_expansao": round(s_novo, 1),
+            "score_sem_vizinhanca": round(s_antigo, 1),
+            "alinhamento_pct": round(alin_de(p), 1),
+            "autorizado_geral_edusoc": round(vol, 2),
+            "pago_geral_edusoc": round(p["edusoc_pago"], 2),
+            "n_municipios_edusoc": len(p["mun_edusoc"]),
+            "proximidade_ponderada": round(prox_total, 2),
+            "prox_direto": round(p["terr_pond"], 2),
+            "prox_vizinho": round(p["viz_pond"], 2),
+            "autorizado_direto": round(p["terr_auto"], 2),
+            "autorizado_vizinho": round(p["viz_auto"], 2),
+            "municipios_pfc_diretos": "; ".join(muns_terr),
+            "municipios_vizinhos": "; ".join(muns_viz),
+        })
+    rk = pd.DataFrame(linhas_rk)
+    if not rk.empty:
+        # ranks globais por score (para medir o efeito da vizinhança): antigo x novo
+        rk["posicao_sem_vizinhanca"] = rk["score_sem_vizinhanca"].rank(
+            ascending=False, method="first").astype(int)
+        rk["posicao_global"] = rk["score_expansao"].rank(
+            ascending=False, method="first").astype(int)
+        rk["subiu_por_vizinhanca"] = rk["posicao_sem_vizinhanca"] - rk["posicao_global"]
+        # ordenação final em CAMADAS (prioritários antes; score dentro de cada)
+        ordem_camada = {"alvo prioritário": 0, "demais candidatos": 1}
+        rk["_c"] = rk["camada"].map(ordem_camada)
+        rk = rk.sort_values(["_c", "score_expansao"], ascending=[True, False]).drop(
+            columns="_c").reset_index(drop=True)
+        rk.insert(0, "posicao", rk.index + 1)
+
+    relatorio = {
+        "elegiveis": len(rk),
+        "min_volume_geral": min_vol,
+        "fator_vizinho": fator_viz,
+        "prioritarios": int((rk["camada"] == "alvo prioritário").sum()) if not rk.empty else 0,
+        "com_pe_direto": int((rk["prox_direto"] > 0).sum()) if not rk.empty else 0,
+        "com_vizinhanca": int((rk["prox_vizinho"] > 0).sum()) if not rk.empty else 0,
+    }
+    return {"ranking": rk, "relatorio": relatorio}
+
+
+# --------------------------------------------------------------------------- #
 # Orquestração
 # --------------------------------------------------------------------------- #
 def gerar(anos=(2023, 2024, 2025), respostas: dict | None = None) -> dict:
@@ -524,9 +1032,25 @@ def gerar(anos=(2023, 2024, 2025), respostas: dict | None = None) -> dict:
         todas.extend(linhas)
 
     resultado = construir_base(todas, curados)
+    resultado["ranking"] = gerar_ranking(todas, curados)  # todos os 94, não só os 16
     SAIDA_BASE.parent.mkdir(parents=True, exist_ok=True)
     resultado["base"].to_csv(SAIDA_BASE, index=False, encoding="utf-8-sig")
     resultado["revisao"].to_csv(SAIDA_REVISAO, index=False, encoding="utf-8-sig")
+    resultado["ranking"].to_csv(SAIDA_RANKING, index=False, encoding="utf-8-sig")
+
+    # Ranking do PFC em duas seções (território e expansão), se houver config
+    if CONFIG_PFC.exists():
+        titulares, cfg = carregar_titulares(), carregar_config_pfc()
+        regioes = carregar_regioes_ibge()
+        pfc = gerar_ranking_pfc(todas, titulares, cfg, curados)                    # Seção 1
+        exp = gerar_ranking_expansao(todas, titulares, cfg, curados, regioes)      # Seção 2
+        pfc["ranking"].to_csv(SAIDA_RANKING_TERRITORIO, index=False, encoding="utf-8-sig")
+        exp["ranking"].to_csv(SAIDA_RANKING_EXPANSAO, index=False, encoding="utf-8-sig")
+        pfc["excluidos"].to_csv(SAIDA_EXCLUIDOS, index=False, encoding="utf-8-sig")
+        pfc["municipios_sem_emenda"].to_csv(SAIDA_MUN_SEM, index=False, encoding="utf-8-sig")
+        resultado["pfc"] = pfc
+        resultado["expansao"] = exp
+
     resultado["origens"] = origens
     return resultado
 
