@@ -24,6 +24,11 @@ venv/
 env/
 .env
 
+# Downloads manuais do painel Power BI (grandes e reproduzíveis) — só o LEIA-ME
+# é versionado; a base gerada (data/emendas_parlamentares.csv) essa sim entra.
+data/emendas_manual/*
+!data/emendas_manual/LEIA-ME.md
+
 # Saídas geradas pelo Radar (publicadas como artefatos no CI)
 radar/preview_local.csv
 radar/log_filtrados.csv
