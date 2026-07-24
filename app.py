@@ -15,7 +15,7 @@ import html
 import json
 import os
 import re
-from urllib.parse import quote_plus
+from urllib.parse import quote, quote_plus
 
 import pandas as pd
 import streamlit as st
@@ -74,8 +74,101 @@ USERS = {
 }
 
 PAGES = ["Visão geral", "Ranking", "Radar", "Funil", "Metodologia", "Verificação"]
-PAGE_ICONS = {"Visão geral": "📊", "Ranking": "📋", "Radar": "📡",
-              "Funil": "🗂️", "Metodologia": "🧮", "Verificação": "🔍"}
+
+# --------------------------------------------------------------------------- #
+# Ícones SVG da sidebar (design system: SVG limpo, nunca emoji)
+# ---------------------------------------------------------------------------
+# O rótulo de st.button é texto puro — não aceita HTML. Então o ícone entra por
+# CSS: cada botão vira alvo pela classe st-key-<chave> que o Streamlit põe no
+# container, e o SVG é desenhado como mask-image. Usar mask (e não background)
+# faz o ícone herdar a COR do texto: cinza no item normal, claro no item ativo,
+# sem precisar de uma segunda cópia do arquivo.
+# --------------------------------------------------------------------------- #
+_SVG_TRACO = ("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' "
+              "stroke='black' stroke-width='1.8' stroke-linecap='round' "
+              "stroke-linejoin='round'>{}</svg>")
+
+# Traçados 24x24 na mesma família visual dos SVGs já usados no hub e na topnav.
+ICONES = {
+    "visao-geral": ("<rect x='3' y='3' width='7' height='9' rx='1'/>"
+                    "<rect x='14' y='3' width='7' height='5' rx='1'/>"
+                    "<rect x='14' y='12' width='7' height='9' rx='1'/>"
+                    "<rect x='3' y='16' width='7' height='5' rx='1'/>"),
+    "ranking": "<path d='M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01'/>",
+    "radar": ("<circle cx='12' cy='12' r='9'/><circle cx='12' cy='12' r='3.5'/>"
+              "<path d='M12 12l6-6'/>"),
+    "funil": "<path d='M3 4h18l-7 8.5V19l-4 2v-8.5z'/>",
+    "metodologia": ("<path d='M4 7h16M4 13h16M4 19h16'/><circle cx='9' cy='7' r='2.2'/>"
+                    "<circle cx='16' cy='13' r='2.2'/><circle cx='7' cy='19' r='2.2'/>"),
+    "verificacao": "<circle cx='11' cy='11' r='7'/><path d='M20 20l-3.6-3.6'/>",
+    "deputados": ("<path d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/>"
+                  "<circle cx='12' cy='7' r='4'/>"),
+    "funil-negociacao": ("<rect x='3' y='4' width='5' height='16' rx='1'/>"
+                         "<rect x='10' y='4' width='5' height='11' rx='1'/>"
+                         "<rect x='17' y='4' width='5' height='7' rx='1'/>"),
+    "trocar-radar": ("<path d='M16 3l4 4-4 4'/><path d='M20 7H8a4 4 0 0 0-4 4'/>"
+                     "<path d='M8 21l-4-4 4-4'/><path d='M4 17h12a4 4 0 0 0 4-4'/>"),
+    # mesmo traçado do "Sair" da barra superior — os dois falam a mesma língua
+    "sair": "<path d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9'/>",
+    "local": ("<path d='M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z'/>"
+              "<circle cx='12' cy='10' r='3'/>"),
+    "bloqueado": ("<rect x='4' y='11' width='16' height='10' rx='2'/>"
+                  "<path d='M8 11V7a4 4 0 0 1 8 0v4'/>"),
+}
+
+
+def svg_icone(nome: str, classe: str = "ic") -> str:
+    """SVG inline, para onde eu mesmo monto o HTML (itens de Escopo, cards)."""
+    return (f"<svg class='{classe}' viewBox='0 0 24 24' fill='none' stroke='currentColor' "
+            f"stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'>"
+            f"{ICONES[nome]}</svg>")
+
+
+def _mask_url(nome: str) -> str:
+    """SVG -> data URI pronta para mask-image."""
+    return f"url(\"data:image/svg+xml,{quote(_SVG_TRACO.format(ICONES[nome]), safe='')}\")"
+
+
+def css_icones_botoes(mapa: dict) -> str:
+    """CSS que põe ícone nos botões da sidebar. mapa: {chave do botão: ícone}.
+
+    As propriedades base saem enumeradas por seletor (e não numa regra genérica
+    para todo botão da sidebar) de propósito: com mask-image ausente, o
+    background:currentColor apareceria como um quadrado sólido em qualquer botão
+    novo que alguém criasse sem ícone. Assim, botão sem entrada no mapa não
+    ganha ::before nenhum.
+    """
+    if not mapa:
+        return ""
+    alvo = "[data-testid='stMarkdownContainer']"
+    linhas = [
+        ", ".join(f".st-key-{k} .stButton>button {alvo}" for k in mapa) +
+        "{display:flex;align-items:center;gap:11px}",
+        ", ".join(f".st-key-{k} .stButton>button {alvo}::before" for k in mapa) +
+        "{content:'';width:17px;height:17px;flex:none;background:currentColor;opacity:.92;"
+        "-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;"
+        "-webkit-mask-size:contain;mask-size:contain;"
+        "-webkit-mask-position:center;mask-position:center}",
+    ]
+    for chave, icone in mapa.items():
+        u = _mask_url(icone)
+        linhas.append(f".st-key-{chave} .stButton>button {alvo}::before"
+                      f"{{-webkit-mask-image:{u};mask-image:{u}}}")
+    return "\n".join(linhas)
+
+
+def slug(texto: str) -> str:
+    """'Funil de negociação' -> 'funil-de-negociacao'.
+
+    As chaves dos botões viram classe CSS (st-key-<chave>), então precisam ser
+    ASCII e sem espaço — senão o seletor não casa.
+    """
+    t = str(texto).lower()
+    for de, para in (("ãâáà", "a"), ("éêè", "e"), ("íî", "i"), ("óôõ", "o"),
+                     ("úü", "u"), ("ç", "c")):
+        for c in de:
+            t = t.replace(c, para)
+    return re.sub(r"[^a-z0-9]+", "-", t).strip("-")
 
 # --------------------------------------------------------------------------- #
 # Tema escuro premium + CSS custom
@@ -423,7 +516,8 @@ body{background:var(--bg)}
    estilizado como rede de segurança caso algum estado residual a recolha. */
 [data-testid="stSidebarCollapseButton"]{display:none!important}
 [data-testid="stSidebar"]>div:first-child{padding:18px 14px 16px}
-[data-testid="stSidebar"] [data-testid="stVerticalBlock"]{gap:2px}
+/* respiro entre itens: 2px deixava a lista com cara de bloco único */
+[data-testid="stSidebar"] [data-testid="stVerticalBlock"]{gap:6px}
 .sb-brand{display:flex;align-items:center;gap:12px;padding:2px 8px 14px}
 .rings{width:36px;height:36px;position:relative;flex:none}
 .rings span{position:absolute;inset:0;border-radius:50%;border:1.7px solid;animation:spin 20s linear infinite}
@@ -434,8 +528,9 @@ body{background:var(--bg)}
 .sb-brand .bt{font-weight:700;font-size:15.5px;letter-spacing:-.2px;line-height:1.1;color:var(--ink)}
 .sb-brand .bt small{display:block;font-family:var(--mono);font-size:10px;color:var(--accent);
   letter-spacing:.5px;margin-top:4px;font-weight:500}
+/* cabeçalho de seção: o padding-top é o que separa um grupo do anterior */
 .sb-sec{font-family:var(--mono);font-size:10.5px;letter-spacing:1.4px;color:var(--dim);
-  text-transform:uppercase;padding:16px 8px 7px}
+  text-transform:uppercase;padding:22px 8px 9px}
 [data-testid="stSidebar"] .stButton>button{width:100%;display:flex;justify-content:flex-start;text-align:left;
   background:transparent;border:none;color:var(--muted);font-size:14px;font-weight:500;
   padding:10px 14px;border-radius:9px;position:relative;box-shadow:none;transition:.15s var(--ease)}
@@ -451,7 +546,7 @@ body{background:var(--bg)}
   box-shadow:0 0 10px var(--accent)}
 /* escopo desabilitado (Federal/Senadores em breve): visível mas claramente inativo */
 [data-testid="stSidebar"] .stButton>button:disabled{opacity:.4;cursor:not-allowed}
-.sb-foot{border-top:1px solid var(--line);margin-top:16px;padding:14px 8px 2px}
+.sb-foot{border-top:1px solid var(--line);margin-top:26px;padding:16px 8px 6px}
 .sf{font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;align-items:center;
   gap:9px;margin-bottom:9px;letter-spacing:.3px}
 .sf .d{width:7px;height:7px;border-radius:50%;flex:none}
@@ -1460,9 +1555,13 @@ _EMENDAS_CHROME_CSS = """
 .topbar .cr b{color:#8B7BF0}
 .topbar .live{color:#8B7BF0;background:rgba(139,123,240,.12);border-color:rgba(139,123,240,.3)}
 .topbar .avatar2{background:linear-gradient(135deg,#8B7BF0,#c0b5ff)}
-/* itens de Escopo (informativos) */
-.esc-item{display:flex;align-items:center;gap:9px;padding:9px 14px;border-radius:9px;
-  font-size:13.5px;font-weight:500;margin-bottom:2px;position:relative}
+/* itens de Escopo (informativos). Vivem num st.markdown só, então o gap do
+   stVerticalBlock não os alcança: o respiro vem do margin-bottom, alinhado
+   com os 6px de gap dos botões acima para o ritmo não quebrar na metade. */
+.esc-item{display:flex;align-items:center;gap:11px;padding:10px 14px;border-radius:9px;
+  font-size:13.5px;font-weight:500;margin-bottom:6px;position:relative}
+.esc-item:last-child{margin-bottom:0}
+.esc-item .ic{width:17px;height:17px;flex:none;opacity:.92}
 .esc-item .esc-leg{margin-left:auto;font-family:var(--mono);font-size:10px;
   letter-spacing:.4px;text-transform:uppercase}
 .esc-item.esc-on{background:rgba(139,123,240,.13);color:var(--ink);
@@ -1565,9 +1664,12 @@ def dlg_em_articulacao(lista):
 
 # Navegação do painel de Emendas (páginas próprias + escopo).
 EMENDA_PAGES = ["Visão geral", "Deputados", "Funil de negociação"]
-EMENDA_ICONS = {"Visão geral": "📊", "Deputados": "👤", "Funil de negociação": "🗂️"}
-EMENDA_ESCOPO = [("Estadual", "ALESP · 16", True), ("Federal", "em breve", False),
+EMENDA_ESCOPO = [("Estadual", "ALESP · {n}", True), ("Federal", "em breve", False),
                  ("Senadores", "em breve", False)]
+# chave do botão -> ícone (a chave vira a classe st-key-<chave> que o CSS usa)
+EMENDA_ICONES = {"emnav_visao-geral": "visao-geral", "emnav_deputados": "deputados",
+                 "emnav_funil-de-negociacao": "funil-negociacao",
+                 "emenda_trocar": "trocar-radar", "emenda_logout": "sair"}
 
 
 def ir_para_emenda(pagina: str):
@@ -1578,6 +1680,8 @@ def render_sidebar_emendas():
     _forcar_sidebar_visivel()
     atual = st.session_state.get("emenda_page", "Visão geral")
     with st.sidebar:
+        st.markdown(f"<style>{css_icones_botoes(EMENDA_ICONES)}</style>",
+                    unsafe_allow_html=True)
         st.markdown(
             '<div class="sb-brand em-brand"><div class="rings em-rings"><span></span><span></span><span></span></div>'
             '<div class="bt">Futuro Cientista<small>EMENDAS PARLAMENTARES</small></div></div>',
@@ -1585,11 +1689,10 @@ def render_sidebar_emendas():
         )
         # Articulação — páginas navegáveis, com destaque da atual (igual à Captação)
         st.markdown('<div class="sb-sec">Articulação</div>', unsafe_allow_html=True)
+        n_deps = _contagens_emendas(_deputados_ordenados())["deputados"]
         for p in EMENDA_PAGES:
-            rotulo = f"{EMENDA_ICONS[p]} {p}"
-            if p == "Deputados":
-                rotulo += " · 16"
-            st.button(rotulo, key=f"emnav_{p}", use_container_width=True,
+            rotulo = f"{p} · {n_deps}" if p == "Deputados" else p
+            st.button(rotulo, key=f"emnav_{slug(p)}", use_container_width=True,
                       type="primary" if atual == p else "secondary",
                       on_click=ir_para_emenda, args=(p,))
         # Escopo — Estadual ativo; Federal/Senadores em breve. Markdown (não
@@ -1597,16 +1700,16 @@ def render_sidebar_emendas():
         st.markdown('<div class="sb-sec">Escopo</div>', unsafe_allow_html=True)
         escopo_html = ""
         for nome, legenda, ativo in EMENDA_ESCOPO:
-            cls, ic = ("esc-on", "📍") if ativo else ("esc-off", "🔒")
-            escopo_html += (f'<div class="esc-item {cls}">{ic} {esc(nome)}'
-                            f'<span class="esc-leg">{esc(legenda)}</span></div>')
+            cls, ic = ("esc-on", "local") if ativo else ("esc-off", "bloqueado")
+            escopo_html += (f'<div class="esc-item {cls}">{svg_icone(ic)}{esc(nome)}'
+                            f'<span class="esc-leg">{esc(legenda.format(n=n_deps))}</span></div>')
         st.markdown(escopo_html, unsafe_allow_html=True)
         st.markdown('<div class="sb-foot"><div class="sf"><span class="d o"></span>'
-                    '16 DEPUTADOS · ALESP</div></div>', unsafe_allow_html=True)
-        if st.button("🛰️ Trocar radar", key="emenda_trocar", use_container_width=True):
+                    f'{n_deps} DEPUTADOS · ALESP</div></div>', unsafe_allow_html=True)
+        if st.button("Trocar radar", key="emenda_trocar", use_container_width=True):
             st.session_state["radar_escolhido"] = None
             st.rerun()
-        if st.button("🔓 Sair", key="emenda_logout", use_container_width=True):
+        if st.button("Sair", key="emenda_logout", use_container_width=True):
             for k in ("user", "page", "login_email", "login_senha", "radar_escolhido"):
                 st.session_state.pop(k, None)
             st.rerun()
@@ -1946,10 +2049,13 @@ if st.session_state["radar_escolhido"] == "emendas":
 _n_naoverif = int((~df[COL_VERIF].apply(verificada_ok)).sum()) if TOTAL else 0
 NAV_SECOES = [("Operação", ["Visão geral", "Radar", "Ranking", "Funil"]),
               ("Dados", ["Metodologia", "Verificação"])]
+# chave do botão -> ícone (mesma mecânica da sidebar de Emendas)
+NAV_ICONES = {**{f"nav_{slug(p)}": slug(p) for p in PAGES},
+              "trocar_radar": "trocar-radar", "logout": "sair"}
 
 
 def _rotulo_nav(p: str) -> str:
-    rotulo = f"{PAGE_ICONS[p]} {p}"
+    rotulo = p
     if p == "Ranking":
         rotulo += f" · {TOTAL}"
     elif p == "Verificação" and _n_naoverif:
@@ -1960,6 +2066,7 @@ def _rotulo_nav(p: str) -> str:
 def render_sidebar():
     _forcar_sidebar_visivel()
     with st.sidebar:
+        st.markdown(f"<style>{css_icones_botoes(NAV_ICONES)}</style>", unsafe_allow_html=True)
         st.markdown(
             '<div class="sb-brand"><div class="rings"><span></span><span></span><span></span></div>'
             '<div class="bt">Futuro Cientista<small>CAPTAÇÃO PRIVADA</small></div></div>',
@@ -1968,7 +2075,7 @@ def render_sidebar():
         for secao, paginas in NAV_SECOES:
             st.markdown(f'<div class="sb-sec">{secao}</div>', unsafe_allow_html=True)
             for p in paginas:
-                st.button(_rotulo_nav(p), key=f"nav_{p}", use_container_width=True,
+                st.button(_rotulo_nav(p), key=f"nav_{slug(p)}", use_container_width=True,
                           type="primary" if st.session_state["page"] == p else "secondary",
                           on_click=ir_para, args=(p,))
         status = ('<div class="sf"><span class="d g"></span>SHEETS CONECTADO</div>'
@@ -1977,10 +2084,10 @@ def render_sidebar():
         st.markdown(f'<div class="sb-foot">{status}'
                     '<div class="sf"><span class="d n"></span>ÚLTIMO SCAN · 06:00</div></div>',
                     unsafe_allow_html=True)
-        if st.button("🛰️ Trocar radar", key="trocar_radar", use_container_width=True):
+        if st.button("Trocar radar", key="trocar_radar", use_container_width=True):
             st.session_state["radar_escolhido"] = None
             st.rerun()
-        if st.button("🔓 Sair", key="logout", use_container_width=True):
+        if st.button("Sair", key="logout", use_container_width=True):
             for k in ("user", "page", "login_email", "login_senha", "radar_escolhido"):
                 st.session_state.pop(k, None)
             st.rerun()
