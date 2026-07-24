@@ -129,14 +129,20 @@ def _mask_url(nome: str) -> str:
     return f"url(\"data:image/svg+xml,{quote(_SVG_TRACO.format(ICONES[nome]), safe='')}\")"
 
 
-def css_icones_botoes(mapa: dict) -> str:
-    """CSS que põe ícone nos botões da sidebar. mapa: {chave do botão: ícone}.
+def css_icones_botoes(mapa: dict, rotulos: dict | None = None) -> str:
+    """CSS dos botões da sidebar. mapa: {chave do botão: ícone}.
 
-    As propriedades base saem enumeradas por seletor (e não numa regra genérica
-    para todo botão da sidebar) de propósito: com mask-image ausente, o
-    background:currentColor apareceria como um quadrado sólido em qualquer botão
-    novo que alguém criasse sem ícone. Assim, botão sem entrada no mapa não
-    ganha ::before nenhum.
+    Faz três coisas, todas escopadas às chaves do mapa:
+      1. desenha o ícone (::before do container de markdown, via mask-image);
+      2. no modo ícone, esconde o texto do rótulo;
+      3. mostra o nome como tooltip no hover (::after do botão), a partir de
+         `rotulos` = {chave: nome}.
+
+    Tudo sai enumerado por seletor, e não numa regra genérica para todo botão
+    da sidebar, de propósito: sem mask-image o background:currentColor viraria
+    um quadrado sólido, e sem ícone o botão ficaria vazio ao esconder o texto.
+    Assim, botão fora do mapa continua com o texto e sem ::before — feio, mas
+    visível, que é o modo certo de falhar.
     """
     if not mapa:
         return ""
@@ -149,11 +155,36 @@ def css_icones_botoes(mapa: dict) -> str:
         "-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;"
         "-webkit-mask-size:contain;mask-size:contain;"
         "-webkit-mask-position:center;mask-position:center}",
+        # modo ícone: o texto some (o modo expandido devolve em _SIDEBAR_EXPANDIDA_CSS)
+        ", ".join(f".st-key-{k} .stButton>button {alvo}>p" for k in mapa) +
+        "{display:none}",
     ]
     for chave, icone in mapa.items():
         u = _mask_url(icone)
         linhas.append(f".st-key-{chave} .stButton>button {alvo}::before"
                       f"{{-webkit-mask-image:{u};mask-image:{u}}}")
+    if rotulos:
+        # tooltip: balão em ::after, posicionado ao lado do botão. Depende do
+        # overflow:visible declarado no bloco SIDEBAR do CSS global — sem ele
+        # os 60px cortam o balão.
+        chaves = [k for k in mapa if k in rotulos]
+        if chaves:
+            linhas += [
+                ", ".join(f".st-key-{k} .stButton>button" for k in chaves) +
+                "{position:relative}",
+                ", ".join(f".st-key-{k} .stButton>button::after" for k in chaves) +
+                "{position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);"
+                "background:var(--surface2);color:var(--ink);border:1px solid var(--line2);"
+                "border-radius:8px;padding:7px 11px;font-size:12.5px;font-weight:500;"
+                "white-space:nowrap;pointer-events:none;z-index:1200;"
+                "box-shadow:0 8px 24px rgba(0,0,0,.45);display:none}",
+                # display, não opacity/visibility: é o padrão que funciona neste projeto
+                ", ".join(f".st-key-{k} .stButton>button:hover::after" for k in chaves) +
+                "{display:block}",
+            ]
+            for chave in chaves:
+                nome = str(rotulos[chave]).replace("\\", "").replace('"', "'")
+                linhas.append(f'.st-key-{chave} .stButton>button::after{{content:"{nome}"}}')
     return "\n".join(linhas)
 
 
@@ -507,34 +538,56 @@ body{background:var(--bg)}
 
 /* ============ SIDEBAR (maquete pfc_app_v3) ============ */
 /* ATENÇÃO — leia antes de mexer nas regras abaixo.
-   As duas regras seguintes são o estado PADRÃO: a sidebar aberta e imune ao
-   colapso acidental do Streamlit (o bug de ela sumir na transição hub ->
-   painel). Elas NÃO significam mais que a barra é fixa: desde que existe o
-   botão de recolher, o recolhimento é INTENCIONAL e controlado pelo Python
-   (st.session_state["sidebar_recolhida"]).
-   Como o recolhimento acontece: _SIDEBAR_RECOLHIDA_CSS sobrescreve estas
-   regras, e só funciona porque é injetado DEPOIS (em _forcar_sidebar_visivel,
-   no render de cada sidebar) e repete os seletores para empatar a
-   especificidade do [aria-expanded="false"] abaixo.
-   Ou seja: a ordem de injeção faz parte do contrato. Quem mover essa
-   injeção para antes deste bloco, ou baixar a especificidade de lá, quebra o
-   botão de recolher sem nenhum erro aparecer — a barra simplesmente não some.
-   Ver: _SIDEBAR_RECOLHIDA_CSS, _forcar_sidebar_visivel, render_topnav. */
+   A sidebar tem DOIS modos e o padrão é o estreito:
+     ÍCONES (60px)   -> este bloco. Só os SVGs, com tooltip no hover.
+     EXPANDIDA (250px)-> _SIDEBAR_EXPANDIDA_CSS, que sobrescreve este bloco.
+   Quem manda é o Python: st.session_state["sidebar_expandida"], alternado pelo
+   botão .tn-sb da barra fixa superior. A barra NUNCA some por completo — foi
+   decisão de projeto: menos estados, e nenhum caminho em que o usuário fique
+   sem navegação (antes existia um modo "escondida", aposentado de propósito).
+
+   O CONTRATO que faz o modo expandido funcionar (dois lados frágeis):
+     1. ORDEM — _SIDEBAR_EXPANDIDA_CSS só vence as larguras !important daqui
+        porque é injetado DEPOIS, em _preparar_sidebar(), no render de cada
+        sidebar. Injetado antes deste bloco, o botão de expandir não faz nada.
+     2. ESPECIFICIDADE — a variante [aria-expanded="false"] logo abaixo é mais
+        específica; lá os seletores são repetidos para empatar com ela.
+   Quebrar qualquer um dos dois NÃO gera erro: a barra apenas deixa de expandir,
+   e o bug parece estar no botão.
+   Ver: _SIDEBAR_EXPANDIDA_CSS, _preparar_sidebar, render_topnav. */
 [data-testid="stSidebar"]{background:var(--surface)!important;border-right:1px solid var(--line);
-  width:250px!important;min-width:250px!important;
-  transform:none!important;margin-left:0!important;visibility:visible!important}
+  width:60px!important;min-width:60px!important;max-width:60px!important;
+  transform:none!important;margin-left:0!important;visibility:visible!important;
+  transition:width .18s var(--ease),min-width .18s var(--ease),max-width .18s var(--ease)}
 [data-testid="stSidebar"][aria-expanded="false"]{transform:none!important;margin-left:0!important}
-/* O botão nativo de recolher fica escondido porque quem recolhe é o nosso
-   controle na barra fixa superior (.tn-sb): ele vive fora da sidebar, então
-   continua clicável com ela recolhida — o nativo, não. Dois controles com
-   comportamentos diferentes só confundiriam.
+/* o tooltip do modo ícone precisa vazar dos 60px: nenhum ancestral pode cortar */
+[data-testid="stSidebar"],
+[data-testid="stSidebar"]>div:first-child,
+[data-testid="stSidebar"] [data-testid="stVerticalBlock"],
+[data-testid="stSidebar"] .stElementContainer,
+[data-testid="stSidebar"] .stButton{overflow:visible!important}
+/* O botão nativo de recolher fica escondido porque quem controla a barra é o
+   nosso .tn-sb, na barra fixa superior: ele vive fora da sidebar, então segue
+   clicável em qualquer modo. Dois controles com comportamentos diferentes só
+   confundiriam.
    O botão nativo de REABRIR (stExpandSidebarButton) continua visível e
    estilizado mais abaixo: é a rede de segurança para quando o Streamlit
-   colapsa a barra por conta própria. */
+   colapsa a barra por conta própria (o bug dela sumir). */
 [data-testid="stSidebarCollapseButton"]{display:none!important}
-[data-testid="stSidebar"]>div:first-child{padding:18px 14px 16px}
+[data-testid="stSidebar"]>div:first-child{padding:18px 8px 16px}
 /* respiro entre itens: 2px deixava a lista com cara de bloco único */
 [data-testid="stSidebar"] [data-testid="stVerticalBlock"]{gap:6px}
+
+/* ---- modo ÍCONES: some o texto, centraliza, e o nome vira tooltip ---- */
+[data-testid="stSidebar"] .stButton>button{justify-content:center!important;padding:10px 0!important}
+[data-testid="stSidebar"] .sb-brand{justify-content:center;padding:2px 0 14px}
+[data-testid="stSidebar"] .sb-brand .bt{display:none}
+/* cabeçalho de seção vira um traço divisor (o rótulo não cabe em 60px) */
+[data-testid="stSidebar"] .sb-sec{height:1px;padding:0;margin:12px 6px;overflow:hidden;
+  background:var(--line);font-size:0;letter-spacing:0}
+/* rodapé: fica só o ponto de status, o texto sai */
+[data-testid="stSidebar"] .sb-foot{margin-top:18px;padding:14px 0 4px}
+[data-testid="stSidebar"] .sf{justify-content:center;font-size:0;gap:0}
 .sb-brand{display:flex;align-items:center;gap:12px;padding:2px 8px 14px}
 .rings{width:36px;height:36px;position:relative;flex:none}
 .rings span{position:absolute;inset:0;border-radius:50%;border:1.7px solid;animation:spin 20s linear infinite}
@@ -1588,6 +1641,10 @@ _EMENDAS_CHROME_CSS = """
 .esc-item.esc-on .esc-leg{color:#8B7BF0}
 .esc-item.esc-off{color:var(--dim);opacity:.6}
 .esc-item.esc-off .esc-leg{color:var(--dim)}
+/* modo ÍCONE (padrão): fica só o SVG, centralizado. O nome vem do title nativo
+   — aqui não dá para usar o balão em ::after, que já é a barrinha do item ativo. */
+.esc-item{justify-content:center;padding:10px 0;gap:0}
+.esc-item .esc-nome, .esc-item .esc-leg{display:none}
 </style>
 """
 
@@ -1618,39 +1675,55 @@ _SIDEBAR_FIX_JS = """
 """
 
 
-# Recolhida: zera a largura e desliza para fora — o MESMO mecanismo do colapso
-# nativo do Streamlit (min/max-width 0 + translateX), por isso o conteúdo reflui
-# sozinho e não brigamos com o layout dele.
+# Modo EXPANDIDO (250px, com os nomes). O padrão é o modo ícone, no CSS global;
+# este bloco é o override — desfaz a largura estreita e devolve tudo que o modo
+# ícone esconde: rótulo dos botões, marca, cabeçalho de seção e rodapé.
 #
 # CONTRATO com o bloco SIDEBAR do CSS global (procure por "ATENÇÃO" lá):
-#   1. ORDEM — o CSS global fixa width/min-width:250px!important e
-#      transform:none!important. Estas regras só vencem porque são injetadas
-#      DEPOIS, no render de cada sidebar. Injetar antes = botão sem efeito.
+#   1. ORDEM — lá a largura é 60px !important. Estas regras só vencem porque são
+#      injetadas DEPOIS, em _preparar_sidebar(), no render de cada sidebar.
+#      Injetar antes daquele bloco = o botão de expandir não faz nada.
 #   2. ESPECIFICIDADE — lá existe a variante [aria-expanded="false"], mais
-#      específica. Os três seletores abaixo repetem o atributo para empatar com
-#      ela; com um seletor só, a barra encolheria mas não sairia da tela.
-# Quebrar qualquer um dos dois não gera erro: a barra simplesmente não recolhe.
-_SIDEBAR_RECOLHIDA_CSS = """
+#      específica. Os três seletores de largura abaixo repetem o atributo para
+#      empatar com ela.
+# Quebrar qualquer um dos dois não gera erro: a barra apenas deixa de expandir.
+_SIDEBAR_EXPANDIDA_CSS = """
 <style>
 [data-testid="stSidebar"],
 [data-testid="stSidebar"][aria-expanded="true"],
 [data-testid="stSidebar"][aria-expanded="false"]{
-  min-width:0!important;max-width:0!important;width:0!important;
-  transform:translateX(-260px)!important;overflow:hidden!important;
-  border-right:none!important}
+  width:250px!important;min-width:250px!important;max-width:250px!important}
+[data-testid="stSidebar"]>div:first-child{padding-left:14px!important;padding-right:14px!important}
+/* devolve o texto dos botões e alinha à esquerda */
+[data-testid="stSidebar"] .stButton>button{justify-content:flex-start!important;
+  padding:10px 14px!important}
+[data-testid="stSidebar"] .stButton>button [data-testid="stMarkdownContainer"]>p{display:block!important}
+/* com o nome à vista, o tooltip vira ruído */
+[data-testid="stSidebar"] .stButton>button::after{display:none!important}
+/* marca, cabeçalho de seção e rodapé voltam ao formato com texto */
+[data-testid="stSidebar"] .sb-brand{justify-content:flex-start;padding:2px 8px 14px}
+[data-testid="stSidebar"] .sb-brand .bt{display:block}
+[data-testid="stSidebar"] .sb-sec{height:auto;padding:22px 8px 9px;margin:0;background:none;
+  font-size:10.5px;letter-spacing:1.4px;overflow:visible}
+[data-testid="stSidebar"] .sb-foot{margin-top:26px;padding:16px 8px 6px}
+[data-testid="stSidebar"] .sf{justify-content:flex-start;font-size:11px;gap:9px}
+/* Escopo (só Emendas): volta o nome e a legenda */
+[data-testid="stSidebar"] .esc-item{justify-content:flex-start;padding:10px 14px;gap:11px}
+[data-testid="stSidebar"] .esc-item .esc-nome{display:inline}
+[data-testid="stSidebar"] .esc-item .esc-leg{display:inline;margin-left:auto}
 </style>
 """
 
 
-def _forcar_sidebar_visivel():
-    """Recuperação automática do bug da sidebar não montada.
+def _preparar_sidebar():
+    """Aplica o modo da sidebar e roda a recuperação do bug dela não montar.
 
-    Só roda quando a barra DEVE estar aberta: se o usuário recolheu de propósito,
-    esta rotina reabriria a barra no rerun seguinte e o botão pareceria quebrado.
+    A recuperação roda SEMPRE: como a barra nunca fica escondida por completo
+    (o modo estreito é o padrão), não existe mais o caso em que forçá-la a
+    aparecer contrariaria uma escolha do usuário.
     """
-    if st.session_state.get("sidebar_recolhida"):
-        st.markdown(_SIDEBAR_RECOLHIDA_CSS, unsafe_allow_html=True)
-        return
+    if st.session_state.get("sidebar_expandida"):
+        st.markdown(_SIDEBAR_EXPANDIDA_CSS, unsafe_allow_html=True)
     components.html(_SIDEBAR_FIX_JS, height=0)
 
 
@@ -1719,6 +1792,9 @@ EMENDA_ESCOPO = [("Estadual", "ALESP · {n}", True), ("Federal", "em breve", Fal
 EMENDA_ICONES = {"emnav_visao-geral": "visao-geral", "emnav_deputados": "deputados",
                  "emnav_funil-de-negociacao": "funil-negociacao",
                  "emenda_trocar": "trocar-radar", "emenda_logout": "sair"}
+# chave do botão -> nome no tooltip do modo ícone
+EMENDA_ROTULOS = {**{f"emnav_{slug(p)}": p for p in EMENDA_PAGES},
+                  "emenda_trocar": "Trocar radar", "emenda_logout": "Sair"}
 
 
 def ir_para_emenda(pagina: str):
@@ -1726,10 +1802,10 @@ def ir_para_emenda(pagina: str):
 
 
 def render_sidebar_emendas():
-    _forcar_sidebar_visivel()
+    _preparar_sidebar()
     atual = st.session_state.get("emenda_page", "Visão geral")
     with st.sidebar:
-        st.markdown(f"<style>{css_icones_botoes(EMENDA_ICONES)}</style>",
+        st.markdown(f"<style>{css_icones_botoes(EMENDA_ICONES, EMENDA_ROTULOS)}</style>",
                     unsafe_allow_html=True)
         st.markdown(
             '<div class="sb-brand em-brand"><div class="rings em-rings"><span></span><span></span><span></span></div>'
@@ -1750,7 +1826,9 @@ def render_sidebar_emendas():
         escopo_html = ""
         for nome, legenda, ativo in EMENDA_ESCOPO:
             cls, ic = ("esc-on", "local") if ativo else ("esc-off", "bloqueado")
-            escopo_html += (f'<div class="esc-item {cls}">{svg_icone(ic)}{esc(nome)}'
+            # nome em <span> (e não texto solto) para o modo ícone conseguir escondê-lo
+            escopo_html += (f'<div class="esc-item {cls}" title="{esc(nome)}">{svg_icone(ic)}'
+                            f'<span class="esc-nome">{esc(nome)}</span>'
                             f'<span class="esc-leg">{esc(legenda.format(n=n_deps))}</span></div>')
         st.markdown(escopo_html, unsafe_allow_html=True)
         st.markdown('<div class="sb-foot"><div class="sf"><span class="d o"></span>'
@@ -1995,16 +2073,18 @@ export default function(component){
       (atual ? ck : '') + '</button>';
   }
 
-  // ícone do controle da sidebar: o chevron aponta para onde a barra vai
-  const sbOff = !!d.sb_off;
+  // controle da sidebar: alterna ícones (60px) <-> nomes (250px). A barra nunca
+  // some — o chevron aponta para o lado em que ela vai se mover.
+  const sbAberta = !!d.sb_aberta;
   const iSb = '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/>' +
-    '<path d="M9 4v16"/><path d="M' + (sbOff ? '13.8 9.5 16.3 12l-2.5 2.5' : '16.3 9.5 13.8 12l2.5 2.5') + '"/></svg>';
-  const sbTitulo = sbOff ? 'Reexibir a barra lateral' : 'Recolher a barra lateral';
+    '<path d="M9 4v16"/><path d="M' + (sbAberta ? '16.3 9.5 13.8 12l2.5 2.5' : '13.8 9.5 16.3 12l-2.5 2.5') + '"/></svg>';
+  const sbTitulo = sbAberta ? 'Encolher a barra lateral (só ícones)'
+                            : 'Expandir a barra lateral (ver os nomes)';
 
   root.innerHTML =
     '<div class="tn-left">' +
     '<button class="tn-sb" data-act="sidebar" title="' + sbTitulo + '" aria-label="' + sbTitulo +
-    '" aria-expanded="' + (sbOff ? 'false' : 'true') + '">' + iSb + '</button>' +
+    '" aria-expanded="' + (sbAberta ? 'true' : 'false') + '">' + iSb + '</button>' +
     '<div class="tn-crumb"><b>' + esc((nomeAtual || '').toUpperCase()) + '</b>' +
     (d.crumb ? ' · ' + esc(d.crumb) : '') + '</div></div>' +
     '<div class="tn-right"><div class="tn-sel">' +
@@ -2061,7 +2141,7 @@ def render_topnav(radar_atual: str, crumb: str = ""):
     res = _topnav_v2(
         data={"radar": radar_atual, "crumb": crumb,
               "inicial": USER.get("inicial", ""), "email": USER.get("email", ""),
-              "sb_off": bool(st.session_state.get("sidebar_recolhida"))},
+              "sb_aberta": bool(st.session_state.get("sidebar_expandida"))},
         key="topnav", on_acao_change=lambda: None)
     ac = getattr(res, "acao", None)
     if not isinstance(ac, dict):
@@ -2077,9 +2157,9 @@ def render_topnav(radar_atual: str, crumb: str = ""):
         st.session_state["radar_escolhido"] = None
         st.rerun()
     elif t == "sidebar":
-        # o Python é o dono do estado: assim o rerun seguinte já sabe se deve
-        # aplicar o CSS de recolhida e se pode rodar a recuperação automática
-        st.session_state["sidebar_recolhida"] = not st.session_state.get("sidebar_recolhida")
+        # o Python é o dono do estado: o rerun seguinte injeta (ou não) o CSS
+        # do modo expandido. Padrão ausente = modo ícone.
+        st.session_state["sidebar_expandida"] = not st.session_state.get("sidebar_expandida")
         st.rerun()
     elif t == "sair":
         for k in ("user", "page", "login_email", "login_senha", "radar_escolhido"):
@@ -2126,6 +2206,9 @@ NAV_SECOES = [("Operação", ["Visão geral", "Radar", "Ranking", "Funil"]),
 # chave do botão -> ícone (mesma mecânica da sidebar de Emendas)
 NAV_ICONES = {**{f"nav_{slug(p)}": slug(p) for p in PAGES},
               "trocar_radar": "trocar-radar", "logout": "sair"}
+# chave do botão -> nome no tooltip do modo ícone
+NAV_ROTULOS = {**{f"nav_{slug(p)}": p for p in PAGES},
+               "trocar_radar": "Trocar radar", "logout": "Sair"}
 
 
 def _rotulo_nav(p: str) -> str:
@@ -2138,9 +2221,10 @@ def _rotulo_nav(p: str) -> str:
 
 
 def render_sidebar():
-    _forcar_sidebar_visivel()
+    _preparar_sidebar()
     with st.sidebar:
-        st.markdown(f"<style>{css_icones_botoes(NAV_ICONES)}</style>", unsafe_allow_html=True)
+        st.markdown(f"<style>{css_icones_botoes(NAV_ICONES, NAV_ROTULOS)}</style>",
+                    unsafe_allow_html=True)
         st.markdown(
             '<div class="sb-brand"><div class="rings"><span></span><span></span><span></span></div>'
             '<div class="bt">Futuro Cientista<small>CAPTAÇÃO PRIVADA</small></div></div>',
