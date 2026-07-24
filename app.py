@@ -118,9 +118,18 @@ html, body, [class*="css"]{font-family:var(--body);line-height:1.6;}
 [data-testid="stHeader"]{background:transparent!important;box-shadow:none!important;}
 [data-testid="stToolbar"]{background:transparent!important;}
 #MainMenu, footer, [data-testid="stDecoration"], [data-testid="stStatusWidget"],
-[data-testid="stToolbarActions"], [data-testid="stMainMenu"]{display:none!important;}
+[data-testid="stToolbarActions"], [data-testid="stMainMenu"],
+/* Deploy: na 1.58 fica FORA de stToolbarActions, em elemento próprio — por isso
+   escapava das regras acima e sobrepunha o seletor de radar da barra superior. */
+[data-testid="stAppDeployButton"], [data-testid="stMainMenuButton"]{display:none!important;}
+/* O header sobra como faixa transparente de 60px, largura inteira, z-index 999990:
+   invisível, mas roubava o clique do seletor e do avatar da .tn (z-index 1000).
+   pointer-events:none devolve o clique à barra; o botão de expandir a sidebar
+   reativa o seu (e o clique programático do _SIDEBAR_FIX_JS segue funcionando). */
+[data-testid="stHeader"], [data-testid="stToolbar"]{pointer-events:none!important;}
 /* botão nativo de reabrir a sidebar: sempre visível e destacado quando ela recolhe */
 [data-testid="stExpandSidebarButton"]{display:flex!important;visibility:visible!important;
+  pointer-events:auto!important;
   background:var(--surface)!important;border:1px solid var(--line-2)!important;border-radius:9px!important;}
 [data-testid="stExpandSidebarButton"] svg, [data-testid="stExpandSidebarButton"] span,
 [data-testid="stExpandSidebarButton"] [data-testid="stIconMaterial"]{color:var(--accent)!important;}
@@ -959,7 +968,11 @@ _hub_component = components_v2.component("pfc_hub", css=_HUB_CSS, js=_HUB_JS)
 _HUB_CHROME_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* No hub não há sidebar: some com ela e com o botão de expandir (o testid
+   stSidebarCollapsedControl / stBaseButton-headerNoPadding é de versões antigas
+   do Streamlit; na 1.58 o botão é stExpandSidebarButton). */
 [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"],
+[data-testid="stExpandSidebarButton"],
 button[data-testid="stBaseButton-headerNoPadding"]{display:none!important}
 [data-testid="stMainBlockContainer"], .block-container{padding:0!important;max-width:100%!important}
 .stApp{background:#04060F!important}
