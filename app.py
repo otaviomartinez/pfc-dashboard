@@ -2042,6 +2042,38 @@ def dlg_descobrir_deputado(row: dict, secao: str) -> None:
         _linha_mun("Vizinho — mesma Região Imediata (IBGE)", row.get("municipios_vizinhos", ""),
                    "#5B9BD5", valor=row.get("autorizado_vizinho", 0))
 
+    # ---- contatos OFICIAIS (públicos, ALESP) — separados dos pessoais do CRM ----
+    ct = dados.contato_oficial(str(row.get("deputado", "")))
+    st.markdown('<div style="font-family:var(--mono);font-size:11px;letter-spacing:1px;'
+                'text-transform:uppercase;color:var(--dim);margin:20px 0 8px">'
+                'Contato oficial · ALESP</div>', unsafe_allow_html=True)
+    if not ct or (ct.get("email") in ("", "não encontrado") and not ct.get("pagina")):
+        st.markdown('<div style="font-size:13px;color:var(--dim)">Não encontrado na '
+                    'lista de titulares da ALESP.</div>', unsafe_allow_html=True)
+    else:
+        def _campo(rot, val, link=None):
+            if not val or val == "não encontrado":
+                corpo = '<span style="color:var(--dim)">não encontrado</span>'
+            elif link:
+                corpo = f'<a href="{esc(link)}" target="_blank" style="color:#b7abff">{esc(val)}</a>'
+            else:
+                corpo = esc(val)
+            return (f'<div style="display:flex;gap:8px;font-size:13px;margin-bottom:5px">'
+                    f'<span style="font-family:var(--mono);font-size:10px;letter-spacing:.5px;'
+                    f'text-transform:uppercase;color:var(--dim);min-width:78px;padding-top:2px">'
+                    f'{rot}</span><span style="color:var(--ink)">{corpo}</span></div>')
+        email = ct.get("email", "")
+        st.markdown(
+            '<div style="background:var(--surface2);border:1px solid var(--line);'
+            'border-left:3px solid #8B7BF0;border-radius:0 10px 10px 0;padding:12px 15px">'
+            + _campo("Email", email, link=(f"mailto:{email}" if email and email != "não encontrado" else None))
+            + _campo("Telefone", ct.get("telefone", ""))
+            + _campo("Página", "abrir no site da ALESP" if ct.get("pagina") else "", link=ct.get("pagina"))
+            + '</div>'
+            '<div style="font-size:11px;color:var(--dim);margin-top:6px">Contato público de '
+            'gabinete. Os contatos pessoais/de assessor ficam no CRM (tela Deputados).</div>',
+            unsafe_allow_html=True)
+
     st.caption("Levantamento de execução (Transparência SP · Power BI 2023-2025).")
     st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
     if no_crm:

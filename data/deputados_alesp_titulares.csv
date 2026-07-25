@@ -1,95 +1,95 @@
-﻿nome_parlamentar,partido,id_alesp
-Agente Federal Danilo Balas,PL,1139
-Alex Madureira,PL,1140
-Altair Moraes,REPUBLICANOS,1178
-Ana Carolina Serra,PSDB,1201
-Ana Perugini,PT,398
-Analice Fernandes,PSD,363
-André Bueno,MDB,1237
-André do Prado,PL,429
-Andréa Werner,PSB,1202
-Atila Jacomussi,PRD,494
-Barros Munhoz,PSD,124
-Beth Sahão,PT,367
-Bruna Furlan,REPUBLICANOS,1203
-Bruno Zambelli,PL,1204
-Caio França,PSB,492
-Capitão Telhada,PP,1205
-Carla Morando,PSD,1173
-Carlos Giannazi,PSOL,417
-Carlão Pignatari,PSD,431
-Clarice Ganem,PODE,1206
-Conte Lopes,PL,141
-Dani Alonso,PL,1207
-Daniel Soares,UNIÃO,1168
-Delegada Graciela,PL,1167
-Delegado Olim,PP,493
-Dirceu Dalben,PSD,1183
-Donato,PT,1208
-Dr. Eduardo Nóbrega,MDB,1209
-Dr. Elton,UNIÃO,1210
-Dr. Jorge do Carmo,PT,1164
-Dra. Damaris Moura,PSDB,1179
-Ediane Maria,PSOL,1211
-Edna Macedo,REPUBLICANOS,254
-Edson Giriboni,UNIÃO,381
-Eduardo Suplicy,PT,1050
-Emídio de Souza,PT,327
-Enio Tatto,PT,372
-Fabiana Bolsonaro,PL,1213
-Felipe Franco,UNIÃO,1214
-Fábio Faria de Sá,PODE,2041
-Gil Diniz Bolsonaro,PL,1161
-Gilmaci Santos,REPUBLICANOS,382
-Guilherme Cortez,PSOL,1216
-Guto Zacarias,MISSÃO,1217
-Itamar Borges,MDB,442
-Jorge Caruso,MDB,299
-Jorge Wilson Xerife do Consumidor,REPUBLICANOS,484
-Leci Brandão,PCdoB,445
-Leonardo Siqueira,NOVO,1219
-Letícia Aguiar,PL,1158
-Lucas Bove,PL,1220
-Luiz Claudio Marcolino,PT,446
-Luiz Fernando T. Ferreira,PT,481
-Léo Oliveira,MDB,200
-Major Mecca,PL,1157
-Marcelo Aguiar,PL,2042
-Marcio Nakashima,PSD,1155
-Marcos Damasio,PL,479
-Maria Lúcia Amary,PSD,347
-Marina Helou,PSB,1154
-Marta Costa,PSD,480
-Maurici,PT,1187
-Mauro Bragato,PSD,75
-Milton Leite Filho,UNIÃO,415
-Monica Seixas do Movimento Pretas,PSOL,1153
-Márcia Lia,PT,477
-Oseias de Madureira,PL,1221
-Paula da Bancada Feminista,PSOL,1222
-Paulo Correa Jr,REPUBLICANOS,475
-Paulo Fiorilo,PT,1152
-Paulo Mansur,PL,1223
-Professora Bebel,PT,1150
-Profª Camila Godoi,UNIÃO,2081
-Rafa Zimbaldi,UNIÃO,1149
-Rafael Saraiva,UNIÃO,1224
-Rafael Silva,PSD,280
-Reis,PT,1225
-Ricardo França,PODE,1226
-Ricardo Madalena,PL,474
-Rodrigo Moraes,PL,451
-Rogério Nogueira,PSD,339
-Rogério Santos,MDB,1227
-Rui Alves,REPUBLICANOS,1228
-Rômulo Fernandes,PT,1229
-Sebastião Santos,REPUBLICANOS,452
-Solange Freitas,UNIÃO,1230
-Tenente Coimbra,PL,1144
-Teonilio Barba,PT,472
-Thainara Faria,PT,1231
-Thiago Auricchio,PL,1142
-Tomé Abduch,REPUBLICANOS,1232
-Valdomiro Lopes,PSB,328
-Valeria Bolsonaro,PL,1141
-Vitão do Cachorrão,PODE,1233
+nome_parlamentar,partido,id_alesp,email_oficial,telefone_gabinete,pagina_alesp
+Agente Federal Danilo Balas,PL,1139,apfdanilobalas@al.sp.gov.br,(11) 3886-6054/6052,https://www.al.sp.gov.br/deputado/?matricula=300607
+Alex Madureira,PL,1140,alexdemadureira@al.sp.gov.br,(11) 3886-6676/ 6677,https://www.al.sp.gov.br/deputado/?matricula=300608
+Altair Moraes,REPUBLICANOS,1178,altairmoraes@al.sp.gov.br,(11) 3886-6468/ 6476,https://www.al.sp.gov.br/deputado/?matricula=300609
+Ana Carolina Serra,PSDB,1201,acrbserra@al.sp.gov.br,(11) 3886-6066/ 6067,https://www.al.sp.gov.br/deputado/?matricula=300657
+Ana Perugini,PT,398,anaperugini@al.sp.gov.br,(11) 3886-6082/ 6083,https://www.al.sp.gov.br/deputado/?matricula=300466
+Analice Fernandes,PSD,363,afernandes@al.sp.gov.br,(11) 3886-6797/ 6798,https://www.al.sp.gov.br/deputado/?matricula=300431
+André Bueno,MDB,1237,andre.bueno@al.sp.gov.br,(11) 3886-6526 / 6527,https://www.al.sp.gov.br/deputado/?matricula=300694
+André do Prado,PL,429,andredoprado@al.sp.gov.br,(11) 3886-6562/ 6563,https://www.al.sp.gov.br/deputado/?matricula=300497
+Andréa Werner,PSB,1202,andreawerner@al.sp.gov.br,(11) 3886-6088/ 6089,https://www.al.sp.gov.br/deputado/?matricula=300658
+Atila Jacomussi,PRD,494,atilajacomussi@al.sp.gov.br,(11) 3886-6090/ 6091,https://www.al.sp.gov.br/deputado/?matricula=300537
+Barros Munhoz,PSD,124,barrosmunhoz@al.sp.gov.br,(11) 3886-6635/ 6665,https://www.al.sp.gov.br/deputado/?matricula=300188
+Beth Sahão,PT,367,bsahao@al.sp.gov.br,(11) 3886-6643/ 6657,https://www.al.sp.gov.br/deputado/?matricula=300435
+Bruna Furlan,REPUBLICANOS,1203,brunafurlan@al.sp.gov.br,(11) 3886-6098/ 6099,https://www.al.sp.gov.br/deputado/?matricula=300659
+Bruno Zambelli,PL,1204,brunozambelli@al.sp.gov.br,(11) 3886-6860/ 6862,https://www.al.sp.gov.br/deputado/?matricula=300660
+Caio França,PSB,492,caiofranca@al.sp.gov.br,(11) 3886-6572/ 6577,https://www.al.sp.gov.br/deputado/?matricula=300540
+Capitão Telhada,PP,1205,capitaotelhada@al.sp.gov.br,(11) 3886-6281/ 6283,https://www.al.sp.gov.br/deputado/?matricula=300661
+Carla Morando,PSD,1173,carlamorando@al.sp.gov.br,(11) 3886-6110 / 6111,https://www.al.sp.gov.br/deputado/?matricula=300614
+Carlos Giannazi,PSOL,417,cgiannazi@al.sp.gov.br,(11) 3886-6686/ 6690,https://www.al.sp.gov.br/deputado/?matricula=300485
+Carlão Pignatari,PSD,431,carlaopignatari@al.sp.gov.br,(11) 3886-6123/ 6124,https://www.al.sp.gov.br/deputado/?matricula=300499
+Clarice Ganem,PODE,1206,clariceganem@al.sp.gov.br,(11) 3886-6093/ 6094,https://www.al.sp.gov.br/deputado/?matricula=300662
+Conte Lopes,PL,141,clopes@al.sp.gov.br,(11) 3886-6464 / 6465,https://www.al.sp.gov.br/deputado/?matricula=300205
+Dani Alonso,PL,1207,danialonso@al.sp.gov.br,(11) 3886-6108/ 6109,https://www.al.sp.gov.br/deputado/?matricula=300663
+Daniel Soares,UNIÃO,1168,DanielSoares@al.sp.gov.br,(11) 3886-6235/ 6236,https://www.al.sp.gov.br/deputado/?matricula=300619
+Delegada Graciela,PL,1167,delegadagraciela@al.sp.gov.br,(11) 3886-6276/ 6279,https://www.al.sp.gov.br/deputado/?matricula=300620
+Delegado Olim,PP,493,deputado.delegadoolim@al.sp.gov.br,(11) 3886-6536/ 6543,https://www.al.sp.gov.br/deputado/?matricula=300543
+Dirceu Dalben,PSD,1183,dirceudalben@al.sp.gov.br,(11) 3886-6737/ 6763,https://www.al.sp.gov.br/deputado/?matricula=300650
+Donato,PT,1208,donato@al.sp.gov.br,(11) 3886-6219/ 6220,https://www.al.sp.gov.br/deputado/?matricula=300664
+Dr. Eduardo Nóbrega,MDB,1209,dreduardonobrega@al.sp.gov.br,(11) 3886-6242,https://www.al.sp.gov.br/deputado/?matricula=300665
+Dr. Elton,UNIÃO,1210,drelton@al.sp.gov.br,(11) 3886-6384/ 6385,https://www.al.sp.gov.br/deputado/?matricula=300666
+Dr. Jorge do Carmo,PT,1164,drdepjorgedocarmo@al.sp.gov.br,(11) 3886-6517/ 6518,https://www.al.sp.gov.br/deputado/?matricula=300623
+Dra. Damaris Moura,PSDB,1179,dradamarismoura@al.sp.gov.br,(11) 3886-7963 / 7936,https://www.al.sp.gov.br/deputado/?matricula=300624
+Ediane Maria,PSOL,1211,edianemaria@al.sp.gov.br,(11) 3886-6395/ 6397,https://www.al.sp.gov.br/deputado/?matricula=300667
+Edna Macedo,REPUBLICANOS,254,ednamacedo@al.sp.gov.br,(11) 3886-6432/ 6435,https://www.al.sp.gov.br/deputado/?matricula=300318
+Edson Giriboni,UNIÃO,381,egiriboni@al.sp.gov.br,(11) 3886-6555 / 6556,https://www.al.sp.gov.br/deputado/?matricula=300449
+Eduardo Suplicy,PT,1050,eduardosuplicy@al.sp.gov.br,(11) 3886-6406/ 6407,https://www.al.sp.gov.br/deputado/?matricula=300693
+Emídio de Souza,PT,327,emidio@al.sp.gov.br,(11) 3886-6420/ 6418,https://www.al.sp.gov.br/deputado/?matricula=300395
+Enio Tatto,PT,372,eniotatto@al.sp.gov.br,(11) 3886-6950/ 6944,https://www.al.sp.gov.br/deputado/?matricula=300440
+Fabiana Bolsonaro,PL,1213,fabianab@al.sp.gov.br,(11) 3886-6504/ 6505,https://www.al.sp.gov.br/deputado/?matricula=300669
+Felipe Franco,UNIÃO,1214,felipefranco@al.sp.gov.br,(11) 3886-6506/ 6507,https://www.al.sp.gov.br/deputado/?matricula=300670
+Fábio Faria de Sá,PODE,2041,fabiofariadesa@al.sp.gov.br,(11) 3886-6541/ 6542,https://www.al.sp.gov.br/deputado/?matricula=300697
+Gil Diniz Bolsonaro,PL,1161,gildiniz@al.sp.gov.br,(11) 3886-6313/ 6321,https://www.al.sp.gov.br/deputado/?matricula=300627
+Gilmaci Santos,REPUBLICANOS,382,gilmacisantos@al.sp.gov.br,(11) 3886-6560/ 7752,https://www.al.sp.gov.br/deputado/?matricula=300450
+Guilherme Cortez,PSOL,1216,guilhermecortez@al.sp.gov.br,(11) 3886-6882/ 6883,https://www.al.sp.gov.br/deputado/?matricula=300672
+Guto Zacarias,MISSÃO,1217,gutozacarias@al.sp.gov.br,(11) 3886-6578/ 6579,https://www.al.sp.gov.br/deputado/?matricula=300673
+Itamar Borges,MDB,442,itamarborges@al.sp.gov.br,(11) 3886-6852/ 6857,https://www.al.sp.gov.br/deputado/?matricula=300510
+Jorge Caruso,MDB,299,jcaruso@al.sp.gov.br,(11) 3886-6736/ 6765,https://www.al.sp.gov.br/deputado/?matricula=300367
+Jorge Wilson Xerife do Consumidor,REPUBLICANOS,484,jorgewilsonxerifedoconsumidor@al.sp.gov.br,(11) 3886-6485/ 6487,https://www.al.sp.gov.br/deputado/?matricula=300549
+Leci Brandão,PCdoB,445,lecibrandao@al.sp.gov.br,(11) 3886-6790/ 6794,https://www.al.sp.gov.br/deputado/?matricula=300513
+Leonardo Siqueira,NOVO,1219,leosiqueira@al.sp.gov.br,(11) 3886-6615/ 6616,https://www.al.sp.gov.br/deputado/?matricula=300675
+Letícia Aguiar,PL,1158,leticiaaguiar@al.sp.gov.br,(11) 3886-6227/ 6228,https://www.al.sp.gov.br/deputado/?matricula=300631
+Lucas Bove,PL,1220,lucasbove@al.sp.gov.br,(11) 3886-6632/ 6634,https://www.al.sp.gov.br/deputado/?matricula=300676
+Luiz Claudio Marcolino,PT,446,lcmarcolino@al.sp.gov.br,(11) 3886-6650/ 6652,https://www.al.sp.gov.br/deputado/?matricula=300514
+Luiz Fernando T. Ferreira,PT,481,lfernando@al.sp.gov.br,(11) 3886-6666/ 6613,https://www.al.sp.gov.br/deputado/?matricula=300545
+Léo Oliveira,MDB,200,leooliveira@al.sp.gov.br,(11) 3886-6386/ 6387,https://www.al.sp.gov.br/deputado/?matricula=300264
+Major Mecca,PL,1157,majormecca@al.sp.gov.br,(11) 3886-6177/ 6178,https://www.al.sp.gov.br/deputado/?matricula=300633
+Marcelo Aguiar,PL,2042,marceloaguiar@al.sp.gov.br,(11) 3886-6155/ 6156,https://www.al.sp.gov.br/deputado/?matricula=300698
+Marcio Nakashima,PSD,1155,MarcioNakashima@al.sp.gov.br,(11) 3886-6633/ 6596,https://www.al.sp.gov.br/deputado/?matricula=300635
+Marcos Damasio,PL,479,marcosdamasio@al.sp.gov.br,(11) 3886-6704 / 6705,https://www.al.sp.gov.br/deputado/?matricula=300552
+Maria Lúcia Amary,PSD,347,mlamary@al.sp.gov.br,(11) 3886-6840/ 6855,https://www.al.sp.gov.br/deputado/?matricula=300415
+Marina Helou,PSB,1154,marinahelou@al.sp.gov.br,(11)3886-6084 / 6078,https://www.al.sp.gov.br/deputado/?matricula=300636
+Marta Costa,PSD,480,depmartacosta@al.sp.gov.br,(11)3886-6621 / 6624,https://www.al.sp.gov.br/deputado/?matricula=300533
+Maurici,PT,1187,depmaurici@al.sp.gov.br,(11) 3886-6753,https://www.al.sp.gov.br/deputado/?matricula=300653
+Mauro Bragato,PSD,75,Mbragato@al.sp.gov.br,(11)3886-6400 / 6417,https://www.al.sp.gov.br/deputado/?matricula=300098
+Milton Leite Filho,UNIÃO,415,mleite@al.sp.gov.br,(11)3886-6550 / 6551,https://www.al.sp.gov.br/deputado/?matricula=300483
+Monica Seixas do Movimento Pretas,PSOL,1153,movimentopretas@al.sp.gov.br,(11)3886-6639 / 6640,https://www.al.sp.gov.br/deputado/?matricula=300637
+Márcia Lia,PT,477,marcialia@al.sp.gov.br,(11) 3886-6104/ 6614,https://www.al.sp.gov.br/deputado/?matricula=300534
+Oseias de Madureira,PL,1221,oseiasdemadureira@al.sp.gov.br,(11) 3886-6423/ 6424,https://www.al.sp.gov.br/deputado/?matricula=300677
+Paula da Bancada Feminista,PSOL,1222,pauladabancadafeminista@al.sp.gov.br,(11) 3886-6687/ 6688,https://www.al.sp.gov.br/deputado/?matricula=300678
+Paulo Correa Jr,REPUBLICANOS,475,paulocorreajr@al.sp.gov.br,(11)3886-6372 / 6377,https://www.al.sp.gov.br/deputado/?matricula=300536
+Paulo Fiorilo,PT,1152,paulofiorilo@al.sp.gov.br,(11)3886-6663/6667,https://www.al.sp.gov.br/deputado/?matricula=300638
+Paulo Mansur,PL,1223,paulomansur@al.sp.gov.br,(11) 3886-6921/ 6922,https://www.al.sp.gov.br/deputado/?matricula=300679
+Professora Bebel,PT,1150,professorabebel@al.sp.gov.br,(011)3886-6645 / 6648,https://www.al.sp.gov.br/deputado/?matricula=300640
+Profª Camila Godoi,UNIÃO,2081,profacamilagodoi@al.sp.gov.br,(11) 3886-6830 / 6831,https://www.al.sp.gov.br/deputado/?matricula=300700
+Rafa Zimbaldi,UNIÃO,1149,rafazimbaldi@al.sp.gov.br,(11)3886-6198 / 6201,https://www.al.sp.gov.br/deputado/?matricula=300641
+Rafael Saraiva,UNIÃO,1224,rafaelsaraiva@al.sp.gov.br,(11) 3886-6740/ 6741,https://www.al.sp.gov.br/deputado/?matricula=300680
+Rafael Silva,PSD,280,rsilva@al.sp.gov.br,(011)3886-6788 / 6792,https://www.al.sp.gov.br/deputado/?matricula=300344
+Reis,PT,1225,deputadoreis@al.sp.gov.br,(11) 3886-6743/ 6744,https://www.al.sp.gov.br/deputado/?matricula=300681
+Ricardo França,PODE,1226,ricardofranca@al.sp.gov.br,(11) 3886-6748,https://www.al.sp.gov.br/deputado/?matricula=300682
+Ricardo Madalena,PL,474,ricardomadalena@al.sp.gov.br,(011)3886-6403 / 6404,https://www.al.sp.gov.br/deputado/?matricula=300539
+Rodrigo Moraes,PL,451,deputadorodrigomoraes@al.sp.gov.br,(011)3886-6055 / 6056,https://www.al.sp.gov.br/deputado/?matricula=300519
+Rogério Nogueira,PSD,339,rnogueira@al.sp.gov.br,(011) 3886-6842 / 6853,https://www.al.sp.gov.br/deputado/?matricula=300407
+Rogério Santos,MDB,1227,rogeriosantos@al.sp.gov.br,(11) 3886-6499/ 6878,https://www.al.sp.gov.br/deputado/?matricula=300683
+Rui Alves,REPUBLICANOS,1228,ruialves@al.sp.gov.br,(11) 3886-6772/ 6773,https://www.al.sp.gov.br/deputado/?matricula=300685
+Rômulo Fernandes,PT,1229,romulofernandes@al.sp.gov.br,(11) 3886-6760/ 6761,https://www.al.sp.gov.br/deputado/?matricula=300684
+Sebastião Santos,REPUBLICANOS,452,sebastiaosantos@al.sp.gov.br,(011) 3886-6474 / 6475,https://www.al.sp.gov.br/deputado/?matricula=300520
+Solange Freitas,UNIÃO,1230,solangefreitas@al.sp.gov.br,(11) 3886-6834/ 6835,https://www.al.sp.gov.br/deputado/?matricula=300686
+Tenente Coimbra,PL,1144,tenentecoimbra@al.sp.gov.br,(11)3886-6776 / 6777,https://www.al.sp.gov.br/deputado/?matricula=300646
+Teonilio Barba,PT,472,teoniliobarba@al.sp.gov.br,(11) 3886-6495/6493/6233/6232/6617,https://www.al.sp.gov.br/deputado/?matricula=300584
+Thainara Faria,PT,1231,thainarafaria@al.sp.gov.br,(11) 3886-6850/ 6851,https://www.al.sp.gov.br/deputado/?matricula=300687
+Thiago Auricchio,PL,1142,ThiagoAuricchio@al.sp.gov.br,(011)3886-6214 / 6216,https://www.al.sp.gov.br/deputado/?matricula=300648
+Tomé Abduch,REPUBLICANOS,1232,tomeabduch@al.sp.gov.br,(11) 3886-6867/ 6868,https://www.al.sp.gov.br/deputado/?matricula=300688
+Valdomiro Lopes,PSB,328,vlopes@al.sp.gov.br,(11) 3886-6251/6252,https://www.al.sp.gov.br/deputado/?matricula=300396
+Valeria Bolsonaro,PL,1141,ValeriaBolsonaro@al.sp.gov.br,(011)3886-6222 / 6223,https://www.al.sp.gov.br/deputado/?matricula=300649
+Vitão do Cachorrão,PODE,1233,vitaodocachorrao@al.sp.gov.br,(11) 3886-6864/ 6865,https://www.al.sp.gov.br/deputado/?matricula=300689

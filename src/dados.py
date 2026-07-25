@@ -312,6 +312,10 @@ def deputados_conectado() -> bool:
 # sensível dos 16 deputados acima. Sem o arquivo, degrada para vazio.
 RANKING_TERRITORIO_CSV = Path(__file__).resolve().parent.parent / "data" / "emendas_ranking_pfc_territorio.csv"
 RANKING_EXPANSAO_CSV = Path(__file__).resolve().parent.parent / "data" / "emendas_ranking_pfc_expansao.csv"
+# Contatos OFICIAIS (públicos) dos titulares da ALESP — email de gabinete,
+# telefone e página oficial. Enriquecido a partir do XML da ALESP. NÃO confundir
+# com os contatos pessoais/de assessor do Fábio (esses ficam no CRM sensível).
+TITULARES_CSV = Path(__file__).resolve().parent.parent / "data" / "deputados_alesp_titulares.csv"
 
 
 @st.cache_data(ttl=60, show_spinner=False)
@@ -330,6 +334,33 @@ def carregar_ranking_expansao() -> pd.DataFrame:
         return pd.read_csv(RANKING_EXPANSAO_CSV).fillna("")
     except Exception:
         return pd.DataFrame()
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def carregar_contatos_oficiais() -> pd.DataFrame:
+    """Tabela pública de contatos oficiais dos titulares (ALESP)."""
+    try:
+        return pd.read_csv(TITULARES_CSV, dtype=str).fillna("")
+    except Exception:
+        return pd.DataFrame()
+
+
+def contato_oficial(nome: str) -> dict:
+    """Email/telefone/página oficiais do deputado, casando por nome (contenção).
+
+    Devolve {"email","telefone","pagina"} — vazio se não houver tabela; com
+    "não encontrado" nos campos se o deputado não estiver entre os titulares.
+    Contatos PÚBLICOS: podem aparecer no levantamento e no dossiê.
+    """
+    df = carregar_contatos_oficiais()
+    if df.empty or "nome_parlamentar" not in df:
+        return {}
+    for _, r in df.iterrows():
+        if _mesmo_deputado(nome, r["nome_parlamentar"]):
+            return {"email": r.get("email_oficial", "").strip(),
+                    "telefone": r.get("telefone_gabinete", "").strip(),
+                    "pagina": r.get("pagina_alesp", "").strip()}
+    return {"email": "não encontrado", "telefone": "não encontrado", "pagina": ""}
 
 
 # --------------------------------------------------------------------------- #
