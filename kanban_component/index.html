@@ -70,6 +70,11 @@
 
   var supportsDnD = ("draggable" in document.createElement("div"));
   var dragId = null, dragFrom = null;
+  // Distingue "cliquei" de "arrastei": mousedown zera didDrag; um arraste real
+  // dispara dragstart (didDrag=true); no click, só emitimos se NÃO houve arraste.
+  // `clicavel` liga esse comportamento — só o funil de Emendas (logado) o pede;
+  // o funil de Captação não passa a flag, então nada muda por lá.
+  var didDrag = false, clicavel = false;
 
   // Listra lateral por Score PFC (limiares das organizações: 85/70,
   // coerentes com os chips de score usados no restante do app).
@@ -81,7 +86,8 @@
   function cardHTML(c) {
     var meta = esc(String(c.setor || "—").toUpperCase()) + " · SCORE " + esc(c.score);
     if (c.valor && c.valor !== "—") { meta += " · " + esc(c.valor); }
-    return '<div class="kcard" draggable="true" data-id="' + esc(c.id) + '" data-status="' + esc(c.status) + '"' +
+    var extra = clicavel ? ' class="kcard clicavel" title="Clique para anotar · arraste para mover de etapa"' : ' class="kcard"';
+    return '<div' + extra + ' draggable="true" data-id="' + esc(c.id) + '" data-status="' + esc(c.status) + '"' +
       ' style="--c:' + corScore(c.score) + '">' +
       '<div class="kn">' + esc(c.nome) + '</div>' +
       '<div class="km">' + meta + '</div></div>';
@@ -97,6 +103,7 @@
     }
     var colunas = (args && args.colunas) || [];
     var editable = !args || args.editable !== false;
+    clicavel = !!(args && args.clicavel);  // clique-para-anotar (só Emendas logado)
     var html = "";
     if (!editable) {
       html += '<div class="banner">🟠 Modo local (CSV): você pode arrastar, mas a mudança não é gravada — apenas demonstra o aviso.</div>';
@@ -132,8 +139,9 @@
 
   function wire() {
     document.querySelectorAll(".kcard").forEach(function (card) {
+      card.addEventListener("mousedown", function () { didDrag = false; });
       card.addEventListener("dragstart", function (e) {
-        dragId = card.dataset.id; dragFrom = card.dataset.status;
+        dragId = card.dataset.id; dragFrom = card.dataset.status; didDrag = true;
         card.classList.add("dragging");
         if (e.dataTransfer) { e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", dragId); } catch (_) {} }
       });
@@ -141,6 +149,17 @@
         card.classList.remove("dragging");
         document.querySelectorAll(".kbody").forEach(function (b) { b.classList.remove("dragover"); });
       });
+      // Clique (sem arraste) -> abre o mini-editor de observação no Python.
+      // Só quando `clicavel`; e didDrag garante que um arraste nunca vira clique.
+      if (clicavel) {
+        card.addEventListener("click", function () {
+          if (didDrag) { didDrag = false; return; }
+          send("streamlit:setComponentValue", {
+            value: { action: "click", org_id: card.dataset.id, nonce: Date.now() },
+            dataType: "json"
+          });
+        });
+      }
     });
     document.querySelectorAll(".kbody").forEach(function (body) {
       body.addEventListener("dragover", function (e) {

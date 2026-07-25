@@ -1407,6 +1407,48 @@ def dlg_deputado(dep: dict):
                    "à equipe logada.")
 
 
+@st.dialog("Observação rápida", width="small")
+def dlg_obs_rapida(nome: str):
+    """Mini-editor aberto ao CLICAR num card do funil de Emendas. Anexa uma
+    observação ao MESMO campo Diálogo que o dossiê edita (sensível → só logado).
+    Não toca em status, temperatura nem contatos: grava só o Diálogo (append)."""
+    if not st.session_state.get("user"):
+        st.warning("🔒 Conteúdo restrito à equipe logada.")
+        return
+    # Diálogo atual como contexto (read-only), casando por nome no CRM.
+    dep = next((d for d in _deputados_ordenados() if d["nome"] == nome), None)
+    atual = (dep or {}).get("dialogo", "")
+    st.markdown(
+        f'<div style="font-size:16px;font-weight:700;color:var(--ink)">{esc(nome)}</div>'
+        f'<div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:3px">'
+        f'Anota no diálogo · aparece no dossiê</div>', unsafe_allow_html=True)
+    if atual:
+        st.markdown(
+            '<div style="font-family:var(--mono);font-size:10px;letter-spacing:.8px;'
+            'text-transform:uppercase;color:var(--dim);margin:14px 0 6px">Diálogo atual</div>'
+            f'<div style="background:var(--surface2);border:1px solid var(--line);'
+            f'border-left:3px solid #8B7BF0;border-radius:0 8px 8px 0;padding:10px 12px;'
+            f'font-size:12.5px;line-height:1.55;color:var(--muted);font-style:italic;'
+            f'max-height:150px;overflow-y:auto;white-space:pre-wrap">{esc(atual)}</div>',
+            unsafe_allow_html=True)
+
+    nota = st.text_area("Nova observação", height=120, key=f"obsrap_txt_{nome}",
+                        placeholder="Ex.: Ligação com o assessor — pediu proposta por e-mail até sexta.")
+    if st.button("Salvar observação", type="primary", use_container_width=True,
+                 key=f"obsrap_save_{nome}"):
+        if not nota.strip():
+            st.info("Escreva uma observação antes de salvar.")
+        else:
+            res = dados.anexar_dialogo_deputado(nome, nota.strip())
+            if res.get("sucesso"):
+                st.success("✓ Observação anexada ao diálogo — visível também no dossiê.")
+                st.toast("Salvo na aba Deputados.")
+                st.caption("Feche para voltar ao funil.")
+            else:
+                st.warning(res.get("mensagem", "Não foi possível gravar."))
+    st.caption("🔒 Grava no campo Diálogo (sensível) · não altera status, temperatura nem contatos.")
+
+
 _EMENDAS_V2_CSS = """
 .em{display:flex;flex-direction:column;gap:22px;font-family:'Inter',system-ui,sans-serif;
   color:var(--ink,#F5F7FA);animation:em-fade .4s ease;--accent:#8B7BF0;--accent-dim:rgba(139,123,240,.13)}
@@ -2295,12 +2337,22 @@ def render_funil_emendas() -> None:
                    else "Arrastar-e-soltar indisponível neste ambiente.")
         return
 
-    resultado = _kanban_component(colunas=colunas, editable=True,
+    # `clicavel` só quando logado: aí o clique num card abre a observação rápida
+    # (conteúdo sensível). Sem login, o card não emite clique — arrastar segue igual.
+    pode_anotar = bool(st.session_state.get("user"))
+    resultado = _kanban_component(colunas=colunas, editable=True, clicavel=pode_anotar,
                                   key="kanban_emendas", default=None)
     if isinstance(resultado, dict):
         nonce = resultado.get("nonce")
         if nonce and nonce != st.session_state.get("kanban_emendas_nonce"):
             st.session_state["kanban_emendas_nonce"] = nonce
+            # CLIQUE (sem arraste): abre o mini-editor de observação. Tratado ANTES
+            # do arraste porque não traz novo_status — não é um movimento de coluna.
+            if resultado.get("action") == "click":
+                nome = str(resultado.get("org_id", "")).strip()
+                if nome and pode_anotar:
+                    dlg_obs_rapida(nome)
+                return
             nome = str(resultado.get("org_id", "")).strip()   # id do card = nome do deputado
             novo = str(resultado.get("novo_status", "")).strip()
             if nome and novo in EMENDA_FUNIL_ETAPAS:

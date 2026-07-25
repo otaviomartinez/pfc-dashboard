@@ -543,6 +543,37 @@ def atualizar_deputado(nome: str, campos: dict) -> dict:
         return {"sucesso": False, "mensagem": f"Erro ao gravar no Google Sheets: {e}"}
 
 
+def anexar_dialogo_deputado(nome: str, texto: str) -> dict:
+    """Acrescenta uma observação DATADA ao campo Diálogo do deputado (por nome).
+
+    É a "observação rápida" do card do funil. Escreve no MESMO campo que o
+    dossiê edita (Diálogo, sensível), então o que se anota aqui aparece lá e
+    vice-versa — não há campo paralelo. Append: preserva o diálogo já existente
+    (mesmo espírito de salvar_observacao das empresas) e, por passar por
+    atualizar_deputado, grava só aquela célula (RAW), sem tocar em status,
+    temperatura, contatos ou os demais campos. Retorna {sucesso, mensagem}.
+    """
+    texto = (texto or "").strip()
+    nome = str(nome or "").strip()
+    if not texto:
+        return {"sucesso": False, "mensagem": "Escreva uma observação antes de salvar."}
+    if not nome:
+        return {"sucesso": False, "mensagem": "Deputado em branco."}
+
+    # Lê o Diálogo atual (fonte da verdade: aba Deputados) para anexar sem perder.
+    atual = ""
+    df = carregar_deputados()
+    if not df.empty and "Deputado" in df and "Diálogo" in df:
+        match = df[df["Deputado"].astype(str).str.strip() == nome]
+        if not match.empty:
+            atual = str(match.iloc[0]["Diálogo"]).strip()
+
+    carimbo = pd.Timestamp.now().strftime("%d/%m/%Y %H:%M")
+    nova = f"[{carimbo}] {texto}"
+    combinado = f"{atual}\n{nova}".strip() if atual else nova
+    return atualizar_deputado(nome, {"Diálogo": combinado})
+
+
 @st.cache_data(ttl=60, show_spinner=False)
 def carregar_editais_privados() -> pd.DataFrame:
     """Lê a aba opcional 'Editais_Privados' (prazos). Vazio se não existir/CSV."""
