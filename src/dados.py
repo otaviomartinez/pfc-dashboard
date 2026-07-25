@@ -42,10 +42,24 @@ ABA_BASE = "Base_Empresas"  # nome alternativo da base (usado ao aprovar do Rada
 ABA_PENDENTES = "Novidades_pendentes"
 # Aba opcional de editais privados (prazos).
 ABA_EDITAIS = "Editais_Privados"
+# Aba do CRM de deputados (radar de Emendas). Contém o Diálogo sensível — a
+# planilha inteira deve permanecer restrita; no app o Diálogo só renderiza logado.
+ABA_DEPUTADOS = "Deputados"
 # Cabeçalho EXATO da aba de novidades.
 HEADERS_NOVIDADES = [
     "Data", "Fonte", "Título", "Descrição", "Score Aderência",
     "Prazo", "Valor estimado", "Link da fonte", "Status aprovação",
+]
+# Cabeçalho EXATO do CRM de deputados (mesmas 22 colunas do CSV original).
+# A leitura/escrita é POR NOME de coluna, então adicionar uma nova (ex.: "Site")
+# na aba do Sheets não quebra o código — o campo novo flui sozinho.
+HEADERS_DEPUTADOS = [
+    "Ordem de Abordagem", "Deputado", "Partido", "Chance Emenda (0-100)",
+    "Aderência PFC (0-100)", "Score Integrado", "Prioridade",
+    "Proximidade Territorial", "Diálogo", "Status", "Temperatura",
+    "Base Regional", "Endereço/Escritório", "Gabinete ALESP", "Telefones",
+    "WhatsApp", "Email", "Instagram", "Emenda/Ação", "Valor",
+    "Estratégia PFC", "Observações",
 ]
 
 # Nomes EXATOS das colunas, conforme a planilha / o CSV.
@@ -170,6 +184,10 @@ def limpar_caches() -> None:
     except Exception:
         pass
     try:
+        carregar_deputados.clear()
+    except Exception:
+        pass
+    try:
         _conectar.clear()
     except Exception:
         pass
@@ -233,19 +251,60 @@ def _ler_base() -> pd.DataFrame:
     return carregar_empresas()[0]
 
 
+def criar_aba_deputados() -> bool:
+    """Garante a aba 'Deputados' com o cabeçalho padrão. True se criada agora."""
+    sh = _conectar()
+    if sh is None:
+        return False
+    try:
+        if ABA_DEPUTADOS in [w.title for w in sh.worksheets()]:
+            return False
+        ws = sh.add_worksheet(title=ABA_DEPUTADOS, rows=200, cols=len(HEADERS_DEPUTADOS))
+        ws.append_row(HEADERS_DEPUTADOS)
+        return True
+    except Exception:
+        return False
+
+
 @st.cache_data(ttl=60, show_spinner=False)
 def carregar_deputados() -> pd.DataFrame:
-    """Base de deputados estaduais (radar de Emendas), do CSV local.
+    """Base de deputados estaduais (CRM do radar de Emendas).
 
-    Contém informação sensível de articulação (diálogos, contatos): o arquivo
-    fica fora do git e o painel só é acessível após login. Sem o arquivo,
-    devolve DataFrame vazio (o painel degrada para estado vazio).
+    Fonte da verdade = aba 'Deputados' no Google Sheets (leitura E escrita). Se
+    o Sheets estiver indisponível, cai para o CSV local como REDE DE SEGURANÇA
+    de leitura (pode estar defasado; nesse modo a escrita fica bloqueada, para
+    os dois nunca divergirem). Sem nenhum dos dois, devolve vazio.
+
+    Contém informação sensível (diálogos, contatos): a planilha é restrita e o
+    Diálogo só renderiza para usuário logado. A leitura é POR NOME de coluna,
+    então colunas novas na aba fluem sem mexer no código.
     """
+    sh = _conectar()
+    if sh is not None:
+        try:
+            registros = sh.worksheet(ABA_DEPUTADOS).get_all_records()
+            if registros:
+                df = pd.DataFrame(registros).astype(str)
+                # get_all_records devolve "" para vazio e tipa números; normaliza
+                return df.replace({"None": "", "nan": ""}).fillna("")
+        except Exception:
+            pass  # aba ausente/erro -> fallback CSV
     try:
         df = pd.read_csv(DEPUTADOS_CSV, dtype=str).fillna("")
         return df.dropna(how="all")
     except Exception:
         return pd.DataFrame()
+
+
+def deputados_conectado() -> bool:
+    """True se a leitura dos deputados veio do Sheets (não do fallback CSV)."""
+    sh = _conectar()
+    if sh is None:
+        return False
+    try:
+        return bool(sh.worksheet(ABA_DEPUTADOS).get_all_records())
+    except Exception:
+        return False
 
 
 # Levantamento de emendas (tela "Descobrir"): rankings gerados por src/emendas.py.
@@ -276,11 +335,13 @@ def carregar_ranking_expansao() -> pd.DataFrame:
 # --------------------------------------------------------------------------- #
 # ESCRITA no CRM sensível: puxar um deputado da tela "Descobrir"
 # ---------------------------------------------------------------------------
-# O CRM (deputados_estaduais.csv) é o arquivo sensível do Fábio, fora do git.
+# O CRM vive na aba 'Deputados' do Google Sheets (dado sensível do Fábio).
 # Esta é a ÚNICA função que ESCREVE nele, e é APPEND-ONLY de propósito:
 #   * nunca modifica uma linha existente -> diálogo, temperatura e status que o
 #     Fábio já escreveu ficam intactos (salvaguarda: não sobrescrever);
 #   * recusa duplicata por nome normalizado/contido (salvaguarda: não duplicar).
+# Só grava quando conectado ao Sheets; no fallback CSV a escrita é bloqueada
+# (para as duas fontes nunca divergirem).
 # --------------------------------------------------------------------------- #
 def _tokens_nome(nome: str) -> set:
     """Nome -> conjunto de tokens sem acento/minúsculo, para comparar."""
@@ -309,31 +370,35 @@ def deputado_no_crm(nome: str, df: pd.DataFrame | None = None) -> bool:
 
 
 def adicionar_deputado_crm(novo: dict) -> dict:
-    """Acrescenta UM deputado ao CRM. Devolve {'sucesso': bool, 'motivo': str}.
+    """Acrescenta UM deputado à aba 'Deputados' do Sheets. {'sucesso', 'motivo'}.
 
-    novo: {coluna_do_CRM: valor}. Colunas ausentes ficam vazias (para o Fábio
-    preencher). Colunas que não existem no CRM são ignoradas (não inventa campo).
+    novo: {coluna_do_CRM: valor}. Escreve POR NOME de coluna (usa o cabeçalho
+    real da aba), então respeita colunas novas. Colunas ausentes ficam vazias
+    para o Fábio preencher. Append-only: nunca toca nas linhas existentes.
     """
-    if not DEPUTADOS_CSV.exists():
-        return {"sucesso": False, "motivo": "crm_ausente",
-                "mensagem": "Base de deputados não encontrada neste ambiente."}
-    try:
-        df = pd.read_csv(DEPUTADOS_CSV, dtype=str).fillna("")
-    except Exception as e:  # noqa: BLE001
-        return {"sucesso": False, "motivo": "leitura", "mensagem": str(e)}
-
+    sh = _conectar()
+    if sh is None:
+        return {"sucesso": False, "motivo": "sheets_indisponivel",
+                "mensagem": "Sem conexão com o Google Sheets — a gravação fica "
+                            "bloqueada no modo local para não divergir dos dados."}
     nome = str(novo.get("Deputado", "")).strip()
     if not nome:
         return {"sucesso": False, "motivo": "sem_nome"}
-    if "Deputado" in df and any(_mesmo_deputado(nome, x) for x in df["Deputado"]):
-        return {"sucesso": False, "motivo": "duplicado"}
-
-    # linha nova com TODAS as colunas do CRM na ordem certa; só preenche o que veio
-    linha = {c: str(novo.get(c, "")) for c in df.columns}
-    df_novo = pd.concat([df, pd.DataFrame([linha])], ignore_index=True)
     try:
-        # utf-8 sem BOM, como o arquivo original; append-only preserva as demais linhas
-        df_novo.to_csv(DEPUTADOS_CSV, index=False, encoding="utf-8")
+        criar_aba_deputados()  # idempotente: cria a aba se ainda não existir
+        ws = sh.worksheet(ABA_DEPUTADOS)
+        cabecalho = ws.row_values(1) or HEADERS_DEPUTADOS
+        if not ws.row_values(1):
+            ws.append_row(HEADERS_DEPUTADOS)
+            cabecalho = HEADERS_DEPUTADOS
+        existentes = [str(r.get("Deputado", "")) for r in ws.get_all_records()]
+        if any(_mesmo_deputado(nome, x) for x in existentes):
+            return {"sucesso": False, "motivo": "duplicado"}
+        # linha na ordem EXATA do cabeçalho da aba; só preenche o que veio.
+        # RAW (não USER_ENTERED): guarda tudo como TEXTO literal — um Diálogo que
+        # comece com "=" nunca vira fórmula (proteção contra injeção de fórmula).
+        linha = [str(novo.get(col, "")) for col in cabecalho]
+        ws.append_row(linha, value_input_option="RAW")
     except Exception as e:  # noqa: BLE001
         return {"sucesso": False, "motivo": "escrita", "mensagem": str(e)}
 

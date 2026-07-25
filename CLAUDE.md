@@ -51,7 +51,7 @@ Duas frentes, escolhidas num **hub** de entrada:
   - **`overflow:visible` na cadeia da sidebar**: o tooltip do modo ícone é um `::after` que precisa vazar para fora dos 60px. Ele depende de `overflow:visible` declarado em **todos** os ancestrais (sidebar → container → `stVerticalBlock` → `stElementContainer` → `stButton`). Um `overflow:hidden` em qualquer um deles corta o balão. Se um dia a sidebar precisar de scroll próprio, esse tooltip precisa de outra solução (por exemplo `position:fixed` posicionado por JS).
 - **Três paletas paralelas de cor de etapa** (`CORES_ETAPA`, `CORES_STATUS`, `ACENTOS_HEX`) precisam ser mantidas em sincronia manualmente. Frágil — deveriam virar uma só.
 - `app.py` passou de 3.600 linhas (componentes v2 com CSS/JS como strings Python). Quebrar em módulos é desejável, mas **não durante uma fase de entrega**.
-- O CSV dos deputados está fora do git: **em deploy, o painel de Emendas aparece vazio.** Resolver migrando os deputados para uma aba do Google Sheets.
+- **CRM de deputados migrado para o Google Sheets** (aba `Deputados`, na mesma planilha das empresas). Leitura e escrita passam por `dados.carregar_deputados` / `dados.adicionar_deputado_crm` — a única porta. O CSV `data/deputados_estaduais.csv` continua fora do git e vira **rede de segurança de leitura** (fallback se o Sheets cair); nesse modo a escrita fica bloqueada, para as duas fontes não divergirem. A escrita é **append-only + RAW** (nunca regrava linha existente; guarda tudo como texto, então um Diálogo com `=` não vira fórmula). Colunas novas na aba fluem sozinhas (leitura/escrita por nome de coluna). Isso destravou o deploy: o painel de Emendas não fica mais vazio fora da máquina local.
 
 ## Fila de trabalho
 
@@ -63,7 +63,7 @@ o trabalho voltou a ser de dados e confiabilidade.
 **Próximo trabalho — features, nesta ordem:**
 1. **Acurácia das datas dos editais** ← é aqui que estamos. Protege a credibilidade
    do sistema: uma data errada é pior que nenhuma (regra 3 acima).
-2. Migrar deputados do CSV para o Google Sheets (destrava o deploy)
+2. ~~Migrar deputados do CSV para o Google Sheets~~ **FEITO** (aba `Deputados`; deploy destravado).
 3. Deputado federal e senador (aguardando as tabelas do Fábio)
 4. Relatório de Prioridades (botão que gera página/PDF do que está vencendo: instituição, data final, valor)
 5. Notificação por **e-mail** quando faltarem 15 dias para um prazo
