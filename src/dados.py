@@ -437,6 +437,41 @@ def adicionar_deputado_crm(novo: dict) -> dict:
     return {"sucesso": True, "motivo": "ok"}
 
 
+def atualizar_status_deputado(nome: str, novo_status: str) -> dict:
+    """Grava SÓ a coluna Status do deputado (por nome) na aba Deputados.
+
+    Usado pelo drag-and-drop do funil de Emendas. Escreve UMA célula — diálogo,
+    temperatura, contatos e os demais campos ficam intactos (mesmo espírito do
+    _atualizar_celula das empresas). Não cria linha: se o deputado não existir,
+    devolve erro. Retorna {sucesso, mensagem}.
+    """
+    nome = str(nome or "").strip()
+    novo_status = str(novo_status or "").strip()
+    if not nome or not novo_status:
+        return {"sucesso": False, "mensagem": "Deputado ou etapa em branco."}
+    sh = _conectar()
+    if sh is None:
+        return {"sucesso": False, "mensagem": "Sem conexão com o Google Sheets — a etapa "
+                "não foi gravada (modo local)."}
+    try:
+        ws = sh.worksheet(ABA_DEPUTADOS)
+        cab = [str(c).strip() for c in ws.row_values(1)]
+        if "Deputado" not in cab or "Status" not in cab:
+            return {"sucesso": False, "mensagem": "Aba Deputados sem coluna Deputado/Status."}
+        col_dep = cab.index("Deputado") + 1
+        col_status = cab.index("Status") + 1
+        nomes = ws.col_values(col_dep)  # nomes[0] é o cabeçalho
+        linha = next((i for i, v in enumerate(nomes[1:], start=2)
+                      if str(v).strip() == nome), None)
+        if linha is None:
+            return {"sucesso": False, "mensagem": f"Deputado '{nome}' não encontrado na aba."}
+        ws.update_cell(linha, col_status, novo_status)  # só a célula de Status
+        carregar_deputados.clear()
+        return {"sucesso": True, "mensagem": f"{nome}: etapa → {novo_status}."}
+    except Exception as e:  # noqa: BLE001
+        return {"sucesso": False, "mensagem": f"Erro ao gravar no Google Sheets: {e}"}
+
+
 @st.cache_data(ttl=60, show_spinner=False)
 def carregar_editais_privados() -> pd.DataFrame:
     """Lê a aba opcional 'Editais_Privados' (prazos). Vazio se não existir/CSV."""

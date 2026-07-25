@@ -1801,6 +1801,31 @@ EMENDA_ICONES = {"emnav_visao-geral": "visao-geral", "emnav_deputados": "deputad
 EMENDA_ROTULOS = {**{f"emnav_{slug(p)}": p for p in EMENDA_PAGES},
                   "emenda_trocar": "Trocar radar", "emenda_logout": "Sair"}
 
+# Etapas do funil de negociação (colunas do kanban), em ordem. Os nomes são
+# escolhidos para SEGUIREM compatíveis com as contagens existentes: "Não iniciado"
+# casa com o check de não-abordados; "Reunião" com startswith("reuni"); "Emenda
+# aprovada" com "aprovada". Arrastar grava a etapa como Status do deputado.
+EMENDA_FUNIL_ETAPAS = ["Não iniciado", "Contato iniciado", "Reunião",
+                       "Emenda encaminhada", "Emenda aprovada"]
+EMENDA_ETAPA_COR = {"Não iniciado": "#7C8698", "Contato iniciado": "#5B9BD5",
+                    "Reunião": "#E8B54A", "Emenda encaminhada": "#8B7BF0",
+                    "Emenda aprovada": "#4ADE80"}
+
+
+def _etapa_de_status(status: str) -> str:
+    """Enquadra um Status (livre) do deputado numa das etapas canônicas do funil."""
+    s = str(status or "").lower()
+    if "aprovada" in s:
+        return "Emenda aprovada"
+    if "encaminh" in s or "empenh" in s or "protocol" in s:
+        return "Emenda encaminhada"
+    if "reuni" in s or "negocia" in s or "andamento" in s:
+        return "Reunião"
+    if any(k in s for k in ("ligac", "ligaç", "contato", "escritor", "assessor",
+                            "email", "e-mail", "mensagem", "whats")):
+        return "Contato iniciado"
+    return "Não iniciado"
+
 
 def ir_para_emenda(pagina: str):
     st.session_state["emenda_page"] = pagina
@@ -2163,6 +2188,68 @@ def render_descobrir() -> None:
             _linha_descobrir(row, "expansao", i, no_crm(row["deputado"]))
 
 
+def _funil_emendas_colunas(deps: list) -> list:
+    """Monta as colunas do kanban a partir dos deputados, enquadrando cada um na
+    sua etapa. card.id = nome (chave da aba); card.status = a etapa (coluna)."""
+    colunas = []
+    for etapa in EMENDA_FUNIL_ETAPAS:
+        cards = [{
+            "id": d["nome"], "status": etapa, "nome": d["nome"],
+            "setor": d.get("partido") or "—",
+            "score": int(d.get("score") or 0),
+            "valor": f'{d.get("temp_emoji","")} {d.get("temp","")}'.strip(),
+        } for d in deps if _etapa_de_status(d.get("status", "")) == etapa]
+        colunas.append({"status": etapa, "cor": EMENDA_ETAPA_COR[etapa], "cards": cards})
+    return colunas
+
+
+def render_funil_emendas() -> None:
+    """Funil de negociação dos deputados — MESMO kanban drag-and-drop da Captação.
+    Arrastar grava a nova etapa na coluna Status da aba Deputados (só essa célula)."""
+    deps = _deputados_ordenados()
+    _mostrar_resultado(st.session_state.pop("kanban_emendas_msg", None))
+    if not deps:
+        st.warning("Base de deputados vazia.")
+        return
+
+    conectado = dados.deputados_conectado()
+    colunas = _funil_emendas_colunas(deps)
+    if not KANBAN_DND_OK or not conectado:
+        # fallback estático (mesmo espírito do funil de Captação)
+        cols_html = ""
+        for c in colunas:
+            cards = "".join(
+                f'<div class="kcard"><div class="kn">{esc(cd["nome"])}</div>'
+                f'<div class="ks">{esc(cd["setor"])}</div></div>' for cd in c["cards"][:8]) \
+                or '<div class="kmore">vazio</div>'
+            cols_html += (f'<div class="kcol"><div class="kcol-h">'
+                          f'<span><span class="accent" style="background:{c["cor"]}"></span>{esc(c["status"])}</span>'
+                          f'<span class="ct">{len(c["cards"])}</span></div>'
+                          f'<div class="kbody">{cards}</div></div>')
+        st.markdown(f'<div class="kan">{cols_html}</div>', unsafe_allow_html=True)
+        st.caption("Arrastar-e-soltar disponível só com o Google Sheets conectado "
+                   "(a etapa grava direto na aba Deputados)." if not conectado
+                   else "Arrastar-e-soltar indisponível neste ambiente.")
+        return
+
+    resultado = _kanban_component(colunas=colunas, editable=True,
+                                  key="kanban_emendas", default=None)
+    if isinstance(resultado, dict):
+        nonce = resultado.get("nonce")
+        if nonce and nonce != st.session_state.get("kanban_emendas_nonce"):
+            st.session_state["kanban_emendas_nonce"] = nonce
+            nome = str(resultado.get("org_id", "")).strip()   # id do card = nome do deputado
+            novo = str(resultado.get("novo_status", "")).strip()
+            if nome and novo in EMENDA_FUNIL_ETAPAS:
+                res = dados.atualizar_status_deputado(nome, novo)
+                st.session_state["kanban_emendas_msg"] = res
+                st.toast(res.get("mensagem", ""))
+            else:
+                st.session_state["kanban_emendas_msg"] = {
+                    "sucesso": False, "mensagem": "Movimento inválido (etapa fora do funil)."}
+            st.rerun()  # sucesso confirma a coluna; falha faz o card voltar à origem
+
+
 def render_emendas():
     """Painel do radar de Emendas Parlamentares (CRM de deputados)."""
     st.markdown(_EMENDAS_CHROME_CSS, unsafe_allow_html=True)
@@ -2191,6 +2278,10 @@ def render_emendas():
     # Tela de PLANEJAMENTO (levantamento de emendas), separada do CRM dos 16.
     if modo == "descobrir":
         render_descobrir()
+        return
+    # Funil de negociação com drag-and-drop (grava a etapa na aba Deputados).
+    if modo == "funil":
+        render_funil_emendas()
         return
 
     deps = _deputados_ordenados()
