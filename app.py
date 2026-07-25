@@ -1868,18 +1868,16 @@ _DESCOBRIR_CSS = """
   color:var(--dim);margin:20px 0 10px;display:flex;align-items:center;gap:10px}
 .dd-sec b{color:#b7abff;font-weight:600}
 .dd-sec .ln{flex:1;height:1px;background:var(--line)}
-/* Linha-card violeta clicável — mesmo tratamento dos glowcards do painel.
-   Alinhamento vertical (o difícil): o Streamlit deixa cada coluna com altura
-   própria e o conteúdo colado no topo. Solução: as colunas esticam para a MESMA
-   altura (align-items:stretch) e cada célula centra o próprio conteúdo — assim
-   nome, score, valores e botão ficam todos no centro da linha. */
+/* Linha-card violeta CLICÁVEL por inteiro. O truque: um botão transparente
+   (chave dd_) é posicionado sobre a linha toda e captura o clique -> abre o
+   dossiê. O botão "Puxar" (chave crm_) fica com z-index maior, então continua
+   sendo a exceção clicável. Mesmo tratamento visual dos glowcards do painel. */
 [data-testid="stHorizontalBlock"]:has(.dd-cell){
-  position:relative;overflow:hidden;box-sizing:border-box;
+  position:relative;overflow:hidden;box-sizing:border-box;cursor:pointer;
   background:var(--surface);border:1px solid var(--line);border-left:3px solid #8B7BF0;
   border-radius:14px;padding:8px 10px 8px 16px;margin-bottom:10px;min-height:62px;
   align-items:stretch;box-shadow:var(--sh-1);
   transition:transform .18s var(--ease),border-color .18s var(--ease),box-shadow .18s var(--ease)}
-/* brilho suave no canto, revelado no hover — a assinatura dos glowcards */
 [data-testid="stHorizontalBlock"]:has(.dd-cell)::after{content:"";position:absolute;
   top:-45%;right:-6%;width:150px;height:150px;border-radius:50%;pointer-events:none;opacity:0;
   background:radial-gradient(circle,rgba(139,123,240,.18),transparent 70%);
@@ -1887,11 +1885,22 @@ _DESCOBRIR_CSS = """
 [data-testid="stHorizontalBlock"]:has(.dd-cell):hover{transform:translateY(-2px);
   border-color:rgba(139,123,240,.5);box-shadow:0 8px 22px -6px rgba(139,123,240,.24)}
 [data-testid="stHorizontalBlock"]:has(.dd-cell):hover::after{opacity:1}
-/* cada coluna vira um flex-column de altura cheia; o conteúdo centraliza nela */
+/* colunas com a mesma altura; conteúdo centrado */
 [data-testid="stHorizontalBlock"]:has(.dd-cell)>[data-testid="stColumn"]{display:flex;flex-direction:column}
 [data-testid="stHorizontalBlock"]:has(.dd-cell) [data-testid="stVerticalBlock"]{flex:1;justify-content:center}
-.dd-cell{min-width:0;display:flex;flex-direction:column;justify-content:center;gap:3px}
-/* linha 1 do card (nome + selo) numa fila só, para o selo não cair pra baixo */
+/* OVERLAY: o container do botão dd_ cobre a linha inteira, invisível mas clicável */
+[data-testid="stHorizontalBlock"]:has(.dd-cell) [class*="st-key-dd_"]{
+  position:absolute;inset:0;z-index:4;margin:0;padding:0}
+[data-testid="stHorizontalBlock"]:has(.dd-cell) [class*="st-key-dd_"] .stButton,
+[data-testid="stHorizontalBlock"]:has(.dd-cell) [class*="st-key-dd_"] button{
+  height:100%;width:100%;min-height:0;border:none;background:transparent;box-shadow:none}
+[data-testid="stHorizontalBlock"]:has(.dd-cell) [class*="st-key-dd_"] button{opacity:0;cursor:pointer}
+/* o botão Puxar fica ACIMA do overlay -> continua clicável (a exceção) */
+[data-testid="stHorizontalBlock"]:has(.dd-cell) [class*="st-key-crm_"]{position:relative;z-index:5}
+/* card = flex horizontal de 3 células (nome | score | autorizado) */
+.dd-cell{min-width:0;display:flex;align-items:center;gap:20px}
+.dd-nomecol{flex:3;min-width:0} .dd-scorecol{flex:0 0 60px} .dd-valcol{flex:2.2;min-width:0}
+.dd-nomecol,.dd-scorecol,.dd-valcol{display:flex;flex-direction:column;justify-content:center;gap:3px}
 .dd-top{display:flex;align-items:center;min-width:0;white-space:nowrap;overflow:hidden}
 .dd-nome{font-weight:700;font-size:14.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis}
 .dd-sub{font-family:var(--mono);font-size:11px;color:var(--dim);
@@ -1899,7 +1908,7 @@ _DESCOBRIR_CSS = """
 .dd-fabio{font-size:9.5px;font-weight:600;padding:2px 8px;border-radius:20px;vertical-align:middle;
   background:rgba(139,123,240,.16);color:#b7abff;margin-left:9px;letter-spacing:.3px}
 .dd-score{font-family:var(--disp);font-weight:700;font-size:22px;line-height:1.1}
-.dd-val{font-size:12.5px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dd-val{font-size:13px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dd-val b{font-family:var(--disp);color:var(--ink)}
 /* boxes do dossiê */
 .dd-box{background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:15px 16px}
@@ -1956,34 +1965,34 @@ def _puxar_para_crm(row: dict, secao: str) -> dict:
 
 def _linha_descobrir(row: dict, secao: str, idx, no_crm: bool) -> None:
     """Uma linha-card de deputado. secao ∈ {'territorio','expansao'}.
-    `no_crm` = já está no CRM (checagem LIVE, feita no render, não o flag estático)."""
+    O card INTEIRO é clicável (abre o dossiê) via um botão transparente sobreposto;
+    o botão "Puxar" fica por cima como a exceção. Na linha, só o autorizado — o
+    pago vs autorizado vive no dossiê. `no_crm` = checagem LIVE contra o CRM."""
     score = float(row.get("score_pfc") or row.get("score_expansao") or 0)
     aut = row.get("autorizado_pfc" if secao == "territorio" else "autorizado_geral_edusoc", 0)
-    pago = row.get("pago_pfc" if secao == "territorio" else "pago_geral_edusoc", 0)
     fatia = row.get("alinhamento_pct", 0)
-    c1, c2, c3, c4, c5 = st.columns([2.9, 0.85, 2.15, 1.0, 1.2])
-    c1.markdown(
-        f'<div class="dd-cell"><div class="dd-top"><span class="dd-nome">{esc(row["deputado"])}</span>'
+    c_info, c_acao = st.columns([7, 1.15])
+    c_info.markdown(
+        '<div class="dd-cell">'
+        f'<div class="dd-nomecol"><div class="dd-top"><span class="dd-nome">{esc(row["deputado"])}</span>'
         + ('<span class="dd-fabio">NO CRM</span>' if no_crm else "")
-        + f'</div><div class="dd-sub">{esc(row.get("partido", ""))} · fatia edu/social {esc(fatia)}%</div></div>',
+        + f'</div><div class="dd-sub">{esc(row.get("partido", ""))} · fatia edu/social {esc(fatia)}%</div></div>'
+        f'<div class="dd-scorecol"><div class="dd-score" style="color:{_cor_score(score)}">{round(score)}</div>'
+        f'<div class="dd-sub">score</div></div>'
+        f'<div class="dd-valcol"><div class="dd-val">aut. <b>{brl_curto(aut)}</b></div>'
+        f'<div class="dd-sub">{esc(_muns_pfc(row, secao))}</div></div>'
+        '</div>',
         unsafe_allow_html=True)
-    c2.markdown(
-        f'<div class="dd-cell"><div class="dd-score" style="color:{_cor_score(score)}">{round(score)}</div>'
-        f'<div class="dd-sub">score</div></div>',
-        unsafe_allow_html=True)
-    c3.markdown(
-        f'<div class="dd-cell"><div class="dd-val">aut. <b>{brl_curto(aut)}</b>'
-        f'<span style="color:var(--dim)"> · </span>pago <b>{brl_curto(pago)}</b></div>'
-        f'<div class="dd-sub">{esc(_muns_pfc(row, secao))}</div></div>',
-        unsafe_allow_html=True)
-    if c4.button("Dossiê", key=f"dd_{secao}_{idx}", use_container_width=True):
+    # botão transparente que cobre o card inteiro (o CSS o sobrepõe) -> abre o dossiê
+    if c_info.button(f"Abrir dossiê de {row['deputado']}", key=f"dd_{secao}_{idx}",
+                     use_container_width=True):
         dlg_descobrir_deputado(dict(row), secao)
-    # Puxar para o CRM: grava DIRETO. Se já está no CRM, botão desabilitado (não duplica).
+    # Puxar para o CRM: grava DIRETO. Se já está no CRM, desabilitado (não duplica).
     if no_crm:
-        c5.button("no CRM", key=f"crm_{secao}_{idx}", disabled=True, use_container_width=True,
-                  help="Este deputado já está no CRM do Fábio.")
-    elif c5.button("Puxar", key=f"crm_{secao}_{idx}", use_container_width=True,
-                   help="Grava este deputado como nova linha no CRM (direto, sem confirmação)."):
+        c_acao.button("no CRM", key=f"crm_{secao}_{idx}", disabled=True, use_container_width=True,
+                      help="Este deputado já está no CRM do Fábio.")
+    elif c_acao.button("Puxar", key=f"crm_{secao}_{idx}", use_container_width=True,
+                       help="Grava este deputado como nova linha no CRM (direto, sem confirmação)."):
         res = _puxar_para_crm(dict(row), secao)
         if res.get("sucesso"):
             st.toast(f"{row['deputado']} puxado para o CRM.")
