@@ -1868,22 +1868,39 @@ _DESCOBRIR_CSS = """
   color:var(--dim);margin:20px 0 10px;display:flex;align-items:center;gap:10px}
 .dd-sec b{color:#b7abff;font-weight:600}
 .dd-sec .ln{flex:1;height:1px;background:var(--line)}
-/* linha-card violeta, clicável — estiliza o bloco horizontal do Streamlit */
+/* Linha-card violeta clicável — mesmo tratamento dos glowcards do painel.
+   Alinhamento vertical (o difícil): o Streamlit deixa cada coluna com altura
+   própria e o conteúdo colado no topo. Solução: as colunas esticam para a MESMA
+   altura (align-items:stretch) e cada célula centra o próprio conteúdo — assim
+   nome, score, valores e botão ficam todos no centro da linha. */
 [data-testid="stHorizontalBlock"]:has(.dd-cell){
+  position:relative;overflow:hidden;box-sizing:border-box;
   background:var(--surface);border:1px solid var(--line);border-left:3px solid #8B7BF0;
-  border-radius:12px;padding:8px 8px 8px 14px;margin-bottom:9px;align-items:center;min-height:60px;
-  transition:transform .16s var(--ease),border-color .16s var(--ease),background .16s var(--ease)}
-[data-testid="stHorizontalBlock"]:has(.dd-cell):hover{transform:translateX(3px);
-  border-color:rgba(139,123,240,.45);background:var(--hover)}
-.dd-cell{min-width:0}
-.dd-nome{font-weight:700;font-size:14.5px;color:var(--ink)}
-.dd-sub{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:4px;
+  border-radius:14px;padding:8px 10px 8px 16px;margin-bottom:10px;min-height:62px;
+  align-items:stretch;box-shadow:var(--sh-1);
+  transition:transform .18s var(--ease),border-color .18s var(--ease),box-shadow .18s var(--ease)}
+/* brilho suave no canto, revelado no hover — a assinatura dos glowcards */
+[data-testid="stHorizontalBlock"]:has(.dd-cell)::after{content:"";position:absolute;
+  top:-45%;right:-6%;width:150px;height:150px;border-radius:50%;pointer-events:none;opacity:0;
+  background:radial-gradient(circle,rgba(139,123,240,.18),transparent 70%);
+  transition:opacity .2s var(--ease)}
+[data-testid="stHorizontalBlock"]:has(.dd-cell):hover{transform:translateY(-2px);
+  border-color:rgba(139,123,240,.5);box-shadow:0 8px 22px -6px rgba(139,123,240,.24)}
+[data-testid="stHorizontalBlock"]:has(.dd-cell):hover::after{opacity:1}
+/* cada coluna vira um flex-column de altura cheia; o conteúdo centraliza nela */
+[data-testid="stHorizontalBlock"]:has(.dd-cell)>[data-testid="stColumn"]{display:flex;flex-direction:column}
+[data-testid="stHorizontalBlock"]:has(.dd-cell) [data-testid="stVerticalBlock"]{flex:1;justify-content:center}
+.dd-cell{min-width:0;display:flex;flex-direction:column;justify-content:center;gap:3px}
+/* linha 1 do card (nome + selo) numa fila só, para o selo não cair pra baixo */
+.dd-top{display:flex;align-items:center;min-width:0;white-space:nowrap;overflow:hidden}
+.dd-nome{font-weight:700;font-size:14.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis}
+.dd-sub{font-family:var(--mono);font-size:11px;color:var(--dim);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dd-fabio{font-size:9.5px;font-weight:600;padding:2px 8px;border-radius:20px;vertical-align:middle;
   background:rgba(139,123,240,.16);color:#b7abff;margin-left:9px;letter-spacing:.3px}
-.dd-tag{font-family:var(--mono);font-size:9px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim)}
 .dd-score{font-family:var(--disp);font-weight:700;font-size:22px;line-height:1.1}
-.dd-val{font-size:12.5px;color:var(--text-2)} .dd-val b{font-family:var(--disp);color:var(--ink)}
+.dd-val{font-size:12.5px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dd-val b{font-family:var(--disp);color:var(--ink)}
 /* boxes do dossiê */
 .dd-box{background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:15px 16px}
 .dd-box.aut{border-left:3px solid #8B7BF0} .dd-box.pago{border-left:3px solid var(--sem-high)}
@@ -1919,13 +1936,13 @@ def _linha_descobrir(row: dict, secao: str, idx) -> None:
     fatia = row.get("alinhamento_pct", 0)
     c1, c2, c3, c4 = st.columns([3.3, 1.0, 2.5, 1.1])
     c1.markdown(
-        f'<div class="dd-cell"><span class="dd-nome">{esc(row["deputado"])}</span>'
+        f'<div class="dd-cell"><div class="dd-top"><span class="dd-nome">{esc(row["deputado"])}</span>'
         + ('<span class="dd-fabio">NO CRM</span>' if _bool_planilha(row.get("na_planilha_fabio")) else "")
-        + f'<div class="dd-sub">{esc(row.get("partido", ""))} · fatia edu/social {esc(fatia)}%</div></div>',
+        + f'</div><div class="dd-sub">{esc(row.get("partido", ""))} · fatia edu/social {esc(fatia)}%</div></div>',
         unsafe_allow_html=True)
     c2.markdown(
-        f'<div class="dd-cell"><div class="dd-tag">score</div>'
-        f'<div class="dd-score" style="color:{_cor_score(score)}">{round(score)}</div></div>',
+        f'<div class="dd-cell"><div class="dd-score" style="color:{_cor_score(score)}">{round(score)}</div>'
+        f'<div class="dd-sub">score</div></div>',
         unsafe_allow_html=True)
     c3.markdown(
         f'<div class="dd-cell"><div class="dd-val">aut. <b>{brl_curto(aut)}</b>'
