@@ -2188,6 +2188,16 @@ def render_descobrir() -> None:
             _linha_descobrir(row, "expansao", i, no_crm(row["deputado"]))
 
 
+def _mostrar_resultado(res):
+    """Banner de resultado (verde/amarelo) a partir de {sucesso, mensagem}.
+    Definido AQUI (e não lá embaixo) porque o painel de Emendas é renderizado
+    antes daquele ponto do módulo — usado pelos dois funis (Emendas e Captação)."""
+    if not res:
+        return
+    (st.success if res.get("sucesso") else st.warning)(
+        res.get("mensagem", "Operação concluída."))
+
+
 def _funil_emendas_colunas(deps: list) -> list:
     """Monta as colunas do kanban a partir dos deputados, enquadrando cada um na
     sua etapa. card.id = nome (chave da aba); card.status = a etapa (coluna)."""
@@ -2708,13 +2718,6 @@ def _cb_salvar_obs(org_id, ta_key):
     st.session_state[f"obs_msg_{org_id}"] = res
     if res.get("sucesso"):
         st.session_state[ta_key] = ""
-
-
-def _mostrar_resultado(res):
-    if not res:
-        return
-    (st.success if res.get("sucesso") else st.warning)(
-        res.get("mensagem", "Operação concluída."))
 
 
 # =========================================================================== #
