@@ -1916,28 +1916,55 @@ def _cor_score(s: float) -> str:
     return "var(--sem-high)" if s >= 60 else "var(--sem-mid)" if s >= 50 else "var(--sem-low)"
 
 
-def _bool_planilha(v) -> bool:
-    return str(v).strip().lower() in ("true", "1", "sim")
+def _muns_pfc(row: dict, secao: str) -> str:
+    """Municípios do PFC onde o deputado atua, como texto legível."""
+    if secao == "territorio":
+        return str(row.get("municipios_pfc", "") or "")
+    diretos = str(row.get("municipios_pfc_diretos", "") or "")
+    vizinhos = str(row.get("municipios_vizinhos", "") or "")
+    return " · ".join(x for x in (
+        (f"direto: {diretos}" if diretos else ""),
+        (f"vizinho: {vizinhos}" if vizinhos else "")) if x) or "sem pé no território"
 
 
-def _linha_descobrir(row: dict, secao: str, idx) -> None:
-    """Uma linha-card clicável de deputado. secao ∈ {'territorio','expansao'}."""
+def _puxar_para_crm(row: dict, secao: str) -> dict:
+    """Monta a linha do CRM a partir do levantamento e grava (append-only)."""
     score = float(row.get("score_pfc") or row.get("score_expansao") or 0)
     if secao == "territorio":
         aut, pago = row.get("autorizado_pfc", 0), row.get("pago_pfc", 0)
         muns = str(row.get("municipios_pfc", "") or "")
+        secao_nome = "Abordar já (território)"
     else:
         aut, pago = row.get("autorizado_geral_edusoc", 0), row.get("pago_geral_edusoc", 0)
-        diretos = str(row.get("municipios_pfc_diretos", "") or "")
-        vizinhos = str(row.get("municipios_vizinhos", "") or "")
-        muns = " · ".join(x for x in (
-            (f"direto: {diretos}" if diretos else ""),
-            (f"vizinho: {vizinhos}" if vizinhos else "")) if x) or "sem pé no território"
+        d = str(row.get("municipios_pfc_diretos", "") or "")
+        v = str(row.get("municipios_vizinhos", "") or "")
+        muns = "; ".join(x for x in (d, v) if x)
+        secao_nome = "Cortejar (expansão)"
+    hoje = datetime.date.today().strftime("%d/%m/%Y")
+    obs = (f"Puxado da Descoberta em {hoje} · {secao_nome}. "
+           f"Fatia educação/social {row.get('alinhamento_pct', 0)}%. "
+           f"Autorizado {brl(aut)}, pago {brl(pago)} (execução 2023-2025).")
+    return dados.adicionar_deputado_crm({
+        "Deputado": row.get("deputado", ""),
+        "Partido": row.get("partido", ""),
+        "Score Integrado": str(round(score)),
+        "Base Regional": muns,
+        "Status": "Não iniciado",  # ponto de partida; o Fábio preenche o resto
+        "Observações": obs,
+    })
+
+
+def _linha_descobrir(row: dict, secao: str, idx, no_crm: bool) -> None:
+    """Uma linha-card de deputado. secao ∈ {'territorio','expansao'}.
+    `no_crm` = já está no CRM (checagem LIVE, feita no render, não o flag estático)."""
+    score = float(row.get("score_pfc") or row.get("score_expansao") or 0)
+    aut = row.get("autorizado_pfc" if secao == "territorio" else "autorizado_geral_edusoc", 0)
+    pago = row.get("pago_pfc" if secao == "territorio" else "pago_geral_edusoc", 0)
     fatia = row.get("alinhamento_pct", 0)
-    c1, c2, c3, c4 = st.columns([3.3, 1.0, 2.5, 1.1])
+    c1, c2, c3, c4, c5 = st.columns([2.9, 0.85, 2.15, 1.0, 1.2])
     c1.markdown(
         f'<div class="dd-cell"><div class="dd-top"><span class="dd-nome">{esc(row["deputado"])}</span>'
-        + ('<span class="dd-fabio">NO CRM</span>' if _bool_planilha(row.get("na_planilha_fabio")) else "")
+        + ('<span class="dd-fabio">NO CRM</span>' if no_crm else "")
         + f'</div><div class="dd-sub">{esc(row.get("partido", ""))} · fatia edu/social {esc(fatia)}%</div></div>',
         unsafe_allow_html=True)
     c2.markdown(
@@ -1947,17 +1974,31 @@ def _linha_descobrir(row: dict, secao: str, idx) -> None:
     c3.markdown(
         f'<div class="dd-cell"><div class="dd-val">aut. <b>{brl_curto(aut)}</b>'
         f'<span style="color:var(--dim)"> · </span>pago <b>{brl_curto(pago)}</b></div>'
-        f'<div class="dd-sub">{esc(muns)}</div></div>',
+        f'<div class="dd-sub">{esc(_muns_pfc(row, secao))}</div></div>',
         unsafe_allow_html=True)
     if c4.button("Dossiê", key=f"dd_{secao}_{idx}", use_container_width=True):
         dlg_descobrir_deputado(dict(row), secao)
+    # Puxar para o CRM: grava DIRETO. Se já está no CRM, botão desabilitado (não duplica).
+    if no_crm:
+        c5.button("no CRM", key=f"crm_{secao}_{idx}", disabled=True, use_container_width=True,
+                  help="Este deputado já está no CRM do Fábio.")
+    elif c5.button("Puxar", key=f"crm_{secao}_{idx}", use_container_width=True,
+                   help="Grava este deputado como nova linha no CRM (direto, sem confirmação)."):
+        res = _puxar_para_crm(dict(row), secao)
+        if res.get("sucesso"):
+            st.toast(f"{row['deputado']} puxado para o CRM.")
+        elif res.get("motivo") == "duplicado":
+            st.toast(f"{row['deputado']} já estava no CRM — não dupliquei.")
+        else:
+            st.toast(f"Não deu para puxar: {res.get('mensagem') or res.get('motivo')}")
+        st.rerun()
 
 
 @st.dialog("Dossiê do deputado", width="large")
 def dlg_descobrir_deputado(row: dict, secao: str) -> None:
     breadcrumb("Descobrir", str(row.get("deputado", "")))
     score = float(row.get("score_pfc") or row.get("score_expansao") or 0)
-    no_crm = _bool_planilha(row.get("na_planilha_fabio"))
+    no_crm = dados.deputado_no_crm(str(row.get("deputado", "")))  # checagem LIVE
     camada = row.get("camada", "") if secao == "expansao" else "No território"
     st.markdown(
         f'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
@@ -2001,8 +2042,22 @@ def dlg_descobrir_deputado(row: dict, secao: str) -> None:
         _linha_mun("Vizinho — mesma Região Imediata (IBGE)", row.get("municipios_vizinhos", ""),
                    "#5B9BD5", valor=row.get("autorizado_vizinho", 0))
 
-    st.caption("Levantamento de execução (Transparência SP · Power BI 2023-2025). "
-               "Puxar este deputado para o CRM é o próximo passo — ainda não disponível.")
+    st.caption("Levantamento de execução (Transparência SP · Power BI 2023-2025).")
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+    if no_crm:
+        st.caption("✓ Já está no CRM do Fábio — o dossiê de negociação vive na tela Deputados.")
+    elif st.button("Puxar para o CRM", key=f"dlg_crm_{slug(str(row.get('deputado','')))}",
+                   type="primary", use_container_width=True,
+                   help="Grava como nova linha no CRM, direto. O Fábio preenche diálogo, "
+                        "temperatura e status."):
+        res = _puxar_para_crm(row, secao)
+        if res.get("sucesso"):
+            st.toast(f"{row.get('deputado','')} puxado para o CRM.")
+        elif res.get("motivo") == "duplicado":
+            st.toast(f"{row.get('deputado','')} já estava no CRM — não dupliquei.")
+        else:
+            st.toast(f"Não deu para puxar: {res.get('mensagem') or res.get('motivo')}")
+        st.rerun()
 
 
 def _linha_mun(rotulo: str, municipios, cor: str, valor=None) -> None:
@@ -2030,12 +2085,18 @@ def render_descobrir() -> None:
     st.markdown(
         '<div class="dd-intro">Quem abordar para emendas de educação e assistência social. '
         'Baseado na execução real de 2023-2025 (Transparência SP). '
-        'Esta é a lista de prospecção — separada do CRM dos 16 deputados.</div>'
+        'Esta é a lista de prospecção — separada do CRM dos 16 deputados. '
+        'O botão <b>Puxar</b> grava o deputado no CRM na hora.</div>'
         '<div class="dd-legend">'
         '<span><span class="sw" style="background:var(--sem-high)"></span>score 60+ · forte</span>'
         '<span><span class="sw" style="background:var(--sem-mid)"></span>50–59 · médio</span>'
         '<span><span class="sw" style="background:var(--sem-low)"></span>&lt;50 · fraco</span>'
         '</div>', unsafe_allow_html=True)
+
+    # Checagem LIVE contra o CRM atual (não o flag estático do ranking, que fica
+    # velho assim que se puxa alguém): decide o selo "NO CRM" e trava a duplicata.
+    crm = dados.carregar_deputados()
+    no_crm = lambda nome: dados.deputado_no_crm(nome, crm)  # noqa: E731
 
     aba1, aba2 = st.tabs([f"Abordar já · {len(terr)}", f"Cortejar · {len(exp)}"])
     with aba1:
@@ -2044,7 +2105,7 @@ def render_descobrir() -> None:
         if terr.empty:
             st.caption("Ninguém no território ainda.")
         for i, row in terr.iterrows():
-            _linha_descobrir(row, "territorio", i)
+            _linha_descobrir(row, "territorio", i, no_crm(row["deputado"]))
     with aba2:
         st.markdown('<div class="dd-intro">Alto alinhamento e volume no estado, ainda '
                     '<b>fora</b> dos nossos municípios (ou só de raspão). Alvo de cortejo — '
@@ -2054,11 +2115,11 @@ def render_descobrir() -> None:
         st.markdown(f'<div class="dd-sec"><b>Alvos prioritários</b> · R$ 5 mi+ em edu/social '
                     f'· {len(pri)}<span class="ln"></span></div>', unsafe_allow_html=True)
         for i, row in pri.iterrows():
-            _linha_descobrir(row, "expansao", i)
+            _linha_descobrir(row, "expansao", i, no_crm(row["deputado"]))
         st.markdown(f'<div class="dd-sec"><b>Demais candidatos</b> · {len(dem)}'
                     f'<span class="ln"></span></div>', unsafe_allow_html=True)
         for i, row in dem.iterrows():
-            _linha_descobrir(row, "expansao", i)
+            _linha_descobrir(row, "expansao", i, no_crm(row["deputado"]))
 
 
 def render_emendas():

@@ -273,6 +273,74 @@ def carregar_ranking_expansao() -> pd.DataFrame:
         return pd.DataFrame()
 
 
+# --------------------------------------------------------------------------- #
+# ESCRITA no CRM sensível: puxar um deputado da tela "Descobrir"
+# ---------------------------------------------------------------------------
+# O CRM (deputados_estaduais.csv) é o arquivo sensível do Fábio, fora do git.
+# Esta é a ÚNICA função que ESCREVE nele, e é APPEND-ONLY de propósito:
+#   * nunca modifica uma linha existente -> diálogo, temperatura e status que o
+#     Fábio já escreveu ficam intactos (salvaguarda: não sobrescrever);
+#   * recusa duplicata por nome normalizado/contido (salvaguarda: não duplicar).
+# --------------------------------------------------------------------------- #
+def _tokens_nome(nome: str) -> set:
+    """Nome -> conjunto de tokens sem acento/minúsculo, para comparar."""
+    import unicodedata
+    s = unicodedata.normalize("NFKD", str(nome or ""))
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return set(s.lower().split())
+
+
+def _mesmo_deputado(a: str, b: str) -> bool:
+    """True se a e b são o mesmo deputado (igual, ou um contém todos os tokens
+    do outro — ex.: 'Danilo Balas' ⊆ 'Agente Federal Danilo Balas'). Exige 2+
+    tokens em comum via contenção total, então 'Altair Moraes' != 'Rodrigo Moraes'."""
+    ta, tb = _tokens_nome(a), _tokens_nome(b)
+    if not ta or not tb:
+        return False
+    return ta == tb or ta <= tb or tb <= ta
+
+
+def deputado_no_crm(nome: str, df: pd.DataFrame | None = None) -> bool:
+    """O deputado (por nome, com normalização) já está no CRM?"""
+    df = carregar_deputados() if df is None else df
+    if df.empty or "Deputado" not in df:
+        return False
+    return any(_mesmo_deputado(nome, x) for x in df["Deputado"])
+
+
+def adicionar_deputado_crm(novo: dict) -> dict:
+    """Acrescenta UM deputado ao CRM. Devolve {'sucesso': bool, 'motivo': str}.
+
+    novo: {coluna_do_CRM: valor}. Colunas ausentes ficam vazias (para o Fábio
+    preencher). Colunas que não existem no CRM são ignoradas (não inventa campo).
+    """
+    if not DEPUTADOS_CSV.exists():
+        return {"sucesso": False, "motivo": "crm_ausente",
+                "mensagem": "Base de deputados não encontrada neste ambiente."}
+    try:
+        df = pd.read_csv(DEPUTADOS_CSV, dtype=str).fillna("")
+    except Exception as e:  # noqa: BLE001
+        return {"sucesso": False, "motivo": "leitura", "mensagem": str(e)}
+
+    nome = str(novo.get("Deputado", "")).strip()
+    if not nome:
+        return {"sucesso": False, "motivo": "sem_nome"}
+    if "Deputado" in df and any(_mesmo_deputado(nome, x) for x in df["Deputado"]):
+        return {"sucesso": False, "motivo": "duplicado"}
+
+    # linha nova com TODAS as colunas do CRM na ordem certa; só preenche o que veio
+    linha = {c: str(novo.get(c, "")) for c in df.columns}
+    df_novo = pd.concat([df, pd.DataFrame([linha])], ignore_index=True)
+    try:
+        # utf-8 sem BOM, como o arquivo original; append-only preserva as demais linhas
+        df_novo.to_csv(DEPUTADOS_CSV, index=False, encoding="utf-8")
+    except Exception as e:  # noqa: BLE001
+        return {"sucesso": False, "motivo": "escrita", "mensagem": str(e)}
+
+    carregar_deputados.clear()  # invalida o cache p/ o próximo read enxergar a linha
+    return {"sucesso": True, "motivo": "ok"}
+
+
 @st.cache_data(ttl=60, show_spinner=False)
 def carregar_editais_privados() -> pd.DataFrame:
     """Lê a aba opcional 'Editais_Privados' (prazos). Vazio se não existir/CSV."""
