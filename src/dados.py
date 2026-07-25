@@ -13,6 +13,7 @@ Funções públicas:
     adicionar_lead_radar(lead)     -> {"sucesso": bool, "mensagem": str}
     salvar_observacao(id, texto)   -> {"sucesso": bool, "mensagem": str}
     atualizar_status(id, status)   -> {"sucesso": bool, "mensagem": str}
+    atualizar_deputado(nome, campos)-> {"sucesso": bool, "mensagem": str}  (edita o CRM, só campos que mudaram)
     limpar_caches()                -> None   (força nova leitura/reconexão)
     modo_conexao()                 -> "sheets" | "csv"
 
@@ -61,6 +62,12 @@ HEADERS_DEPUTADOS = [
     "WhatsApp", "Email", "Instagram", "Emenda/Ação", "Valor",
     "Estratégia PFC", "Observações",
 ]
+# Colunas OFICIAIS da ALESP (públicas, vindas da fonte oficial): a edição pela
+# tela NUNCA escreve nelas — o Fábio não edita contato oficial. Guarda de defesa
+# em atualizar_deputado(), mesmo que o app já não as ofereça para edição.
+COLS_OFICIAIS_ALESP = {
+    "Email Oficial", "Telefone Gabinete", "Página ALESP", "Pagina ALESP",
+}
 
 # Nomes EXATOS das colunas, conforme a planilha / o CSV.
 COL_ID = "ID"
@@ -468,6 +475,70 @@ def atualizar_status_deputado(nome: str, novo_status: str) -> dict:
         ws.update_cell(linha, col_status, novo_status)  # só a célula de Status
         carregar_deputados.clear()
         return {"sucesso": True, "mensagem": f"{nome}: etapa → {novo_status}."}
+    except Exception as e:  # noqa: BLE001
+        return {"sucesso": False, "mensagem": f"Erro ao gravar no Google Sheets: {e}"}
+
+
+def atualizar_deputado(nome: str, campos: dict) -> dict:
+    """Grava SÓ as células dos campos informados do deputado (por nome) na aba
+    Deputados. Preserva TODO o resto: escreve apenas as colunas presentes em
+    `campos`, célula a célula, sem tocar nas demais (mesmo espírito de
+    atualizar_status_deputado, mas para vários campos de uma vez). Usado pela
+    edição do dossiê (diálogo, status, temperatura, próximos passos).
+
+    Invariantes (as mesmas que valem para o resto do CRM):
+      * Só grava conectado ao Sheets; no fallback CSV a escrita fica bloqueada
+        (para as duas fontes nunca divergirem).
+      * RAW (não USER_ENTERED): guarda tudo como TEXTO literal — um Diálogo que
+        comece com "=" nunca vira fórmula (proteção contra injeção de fórmula).
+      * Recusa as colunas OFICIAIS da ALESP — contato oficial não se edita aqui.
+      * Escreve POR NOME de coluna; uma coluna que ainda não exista na aba é
+        criada no fim do cabeçalho antes de gravar ("coluna nova flui sozinha").
+      * NÃO cria linha: se o deputado não existir na aba, devolve erro.
+
+    Retorna {sucesso, mensagem}.
+    """
+    nome = str(nome or "").strip()
+    if not nome:
+        return {"sucesso": False, "mensagem": "Deputado em branco."}
+    # Descarta colunas oficiais e chaves vazias; None vira "". String vazia é
+    # permitida de propósito (deixa o Fábio LIMPAR um campo).
+    campos = {str(k).strip(): ("" if v is None else str(v))
+              for k, v in (campos or {}).items()
+              if str(k).strip() and str(k).strip() not in COLS_OFICIAIS_ALESP}
+    if not campos:
+        return {"sucesso": False, "mensagem": "Nada para gravar."}
+
+    sh = _conectar()
+    if sh is None:
+        return {"sucesso": False, "mensagem": "Sem conexão com o Google Sheets — as "
+                "alterações não foram gravadas (modo local, escrita bloqueada)."}
+    try:
+        import gspread
+        ws = sh.worksheet(ABA_DEPUTADOS)
+        cab = [str(c).strip() for c in ws.row_values(1)]
+        if "Deputado" not in cab:
+            return {"sucesso": False, "mensagem": "Aba Deputados sem coluna Deputado."}
+        col_dep = cab.index("Deputado") + 1
+        nomes = ws.col_values(col_dep)  # nomes[0] é o cabeçalho
+        linha = next((i for i, v in enumerate(nomes[1:], start=2)
+                      if str(v).strip() == nome), None)
+        if linha is None:
+            return {"sucesso": False, "mensagem": f"Deputado '{nome}' não encontrado na aba."}
+
+        # Cria no cabeçalho qualquer coluna nova ANTES de montar as células.
+        for col in campos:
+            if col not in cab:
+                cab.append(col)
+                ws.update_cell(1, len(cab), col)
+
+        # Uma única chamada de escrita para todas as células (RAW).
+        celulas = [gspread.Cell(linha, cab.index(col) + 1, val)
+                   for col, val in campos.items()]
+        ws.update_cells(celulas, value_input_option="RAW")
+        carregar_deputados.clear()  # invalida o cache p/ o próximo read enxergar
+        return {"sucesso": True,
+                "mensagem": f"{nome}: {len(celulas)} campo(s) atualizado(s) na aba Deputados."}
     except Exception as e:  # noqa: BLE001
         return {"sucesso": False, "mensagem": f"Erro ao gravar no Google Sheets: {e}"}
 

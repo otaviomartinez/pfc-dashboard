@@ -1350,8 +1350,61 @@ def dlg_deputado(dep: dict):
         f'<div style="font-size:14px;color:var(--ink);line-height:1.6">{val}</div></div>'
         for lab, val in linhas)
     st.markdown(corpo, unsafe_allow_html=True)
-    st.caption("ℹ️ Registrar novo contato/atualizar diálogo grava na planilha de deputados "
-               "(a ser conectada ao Google Sheets nesta rodada é somente leitura).")
+
+    # ---- EDIÇÃO (sensível) — só para usuário autenticado (regra 4) ----------
+    # Grava pela porta única dados.atualizar_deputado: só as células que MUDARAM,
+    # preservando o resto (regra 2). O Status usa as MESMAS 5 etapas do funil,
+    # então dossiê e drag-and-drop escrevem o mesmo campo, sem divergir (regra 3).
+    # Os contatos OFICIAIS da ALESP não entram aqui: são só-leitura (regra 1).
+    if st.session_state.get("user"):
+        nome = dep["nome"]
+        etapa_atual = _etapa_de_status(dep["status"])
+        idx_status = EMENDA_FUNIL_ETAPAS.index(etapa_atual) if etapa_atual in EMENDA_FUNIL_ETAPAS else 0
+        idx_temp = _TEMP_ORDEM.index(dep["temp"]) if dep["temp"] in _TEMP_ORDEM else 0
+
+        st.markdown('<div style="margin-top:22px;padding-top:18px;'
+                    'border-top:1px solid var(--line);font-family:var(--mono);font-size:11px;'
+                    'letter-spacing:1px;text-transform:uppercase;color:#8B7BF0">'
+                    '✎ Atualizar relacionamento</div>', unsafe_allow_html=True)
+
+        ce1, ce2 = st.columns(2)
+        novo_status = ce1.selectbox("Status · etapa do funil", EMENDA_FUNIL_ETAPAS,
+                                    index=idx_status, key=f"ed_status_{nome}")
+        nova_temp = ce2.selectbox("Temperatura", _TEMP_ORDEM,
+                                  index=idx_temp, key=f"ed_temp_{nome}")
+        novo_dialogo = st.text_area("Diálogo · anotações de negociação",
+                                    value=dep["dialogo"], height=130,
+                                    key=f"ed_dialogo_{nome}")
+        nova_obs = st.text_area("Registro de reunião / próximos passos",
+                                value=dep["obs"], height=90, key=f"ed_obs_{nome}")
+
+        if st.button("Salvar alterações", type="primary", use_container_width=True,
+                     key=f"ed_salvar_{nome}"):
+            campos = {}
+            if novo_status != etapa_atual:
+                campos["Status"] = novo_status
+            if nova_temp != dep["temp"]:
+                campos["Temperatura"] = f"{_TEMP_EMOJI[nova_temp]} {nova_temp}"
+            if novo_dialogo.strip() != dep["dialogo"]:
+                campos["Diálogo"] = novo_dialogo.strip()
+            if nova_obs.strip() != dep["obs"]:
+                campos["Observações"] = nova_obs.strip()
+
+            if not campos:
+                st.info("Nenhuma alteração para salvar.")
+            else:
+                res = dados.atualizar_deputado(nome, campos)
+                if res.get("sucesso"):
+                    st.success(f"✓ {res['mensagem']} Os demais campos foram preservados.")
+                    st.toast("Deputado atualizado no Google Sheets.")
+                    st.caption("Feche este dossiê para ver a base e o funil já atualizados.")
+                else:
+                    st.warning(res.get("mensagem", "Não foi possível gravar."))
+        st.caption("🔒 Edição restrita à equipe logada · grava direto na aba Deputados do "
+                   "Google Sheets. Contatos oficiais da ALESP são só-leitura.")
+    else:
+        st.caption("ℹ️ A edição do relacionamento (diálogo, status, temperatura) é restrita "
+                   "à equipe logada.")
 
 
 _EMENDAS_V2_CSS = """
