@@ -2128,6 +2128,84 @@ def _linha_descobrir(row: dict, secao: str, idx, no_crm: bool) -> None:
         st.rerun()
 
 
+# --------------------------------------------------------------------------- #
+# "Melhor argumento de abordagem" — frase-gancho composta do dado do
+# levantamento. Escolhe o argumento MAIS FORTE (território direto > vizinhança >
+# alinhamento proporcional > volume geral); nunca inventa — se não há gancho
+# forte, diz algo honesto. Só composição de texto (sem IA, sem fonte nova).
+# --------------------------------------------------------------------------- #
+_MUN_MINUSC = {"de", "do", "da", "dos", "das", "e", "a", "o", "no", "na"}
+
+
+def _cap_mun(nome: str) -> str:
+    """Title-case pt-BR: mantém conectivos minúsculos ('Campina do Monte Alegre')."""
+    pal = str(nome).lower().split()
+    return " ".join(w if (i > 0 and w in _MUN_MINUSC) else w.capitalize()
+                    for i, w in enumerate(pal))
+
+
+def _fmt_muns(s, limite: int = 3) -> str:
+    """Lista de municípios ('SALTO; IPERÓ') -> 'Salto/Iperó' (corta em `limite`)."""
+    partes = [_cap_mun(p) for p in str(s or "").replace(";", ",").split(",") if p.strip()]
+    if not partes:
+        return ""
+    if len(partes) <= limite:
+        return "/".join(partes)
+    return "/".join(partes[:limite]) + f" +{len(partes) - limite}"
+
+
+def _pct_int(v) -> str:
+    try:
+        return f"{round(float(v))}%"
+    except (TypeError, ValueError):
+        return "0%"
+
+
+def _argumento_abordagem(row: dict, secao: str) -> str:
+    """Melhor gancho de abordagem, do argumento mais forte ao mais fraco.
+    Só usa dado real do levantamento — se não há gancho, é honesto."""
+    def n(k):
+        try:
+            return float(row.get(k) or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    alinh = n("alinhamento_pct")
+    # 1) TERRITÓRIO DIRETO — já financia num município onde o PFC atua
+    if secao == "territorio":
+        aut, muns = n("autorizado_pfc"), str(row.get("municipios_pfc", "")).strip()
+    else:
+        aut, muns = n("autorizado_direto"), str(row.get("municipios_pfc_diretos", "")).strip()
+    if muns and aut > 0:
+        return (f"Já destinou {brl_curto(aut)} a educação/social em {_fmt_muns(muns)}, "
+                f"onde o PFC atua — bom gancho para abrir a conversa.")
+    if muns:
+        return (f"Atua em {_fmt_muns(muns)}, onde o PFC está presente — "
+                f"vale sondar a agenda de educação/social.")
+    # 2) VIZINHANÇA — financia colado aos nossos municípios (só expansão)
+    if secao == "expansao":
+        aut_viz = n("autorizado_vizinho")
+        muns_viz = str(row.get("municipios_vizinhos", "")).strip()
+        if muns_viz and (aut_viz > 0 or n("autorizado_geral_edusoc") > 0):
+            valor = aut_viz if aut_viz > 0 else n("autorizado_geral_edusoc")
+            return (f"Financia educação/social colada aos nossos municípios ({brl_curto(valor)}) "
+                    f"— candidato natural para trazer a {_fmt_muns(muns_viz)}.")
+    # 3) ALINHAMENTO PROPORCIONAL alto
+    if alinh >= 40:
+        return (f"{_pct_int(alinh)} de tudo que destina vai para educação/social "
+                f"— perfil fortemente alinhado ao PFC.")
+    # 4) VOLUME GERAL alto
+    aut_geral = n("autorizado_geral_edusoc") or n("autorizado_pfc")
+    if aut_geral >= 1_000_000:
+        return (f"Alto volume em educação/social no estado ({brl_curto(aut_geral)}) "
+                f"— ainda sem pé nos nossos municípios, mas alvo de cortejo.")
+    # 5) FALLBACK HONESTO — nada de forçar
+    if alinh > 0:
+        return (f"Sem histórico direto nos nossos municípios ainda — mas {_pct_int(alinh)} "
+                f"do que destina é educação/social, vale um primeiro contato.")
+    return "Sem histórico direto nos nossos municípios ainda — abrir pela pauta do PFC."
+
+
 @st.dialog("Dossiê do deputado", width="large")
 def dlg_descobrir_deputado(row: dict, secao: str) -> None:
     breadcrumb("Descobrir", str(row.get("deputado", "")))
@@ -2144,6 +2222,21 @@ def dlg_descobrir_deputado(row: dict, secao: str) -> None:
         f'<div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:8px">'
         f'{esc(camada)} · score <b style="color:{_cor_score(score)}">{("%.1f"%score).replace(".",",")}</b> '
         f'· fatia educação/social {esc(row.get("alinhamento_pct",0))}%</div>',
+        unsafe_allow_html=True)
+
+    # ---- MELHOR GANCHO DE ABORDAGEM — a 1ª coisa que o Fábio lê ----
+    _chat_svg = ('<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#b7abff" '
+                 'stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" '
+                 'style="vertical-align:-2px;margin-right:6px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 '
+                 '2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>')
+    st.markdown(
+        '<div style="background:linear-gradient(135deg,rgba(139,123,240,.16),rgba(139,123,240,.03));'
+        'border:1px solid rgba(139,123,240,.34);border-left:3px solid #8B7BF0;border-radius:12px;'
+        'padding:14px 16px;margin:18px 0 4px">'
+        f'<div style="font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;'
+        f'color:#b7abff;margin-bottom:7px">{_chat_svg}Melhor gancho de abordagem</div>'
+        f'<div style="font-size:15.5px;line-height:1.5;color:var(--ink);font-weight:500">'
+        f'{esc(_argumento_abordagem(row, secao))}</div></div>',
         unsafe_allow_html=True)
 
     # ---- AUTORIZADO x PAGO — sempre separados e rotulados ----
