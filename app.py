@@ -627,7 +627,10 @@ body{background:var(--bg)}
 .sf{font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;align-items:center;
   gap:9px;margin-bottom:9px;letter-spacing:.3px}
 .sf .d{width:7px;height:7px;border-radius:50%;flex:none}
+/* pontos de status = cor de SAÚDE, não de identidade: verde vivo / vermelho caiu.
+   (o .d.o antigo, na cor de marca, foi aposentado para status de conexão) */
 .sf .d.g{background:var(--sem-high);box-shadow:0 0 8px var(--sem-high);animation:pulse2 2s infinite}
+.sf .d.r{background:var(--sem-urgent);box-shadow:0 0 8px var(--sem-urgent);animation:pulse2 2s infinite}
 .sf .d.o{background:var(--accent);box-shadow:0 0 8px var(--accent)}
 .sf .d.n{background:var(--dim)}
 @keyframes pulse2{50%{opacity:.4}}
@@ -1961,8 +1964,14 @@ def render_sidebar_emendas():
                             f'<span class="esc-nome">{esc(nome)}</span>'
                             f'<span class="esc-leg">{esc(legenda.format(n=n_deps))}</span></div>')
         st.markdown(escopo_html, unsafe_allow_html=True)
-        st.markdown('<div class="sb-foot"><div class="sf"><span class="d o"></span>'
-                    f'{n_deps} DEPUTADOS · ALESP</div></div>', unsafe_allow_html=True)
+        # Status de conexão = cor de saúde (verde vivo / vermelho caiu), igual ao
+        # Captação. A contagem de deputados desce para a 2ª linha (ponto neutro).
+        conn = ('<div class="sf"><span class="d g"></span>SHEETS CONECTADO</div>'
+                if modo_conectado else
+                '<div class="sf"><span class="d r"></span>MODO LOCAL · CSV</div>')
+        st.markdown(f'<div class="sb-foot">{conn}'
+                    f'<div class="sf"><span class="d n"></span>{n_deps} DEPUTADOS · ALESP</div></div>',
+                    unsafe_allow_html=True)
         if st.button("Trocar radar", key="emenda_trocar", use_container_width=True):
             st.session_state["radar_escolhido"] = None
             st.rerun()
@@ -2734,13 +2743,15 @@ _TOPNAV_CSS = """
 .tn-left{display:flex;align-items:center;gap:13px;min-width:0}
 /* controle da sidebar: mora na barra fixa de propósito — é o único lugar que
    continua visível com a sidebar recolhida (e sobrevive ao bug dela sumir). */
-.tn-sb{display:flex;align-items:center;justify-content:center;width:34px;height:34px;flex:none;
-  background:var(--acc-soft);border:1px solid color-mix(in srgb,var(--acc) 30%,transparent);
-  border-radius:9px;cursor:pointer;padding:0;transition:.16s cubic-bezier(.16,1,.3,1)}
+.tn-sb{display:flex;align-items:center;gap:8px;height:34px;flex:none;
+  background:var(--acc-soft);border:1px solid color-mix(in srgb,var(--acc) 34%,transparent);
+  border-radius:9px;cursor:pointer;padding:0 12px 0 10px;transition:.16s cubic-bezier(.16,1,.3,1)}
 .tn-sb:hover{background:color-mix(in srgb,var(--acc) 22%,transparent);
-  border-color:color-mix(in srgb,var(--acc) 55%,transparent)}
+  border-color:color-mix(in srgb,var(--acc) 60%,transparent)}
 .tn-sb svg{width:18px;height:18px;fill:none;stroke:var(--acc);stroke-width:1.8;
   stroke-linecap:round;stroke-linejoin:round}
+.tn-sb-lbl{font-family:'Inter',system-ui,sans-serif;font-size:12.5px;font-weight:600;
+  color:var(--acc);white-space:nowrap;letter-spacing:.2px}
 .tn-crumb{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.8px;
   color:var(--dim,#6B7688);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tn-crumb b{color:var(--acc);font-weight:600}
@@ -2829,7 +2840,8 @@ export default function(component){
   root.innerHTML =
     '<div class="tn-left">' +
     '<button class="tn-sb" data-act="sidebar" title="' + sbTitulo + '" aria-label="' + sbTitulo +
-    '" aria-expanded="' + (sbAberta ? 'true' : 'false') + '">' + iSb + '</button>' +
+    '" aria-expanded="' + (sbAberta ? 'true' : 'false') + '">' + iSb +
+    '<span class="tn-sb-lbl">Menu</span></button>' +
     '<div class="tn-crumb"><b>' + esc((nomeAtual || '').toUpperCase()) + '</b>' +
     (d.crumb ? ' · ' + esc(d.crumb) : '') + '</div></div>' +
     '<div class="tn-right"><div class="tn-sel">' +
@@ -2983,7 +2995,7 @@ def render_sidebar():
                           on_click=ir_para, args=(p,))
         status = ('<div class="sf"><span class="d g"></span>SHEETS CONECTADO</div>'
                   if modo_conectado else
-                  '<div class="sf"><span class="d o"></span>MODO LOCAL · CSV</div>')
+                  '<div class="sf"><span class="d r"></span>MODO LOCAL · CSV</div>')
         st.markdown(f'<div class="sb-foot">{status}'
                     '<div class="sf"><span class="d n"></span>ÚLTIMO SCAN · 06:00</div></div>',
                     unsafe_allow_html=True)
