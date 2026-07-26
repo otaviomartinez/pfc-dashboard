@@ -23,6 +23,7 @@ import streamlit.components.v1 as components
 import streamlit.components.v2 as components_v2
 
 from src import dados
+from src import relatorios
 from src.dados import (
     COL_CANAL, COL_CHANCE, COL_EDITAL, COL_EMPRESA, COL_ENCAIXE, COL_ID,
     COL_INSTITUTO, COL_JANELA, COL_MODALIDADE, COL_OBS, COL_PRESENCA,
@@ -73,7 +74,7 @@ USERS = {
     },
 }
 
-PAGES = ["Visão geral", "Ranking", "Radar", "Funil", "Metodologia", "Verificação"]
+PAGES = ["Visão geral", "Ranking", "Radar", "Funil", "Relatório", "Metodologia", "Verificação"]
 
 # --------------------------------------------------------------------------- #
 # Ícones SVG da sidebar (design system: SVG limpo, nunca emoji)
@@ -115,6 +116,9 @@ ICONES = {
     "sair": "<path d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9'/>",
     "local": ("<path d='M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z'/>"
               "<circle cx='12' cy='10' r='3'/>"),
+    # documento com linhas: Relatório de Prioridades (os dois painéis reusam)
+    "relatorio": ("<path d='M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z'/>"
+                  "<path d='M14 3v6h6'/><path d='M8 13h8M8 17h6'/>"),
     "bloqueado": ("<rect x='4' y='11' width='16' height='10' rx='2'/>"
                   "<path d='M8 11V7a4 4 0 0 1 8 0v4'/>"),
 }
@@ -1884,13 +1888,14 @@ def dlg_em_articulacao(lista):
 
 # Navegação do painel de Emendas (páginas próprias + escopo).
 # "Descobrir" é a tela de PLANEJAMENTO (quem abordar), separada do CRM dos 16.
-EMENDA_PAGES = ["Visão geral", "Deputados", "Descobrir", "Funil de negociação"]
+EMENDA_PAGES = ["Visão geral", "Deputados", "Descobrir", "Funil de negociação", "Relatório"]
 EMENDA_ESCOPO = [("Estadual", "ALESP · {n}", True), ("Federal", "em breve", False),
                  ("Senadores", "em breve", False)]
 # chave do botão -> ícone (a chave vira a classe st-key-<chave> que o CSS usa)
 EMENDA_ICONES = {"emnav_visao-geral": "visao-geral", "emnav_deputados": "deputados",
                  "emnav_descobrir": "descobrir",
                  "emnav_funil-de-negociacao": "funil-negociacao",
+                 "emnav_relatorio": "relatorio",
                  "emenda_trocar": "trocar-radar", "emenda_logout": "sair"}
 # chave do botão -> nome no tooltip do modo ícone
 EMENDA_ROTULOS = {**{f"emnav_{slug(p)}": p for p in EMENDA_PAGES},
@@ -2365,12 +2370,121 @@ def render_funil_emendas() -> None:
             st.rerun()  # sucesso confirma a coluna; falha faz o card voltar à origem
 
 
+# --------------------------------------------------------------------------- #
+# RELATÓRIO DE PRIORIDADES · EMENDAS (tela + PDF)
+# ---------------------------------------------------------------------------
+# Puxa dados REAIS do levantamento (rankings território/expansão) + o contato
+# OFICIAL da ALESP. Território primeiro (quem já atua nos municípios do PFC),
+# depois os alvos prioritários de expansão. Autorizado e pago sempre separados
+# (nunca somados). A coleta alimenta a tela E o PDF (relatorios.pdf_emendas).
+# --------------------------------------------------------------------------- #
+def _dep_item_relatorio(row: dict, secao: str) -> dict:
+    nome = str(row.get("deputado", "")).strip()
+    if secao == "territorio":
+        aut, pago, score = row.get("autorizado_pfc", 0), row.get("pago_pfc", 0), row.get("score_pfc", 0)
+    else:
+        aut, pago = row.get("autorizado_geral_edusoc", 0), row.get("pago_geral_edusoc", 0)
+        score = row.get("score_expansao", 0)
+    ct = dados.contato_oficial(nome)
+    return {
+        "deputado": nome, "partido": str(row.get("partido", "")).strip() or "—",
+        "municipios": _muns_pfc(row, secao),
+        "autorizado": brl(aut), "pago": brl(pago),
+        "score": str(round(float(score or 0))),
+        "email": ct.get("email", ""), "telefone": ct.get("telefone", ""),
+    }
+
+
+def _itens_relatorio_emendas():
+    """(território, expansão) do levantamento. Território todo; expansão só os
+    alvos prioritários (o conjunto acionável de 'quem cortejar')."""
+    terr_df = dados.carregar_ranking_territorio()
+    exp_df = dados.carregar_ranking_expansao()
+    territorio = [_dep_item_relatorio(r, "territorio") for _, r in terr_df.iterrows()] \
+        if not terr_df.empty else []
+    if not exp_df.empty:
+        pri = exp_df[exp_df["camada"] == "alvo prioritário"] if "camada" in exp_df else exp_df
+        expansao = [_dep_item_relatorio(r, "expansao") for _, r in pri.iterrows()]
+    else:
+        expansao = []
+    return territorio, expansao
+
+
+def _tabela_emendas_html(itens: list) -> str:
+    linhas = ""
+    for i, d in enumerate(itens, start=1):
+        contato = "<br>".join(x for x in (d["email"], d["telefone"])
+                              if x and x != "não encontrado") or "—"
+        linhas += (
+            f'<tr><td class="rp-n">{i}</td>'
+            f'<td><div class="rp-nome">{esc(d["deputado"])}</div>'
+            f'<div class="rp-sub">{esc(d["partido"])}</div></td>'
+            f'<td>{esc(d["municipios"])}</td>'
+            f'<td>aut. <b style="color:var(--ink)">{esc(d["autorizado"])}</b><br>'
+            f'<span style="color:var(--dim)">pago {esc(d["pago"])}</span></td>'
+            f'<td style="font-weight:700;color:#8B7BF0">{esc(d["score"])}</td>'
+            f'<td class="rp-sub">{contato}</td></tr>')
+    return ('<table class="rp"><tr><th>#</th><th>Deputado</th><th>Municípios do PFC</th>'
+            '<th>Educação / social</th><th>Score</th><th>Contato oficial</th></tr>'
+            f'{linhas}</table>')
+
+
+def render_relatorio_emendas():
+    st.markdown(
+        '<div class="phead" style="margin-bottom:6px"><h1 style="color:var(--ink)">'
+        'Relatório de Prioridades</h1></div>', unsafe_allow_html=True)
+    territorio, expansao = _itens_relatorio_emendas()
+    if not territorio and not expansao:
+        st.info("Levantamento ainda não gerado. Rode `python -m src.emendas` para "
+                "produzir os rankings em `data/`.")
+        return
+
+    agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+    resumo = (f"{len(territorio)} deputado(s) no território · "
+              f"{len(expansao)} alvo(s) prioritário(s) de expansão.")
+    top = st.columns([3, 1])
+    top[0].caption(f"🗓️ Gerado em {agora} · {resumo}")
+    pdf = relatorios.pdf_emendas(territorio, expansao, agora, resumo=resumo)
+    top[1].download_button("⬇ Baixar PDF", data=pdf,
+                           file_name=f"PFC_Prioridades_Emendas_{datetime.date.today():%Y-%m-%d}.pdf",
+                           mime="application/pdf", use_container_width=True)
+
+    st.markdown(
+        '<style>'
+        '.rp{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}'
+        '.rp th{font-family:var(--mono);font-size:10px;letter-spacing:.6px;text-transform:uppercase;'
+        'color:var(--dim);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}'
+        '.rp td{padding:11px 10px;border-bottom:1px solid var(--line);color:var(--muted);vertical-align:top}'
+        '.rp .rp-n{font-family:var(--mono);color:var(--dim);width:34px}'
+        '.rp .rp-nome{color:var(--ink);font-weight:600}'
+        '.rp .rp-sub{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:2px}'
+        '</style>', unsafe_allow_html=True)
+
+    st.markdown('<div style="font-weight:700;font-size:15px;color:var(--ink);margin-top:8px">'
+                '1. Abordar já — atuam no território do PFC</div>'
+                '<div style="font-size:12.5px;color:var(--dim);margin:2px 0 4px">Já financiam '
+                'educação/social dentro dos municípios do PFC.</div>', unsafe_allow_html=True)
+    st.markdown(_tabela_emendas_html(territorio) if territorio
+                else '<div style="color:var(--dim);font-size:13px">Ninguém no território ainda.</div>',
+                unsafe_allow_html=True)
+
+    st.markdown('<div style="font-weight:700;font-size:15px;color:var(--ink);margin-top:20px">'
+                '2. Cortejar — alto volume, fora do território</div>'
+                '<div style="font-size:12.5px;color:var(--dim);margin:2px 0 4px">Alto alinhamento '
+                'e volume no estado, ainda fora dos nossos municípios.</div>', unsafe_allow_html=True)
+    st.markdown(_tabela_emendas_html(expansao) if expansao
+                else '<div style="color:var(--dim);font-size:13px">Sem alvos de expansão.</div>',
+                unsafe_allow_html=True)
+    st.caption("Valores da execução real 2023–2025 (Transparência SP). Autorizado e pago "
+               "separados, nunca somados. Contato oficial da ALESP (gabinete) — não o pessoal.")
+
+
 def render_emendas():
     """Painel do radar de Emendas Parlamentares (CRM de deputados)."""
     st.markdown(_EMENDAS_CHROME_CSS, unsafe_allow_html=True)
     emenda_page = st.session_state.setdefault("emenda_page", "Visão geral")
     modo = {"Visão geral": "visao", "Deputados": "deputados", "Descobrir": "descobrir",
-            "Funil de negociação": "funil"}.get(emenda_page, "visao")
+            "Funil de negociação": "funil", "Relatório": "relatorio"}.get(emenda_page, "visao")
     render_topnav("emendas", emenda_page.upper())
     render_sidebar_emendas()
 
@@ -2380,7 +2494,8 @@ def render_emendas():
     subttl = {"Visão geral": "Articulação política",
               "Deputados": "Base de deputados · ALESP",
               "Descobrir": "Levantamento de emendas · quem abordar",
-              "Funil de negociação": "Negociações por temperatura"}.get(emenda_page, "")
+              "Funil de negociação": "Negociações por temperatura",
+              "Relatório": "Relatório de Prioridades · quem abordar"}.get(emenda_page, "")
     st.markdown(
         f'<div class="topbar"><div>'
         f'<div class="hi">{saud}, {esc(primeiro)}</div>'
@@ -2397,6 +2512,10 @@ def render_emendas():
     # Funil de negociação com drag-and-drop (grava a etapa na aba Deputados).
     if modo == "funil":
         render_funil_emendas()
+        return
+    # Relatório de Prioridades: quem abordar (do levantamento), tela + PDF.
+    if modo == "relatorio":
+        render_relatorio_emendas()
         return
 
     deps = _deputados_ordenados()
@@ -2734,7 +2853,7 @@ if st.session_state["radar_escolhido"] == "emendas":
 # Sidebar de navegação (maquete pfc_app_v3) + top bar
 # --------------------------------------------------------------------------- #
 _n_naoverif = int((~df[COL_VERIF].apply(verificada_ok)).sum()) if TOTAL else 0
-NAV_SECOES = [("Operação", ["Visão geral", "Radar", "Ranking", "Funil"]),
+NAV_SECOES = [("Operação", ["Visão geral", "Radar", "Ranking", "Funil", "Relatório"]),
               ("Dados", ["Metodologia", "Verificação"])]
 # chave do botão -> ícone (mesma mecânica da sidebar de Emendas)
 NAV_ICONES = {**{f"nav_{slug(p)}": slug(p) for p in PAGES},
@@ -4014,6 +4133,129 @@ def page_funil():
         st.caption(HINT_ESCRITA + " — ao arrastar em modo CSV o app mostra um aviso e o card volta.")
 
 
+# --------------------------------------------------------------------------- #
+# RELATÓRIO DE PRIORIDADES · CAPTAÇÃO (tela + PDF)
+# ---------------------------------------------------------------------------
+# Puxa dados REAIS: fila do Radar (novidades pendentes) + editais da base
+# (status 'Edital') e da aba Editais_Privados. Respeita a regra de acurácia
+# (regra 3): data fora da janela confiável vira "prazo a confirmar", nunca um
+# número de dias que pode estar chutado. A coleta é única e alimenta a tela E
+# o PDF (relatorios.pdf_captacao) — as duas visões nunca divergem.
+# --------------------------------------------------------------------------- #
+def _valor_rel(v) -> str:
+    """Valor legível: número vira R$; texto livre do radar ('R$ 80 mil') passa."""
+    try:
+        n = float(v)
+        return brl(n) if n > 0 else "—"
+    except (TypeError, ValueError):
+        return str(v).strip() or "—"
+
+
+def _dias_texto(dias) -> str:
+    if not isinstance(dias, int):
+        return "prazo a confirmar"
+    if dias < 0:
+        return f"vencida há {-dias} dia(s)"
+    if dias == 0:
+        return "encerra hoje"
+    return f"faltam {dias} dia(s)"
+
+
+def _itens_relatorio_captacao() -> list[dict]:
+    """Lista unificada de oportunidades COM prazo, ordenada por urgência.
+    Fontes reais: fila do Radar + editais da base/privados. Dedupe por nome."""
+    hoje = datetime.date.today()
+    brutos = []
+    for nv in dados.carregar_novidades_pendentes():
+        op = _op_de_novidade(nv)
+        if str(op.get("prazo", "")).strip():
+            brutos.append((op["titulo"], op["fonte"], op["valor"], op["prazo"], op["dias"]))
+    for e in _coletar_editais():
+        if not (e.get("data") or str(e.get("raw", "")).strip()):
+            continue
+        dias = (e["data"] - hoje).days if e.get("data") else None
+        brutos.append((e["nome"], "Base de captação", e.get("valor", 0),
+                       e.get("raw", ""), dias))
+
+    vistos, itens = set(), []
+    for nome, inst, valor, prazo, dias in brutos:
+        chave = str(nome).strip().lower()
+        if not chave or chave in vistos:
+            continue
+        # Já vencido com data confiável não é prioridade "perto do prazo": fora.
+        # (Datas fora da janela confiável — inclusive chutes de ano — caem como
+        # "a confirmar", nunca como um número de dias que pode estar errado.)
+        if _prazo_confiavel(dias) and isinstance(dias, int) and dias < 0:
+            continue
+        vistos.add(chave)
+        futuro = _prazo_confiavel(dias) and isinstance(dias, int) and dias >= 0
+        itens.append({
+            "nome": str(nome).strip(), "instituicao": str(inst).strip(),
+            "valor": _valor_rel(valor),
+            "data_final": _fmt_prazo(prazo) if futuro else "a confirmar",
+            "dias_txt": _dias_texto(dias) if futuro else "prazo a confirmar",
+            "urgente": bool(futuro and dias <= 7),
+            "confiavel": futuro,
+            "_ordem": dias if futuro else 10 ** 6,
+        })
+    itens.sort(key=lambda it: it["_ordem"])
+    return itens
+
+
+def page_relatorio():
+    st.markdown(
+        '<div class="phead"><h1>Relatório de Prioridades</h1>'
+        '<p>oportunidades da Captação ordenadas por urgência de prazo — na tela e em PDF</p></div>',
+        unsafe_allow_html=True,
+    )
+    itens = _itens_relatorio_captacao()
+    agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+    n_conf = sum(1 for it in itens if it["confiavel"])
+    resumo = (f"{len(itens)} oportunidade(s) com prazo · {n_conf} com data confiável · "
+              f"{len(itens) - n_conf} a confirmar.")
+
+    top = st.columns([3, 1])
+    top[0].caption(f"🗓️ Gerado em {agora} · {resumo}")
+    if itens:
+        pdf = relatorios.pdf_captacao(itens, agora, resumo=resumo)
+        top[1].download_button("⬇ Baixar PDF", data=pdf,
+                               file_name=f"PFC_Prioridades_Captacao_{datetime.date.today():%Y-%m-%d}.pdf",
+                               mime="application/pdf", use_container_width=True)
+
+    if not itens:
+        st.info("Nenhuma oportunidade com prazo cadastrado no momento. "
+                "Assim que o Radar trouxer editais com data, eles aparecem aqui.")
+        return
+
+    linhas = ""
+    for i, it in enumerate(itens, start=1):
+        cor = "#F0663F" if it["urgente"] else ("var(--ink)" if it["confiavel"] else "var(--dim)")
+        linhas += (
+            f'<tr><td class="rp-n">{i}</td>'
+            f'<td><div class="rp-nome">{esc(it["nome"])}</div>'
+            f'<div class="rp-sub">{esc(it["instituicao"])}</div></td>'
+            f'<td>{esc(it["valor"])}</td>'
+            f'<td>{esc(it["data_final"])}</td>'
+            f'<td style="color:{cor};font-weight:600">{esc(it["dias_txt"])}</td></tr>')
+    st.markdown(
+        '<style>'
+        '.rp{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:6px}'
+        '.rp th{font-family:var(--mono);font-size:10px;letter-spacing:.6px;text-transform:uppercase;'
+        'color:var(--dim);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}'
+        '.rp td{padding:11px 10px;border-bottom:1px solid var(--line);color:var(--muted);vertical-align:top}'
+        '.rp .rp-n{font-family:var(--mono);color:var(--dim);width:34px}'
+        '.rp .rp-nome{color:var(--ink);font-weight:600}'
+        '.rp .rp-sub{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:2px}'
+        '</style>'
+        '<table class="rp"><tr><th>#</th><th>Oportunidade / Instituição</th><th>Valor</th>'
+        f'<th>Data final</th><th>Prazo</th></tr>{linhas}</table>',
+        unsafe_allow_html=True)
+    st.caption("Só prazos que ainda vão vencer. As linhas em cinza são \"prazo a confirmar\": "
+               "a data não é confiável e não mostramos um número de dias que pode estar "
+               "errado. As urgentes (≤ 7 dias) aparecem em vermelho. Já vencidos ficam de "
+               "fora. Uma data errada é pior que nenhuma.")
+
+
 # Gráfico de Score: donut único elegante + chips clicáveis (SVG/JS autocontido).
 ORBITAL_TEMPLATE = r"""<!doctype html><html><head><meta charset="utf-8"><style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap');
@@ -4476,7 +4718,8 @@ def page_verificacao():
 # ROTEAMENTO
 # =========================================================================== #
 ROTAS = {"Visão geral": page_visao, "Ranking": page_ranking, "Radar": page_radar,
-         "Funil": page_funil, "Metodologia": page_metodo, "Verificação": page_verificacao}
+         "Funil": page_funil, "Relatório": page_relatorio,
+         "Metodologia": page_metodo, "Verificação": page_verificacao}
 ROTAS.get(PAGINA, page_visao)()
 
 # --------------------------------------------------------------------------- #
