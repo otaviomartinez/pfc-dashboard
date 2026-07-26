@@ -4,3 +4,4 @@ requests>=2.31
 beautifulsoup4>=4.12
 gspread>=6.0
 google-auth>=2.30
+htmldate>=1.9  # data de publicação (metadado) p/ ancorar o ano do prazo

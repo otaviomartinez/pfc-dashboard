@@ -1,10 +1,20 @@
 """
-Extração conservadora de data-limite (prazo de inscrição) em textos pt-BR.
+Extração de data-limite (prazo de inscrição) em textos pt-BR — v2.
 
-extrair_prazo(texto, url="") -> "AAAA-MM-DD" ou None.
-Só reconhece datas ancoradas em um gatilho de prazo ("inscrições até",
-"prazo:", "encerra em", "submissão até"…) — uma data solta pode ser data de
-publicação, então é ignorada. Nunca inventa: ambíguo/invalido devolve None.
+extrair_prazo(texto, url="", pub=None) -> "AAAA-MM-DD" ou None.
+
+Três camadas de defesa (a sondagem mostrou por que cada uma importa):
+  1. ÂNCORAS EM CAMADAS: só reconhece a data colada a uma âncora FORTE de prazo
+     ("prazo de inscrição", "inscrições até", "recebimento de propostas",
+     "candidaturas até", "data limite"…). O "até" PURO foi DESCARTADO — era ele
+     que pegava a data de execução errada ("recursos até 31 de dezembro") no
+     Somando Impactos, em vez do prazo de inscrição real.
+  2. ANO com trava de metadado: se a data por extenso não traz o ano, o ano é
+     inferido da DATA DE PUBLICAÇÃO (radar/publicacao.py), que só existe quando
+     veio de metadado estruturado. Sem ano e sem publicação confiável -> None
+     ("a confirmar"). NUNCA se chuta o ano.
+  3. Sanidade: prazo que resolve para o passado distante (>120 dias) é descartado
+     (pega inferência que caiu num ano velho). Combina com _prazo_confiavel do app.
 """
 from __future__ import annotations
 
@@ -20,22 +30,37 @@ _MESES = {
     "jul": 7, "ago": 8, "set": 9, "out": 10, "nov": 11, "dez": 12,
 }
 
-# Palavras que ancoram uma data como PRAZO (não data de publicação).
-_GATILHOS = (
-    "inscricao", "inscricoes", "submissao", "submissoes", "candidatura",
-    "candidaturas", "prazo", "encerra", "encerram", "encerramento",
-    "deadline", "data limite", "data-limite", "termina", "terminam", "ate",
-)
+# ÂNCORAS EM CAMADAS (normalizadas, sem acento). Cada uma leva um contexto de
+# prazo/inscrição/proposta — o "ate" PURO ficou de fora de propósito.
+#   prioridade 0 = prazo de inscrição/candidatura/proposta (o mais confiável)
+#   prioridade 1 = genéricas fortes (podem ser um limite secundário, ex.: de
+#                  impugnação); só vencem se nenhuma de prioridade 0 aparecer antes.
+_ANCORAS = [
+    # --- prioridade 0 -------------------------------------------------------
+    ("prazo de inscricao", 0), ("prazo de inscricoes", 0), ("prazo das inscricoes", 0),
+    ("prazo de submissao", 0),
+    ("inscricoes abertas ate o dia", 0), ("inscricoes estao abertas ate o dia", 0),
+    ("inscricoes abertas ate", 0), ("inscricoes estao abertas ate", 0),
+    ("inscricoes ate o dia", 0), ("inscricoes ate", 0), ("inscricao ate", 0),
+    ("inscricoes vao ate", 0), ("inscricoes seguem ate", 0),
+    ("inscricoes encerram", 0), ("encerramento das inscricoes", 0),
+    ("candidaturas ate", 0), ("candidatura ate", 0),
+    ("recebimento de propostas", 0), ("recebimento das propostas", 0),
+    ("recebimento de projetos", 0), ("recebimento de inscricoes", 0),
+    ("propostas ate", 0), ("submissao ate", 0), ("submissoes ate", 0),
+    ("submeter propostas ate", 0), ("prazo termina", 0),
+    # --- prioridade 1 -------------------------------------------------------
+    ("data limite", 1), ("data-limite", 1), ("prazo final", 1),
+]
 
-# gatilho -> até 30 chars sem dígito -> data por extenso OU numérica
-_RE_PRAZO = re.compile(
-    r"\b(?:" + "|".join(_GATILHOS) + r")\b"
-    r"[^0-9]{0,30}?"
-    r"(?:"
-    r"(\d{1,2})\s*(?:o|º)?\s*(?:de\s+)?([a-z]{3,9})\.?(?:\s+de\s+(\d{4}))?"  # 16 de março [de 2026]
-    r"|(\d{1,2})[/\-.](\d{1,2})(?:[/\-.](\d{2,4}))?"                          # 16/03[/2026]
-    r")"
-)
+# data por extenso ("3 de agosto [de 2026]") OU numérica ("03/08[/2026]")
+_D_EXT = r"(\d{1,2})\s*(?:o|º)?\s*(?:de\s+)?([a-z]{3,9})\.?(?:\s+de\s+(\d{4}))?"
+_D_NUM = r"(\d{1,2})[/\-.](\d{1,2})(?:[/\-.](\d{2,4}))?"
+# âncora -> até 40 chars sem dígito -> data
+_RE_ANCORAS = [
+    (re.compile(re.escape(anc) + r"[^0-9]{0,40}?(?:" + _D_EXT + r"|" + _D_NUM + r")"), pri)
+    for anc, pri in _ANCORAS
+]
 
 
 def _norm(s: str) -> str:
@@ -45,52 +70,71 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s.lower())
 
 
-def _montar_data(dia: int, mes: int, ano: int | None):
-    """Valida a data. SEM ano explícito -> None (NUNCA inventa o ano).
+def _candidatos(texto_norm: str):
+    """Todas as datas ancoradas, como (prioridade, posição, dia, mes, ano|None),
+    ordenadas por (prioridade, posição) — a mais confiável e mais ao início primeiro."""
+    achados = []
+    for rx, pri in _RE_ANCORAS:
+        for m in rx.finditer(texto_norm):
+            if m.group(1):  # por extenso
+                mes = _MESES.get(m.group(2))
+                if mes is None:  # "12 meses", "10 cidades"… não é data
+                    continue
+                dia = int(m.group(1))
+                ano = int(m.group(3)) if m.group(3) else None
+            else:            # numérica DD/MM[/AAAA]
+                dia, mes = int(m.group(4)), int(m.group(5))
+                if not (1 <= mes <= 12):
+                    continue
+                ano = int(m.group(6)) if m.group(6) else None
+            if not (1 <= dia <= 31):
+                continue
+            achados.append((pri, m.start(), dia, mes, ano))
+    achados.sort(key=lambda c: (c[0], c[1]))
+    return achados
 
-    O chute de ano ("assume o próximo ano em que a data é futura") era a
-    causa-raiz do bug do 2027: uma data "6 de junho" sem ano, com junho já
-    passado, virava 2027. Melhor não ter data (o app mostra "prazo a confirmar")
-    do que fabricar uma errada — uma data errada é pior que nenhuma.
-    """
-    if ano is None:
-        return None
-    if ano < 100:
-        ano += 2000
-    try:
-        return datetime.date(ano, mes, dia)
-    except ValueError:
-        return None
+
+def _resolver_data(dia: int, mes: int, ano: int | None,
+                   pub: datetime.date | None) -> datetime.date | None:
+    """Ano explícito vence. Sem ano, ancora na PUBLICAÇÃO (só de metadado):
+    menor ano em que a data é >= publicação. Sem ano e sem pub -> None."""
+    if ano is not None:
+        if ano < 100:
+            ano += 2000
+        try:
+            return datetime.date(ano, mes, dia)
+        except ValueError:
+            return None
+    if pub is None:
+        return None  # sem ano e sem publicação confiável -> "a confirmar"
+    for y in (pub.year, pub.year + 1):
+        try:
+            d = datetime.date(y, mes, dia)
+        except ValueError:
+            return None
+        if d >= pub:
+            return d
+    return None
 
 
-def extrair_prazo(texto: str, url: str = "") -> str | None:
+def extrair_prazo(texto: str, url: str = "",
+                  pub: datetime.date | None = None) -> str | None:
     """Data-limite em ISO (AAAA-MM-DD) achada no texto, ou None.
 
-    Só devolve data quando o ANO está explícito no texto (ver _montar_data).
-    Descarta data antiga demais (fantasma de página velha, ex.: um "2022"
-    solto numa listagem) — segue procurando um casamento melhor no texto.
+    `pub` = data de publicação da página (radar/publicacao.data_publicacao),
+    usada só para inferir o ano quando o prazo vem sem ano. Percorre os
+    candidatos por confiança e devolve o primeiro que resolve para uma data
+    válida e não vencida-há-muito.
     """
     t = _norm(texto)[:30000]
     if not t:
         return None
     hoje = datetime.date.today()
-    for m in _RE_PRAZO.finditer(t):
-        if m.group(1):                       # data por extenso
-            mes = _MESES.get(m.group(2))
-            if mes is None:                  # "12 meses", "10 cidades"… não é data
-                continue
-            data = _montar_data(int(m.group(1)), mes,
-                                int(m.group(3)) if m.group(3) else None)
-        else:                                # data numérica DD/MM[/AAAA]
-            dia, mes = int(m.group(4)), int(m.group(5))
-            if not (1 <= mes <= 12):
-                continue
-            data = _montar_data(dia, mes,
-                                int(m.group(6)) if m.group(6) else None)
+    for _pri, _pos, dia, mes, ano in _candidatos(t):
+        data = _resolver_data(dia, mes, ano, pub)
         if data is None:
             continue
-        # Sanidade: prazo que "venceu" há muito (>120 dias) não é prazo — é data
-        # de publicação/edição antiga. Ignora e procura outra data no texto.
+        # 3ª linha: prazo vencido há muito (>120 dias) é fantasma/ano velho.
         if (data - hoje).days < -120:
             continue
         return data.isoformat()

@@ -18,7 +18,7 @@ import time
 import requests
 from bs4 import BeautifulSoup
 
-from radar import prazos
+from radar import prazos, publicacao
 from radar.fontes_genericas import HEADERS, TIMEOUT, limpar_texto
 
 MAX_ENRIQUECIMENTOS = 40
@@ -73,9 +73,12 @@ def enriquecer(op: dict) -> dict:
                 op["valor_estimado"] = limpar_texto(m.group(0))
                 ganho["valor"] = True
 
-        # prazo: a página do edital costuma ter a data que a listagem omite
+        # prazo: a página do edital costuma ter a data que a listagem omite.
+        # A data de publicação (SÓ de metadado, do HTML cru — o soup acima já
+        # perdeu <script>/<time>) ancora o ano de um prazo escrito sem ano.
         if not isinstance(op.get("dias_restantes"), int):
-            iso = prazos.extrair_prazo(texto_pagina, url)
+            pub = publicacao.data_publicacao(r.text)
+            iso = prazos.extrair_prazo(texto_pagina, url, pub=pub)
             if iso:
                 op["prazo"] = iso
                 op["dias_restantes"] = prazos.dias_restantes(iso)
