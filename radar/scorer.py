@@ -16,13 +16,20 @@ POSITIVAS_FORTES = [
     "permanencia escolar", "tecnologia social", "formacao de professores",
     "equidade educacional",
 ]
-# TEMA do fomento (o QUE o edital financia) — puxa aderência para cima.
-# NÃO inclui "estudante/jovem/cientista/olimpiada": esses descrevem QUEM
-# participa, não o tema do projeto, e eram o que puxava oportunidade-para-aluno
-# para dentro da captação. Ficaram de fora de propósito (ver NEGATIVAS_ALUNO).
+# ELEGIBILIDADE do PFC (conceito AMPLO, não tema estreito). O PFC é educação
+# científica, mas é uma OSC que se candidata a muita coisa: educação, ciência,
+# juventude, impacto social, desenvolvimento comunitário, inovação, formação,
+# terceiro setor amplo, cultura educativa. Tudo isso é "dinheiro que o PFC pode
+# captar" e deve pontuar como aderente. O que NÃO cabe (bem-estar animal, saúde
+# hospitalar, aldeia indígena específica) sai no pré-filtro (ver NAO_ELEGIVEL);
+# e QUEM participa (estudante/olimpíada) sai por NEGATIVAS_ALUNO — não aqui.
 POSITIVAS = POSITIVAS_FORTES + [
     "educacao", "juventude", "vulnerabilidade social", "ciencia", "stem",
-    "projeto de vida",
+    "projeto de vida", "impacto social", "socioambiental", "comunitario",
+    "comunidade", "desenvolvimento comunitario", "terceiro setor",
+    "sociedade civil", "organizacoes sociais", "organizacao social", "inovacao",
+    "formacao", "empreendedorismo", "periferia", "inclusao", "direitos humanos",
+    "cultura educativa", "assistencia social",
 ]
 NEGATIVAS = [
     "pos-graduacao", "mestrado", "doutorado", "curso pago", "mensalidade",
@@ -41,6 +48,22 @@ NEGATIVAS_ALUNO = [
     "bolsa de estudo", "inscricao de participante", "inscricoes de participantes",
     "competicao estudantil", "gabarito", "prova classificatoria",
 ]
+# INAPLICÁVEL ao PFC (não é falta de tema — é falta de elegibilidade): editais
+# que o PFC genuinamente não tem como concorrer. Régua estreita DE PROPÓSITO: só
+# o inequivocamente fora (bem-estar animal; saúde hospitalar/clínica específica;
+# recorte étnico/aldeia indígena específico). NÃO inclui "impacto social",
+# "comunitário", "cultura", "ambiente" genéricos — nesses o PFC PODE se
+# candidatar, então ficam. Barra no pré-filtro (avaliar_sinal).
+NAO_ELEGIVEL = [
+    # bem-estar animal
+    "bem-estar animal", "bem estar animal", "protecao animal", "causa animal",
+    "resgate animal", "abrigo animal", "fauna", "veterinari",
+    # saúde hospitalar / clínica específica (não "educação em saúde")
+    "hospital", "hospitalar", "oncolog", "cancer", "leito", "uti ",
+    "cirurgi", "doenca rara", "cuidados paliativos", "ambulatori",
+    # recorte étnico/aldeia indígena específico
+    "indigena", "indigenas", "aldeia", "povos originarios", "terra indigena",
+]
 
 # --- Região (20%) ------------------------------------------------------------
 REGIOES_PFC = [
@@ -58,6 +81,11 @@ REGIOES_AMPLAS = ["sao paulo", "nacional", "todo o brasil", "todo brasil", "em t
 SINAIS_FORTES = [
     "edital", "chamada pública", "chamada de projetos", "inscrições abertas",
     "seleção de projetos", "seleção pública", "convocatória", "processo seletivo",
+    # variações de "inscrições abertas" (aluno/olimpíada já caíram antes):
+    "abre inscrições", "abrem inscrições", "recebe inscrições", "recebem inscrições",
+    # prêmio institucional / patrocínio também são captação que o PFC concorre —
+    # prêmio PARA ALUNO já cai antes, em e_oportunidade_aluno.
+    "prêmio", "premiação", "patrocínio", "patrocinador",
 ]
 SINAIS_FRACOS = [
     "recursos", "proposta", "financiamento", "apoio financeiro", "doação",
@@ -111,12 +139,22 @@ def e_oportunidade_aluno(titulo: str, descricao: str) -> bool:
     return any(k in texto for k in NEGATIVAS_ALUNO)
 
 
+def e_nao_elegivel(titulo: str, descricao: str) -> bool:
+    """True se é captação que o PFC genuinamente NÃO tem como concorrer
+    (bem-estar animal, saúde hospitalar/clínica, recorte étnico/aldeia indígena).
+    NÃO barra impacto social/comunitário/cultura/ambiente amplos — nesses o PFC
+    pode se candidatar. Normaliza acentos (chaves em NAO_ELEGIVEL são sem acento)."""
+    texto = _norm(f"{titulo or ''} {descricao or ''}")
+    return any(k in texto for k in NAO_ELEGIVEL)
+
+
 def avaliar_sinal(op: dict) -> tuple[bool, str]:
     """Decisão do pré-filtro. Retorna (passa, motivo_descarte).
 
-    Ordem: exclusão administrativa -> exclusão de oportunidade-para-aluno ->
-    filtro de sinal forte/fraco. Sem whitelist: toda fonte passa pelo mesmo
-    crivo (o radar de captação só deixa passar captação de recurso).
+    Ordem: exclusão administrativa -> oportunidade-para-aluno -> inelegível
+    (fora do que o PFC concorre) -> filtro de sinal. Sem whitelist: toda fonte
+    passa pelo mesmo crivo. A régua é ELEGIBILIDADE (dinheiro que o PFC pode
+    captar), não tema estreito — impacto social, comunitário e cultura entram.
     """
     titulo = op.get("titulo", "")
     descricao = op.get("descricao", "")
@@ -124,6 +162,8 @@ def avaliar_sinal(op: dict) -> tuple[bool, str]:
         return False, "título genérico/administrativo excluído"
     if e_oportunidade_aluno(titulo, descricao):
         return False, "oportunidade para aluno (olimpíada/medalha/bolsa), não captação"
+    if e_nao_elegivel(titulo, descricao):
+        return False, "inaplicável ao PFC (bem-estar animal/saúde hospitalar/aldeia indígena)"
     if tem_sinal_de_oportunidade(titulo, descricao):
         return True, ""
     return False, "sem sinal de oportunidade"

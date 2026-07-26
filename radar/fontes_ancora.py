@@ -8,7 +8,11 @@ Extração conservadora: nunca inventa prazo/valor ausentes. O isolamento
 """
 from __future__ import annotations
 
-from radar.fontes_genericas import extrair_de_soup, pegar_soup
+from urllib.parse import urljoin
+
+from radar.fontes_genericas import (
+    extrair_de_soup, limpar_texto, montar_item, pegar_soup,
+)
 
 
 def _coletar(url: str, fonte: str, seletores, limite: int = 25) -> list[dict]:
@@ -41,6 +45,40 @@ def fonte_abcr():
 def fonte_mapaosc():
     return _coletar("https://mapaosc.ipea.gov.br/editais", "Mapa das OSC (IPEA)",
                     ["div[class*=card]", "article", "li", "tr"])
+
+
+def fonte_capta():
+    # Apex capta.org.br falha DNS às vezes; o www é estável. Editais ficam em
+    # blocos div.post (título em h3). Muita coisa é ambiente/cultura/social —
+    # o filtro de relevância derruba o que não é captação de educação/ciência.
+    return _coletar("https://www.capta.org.br/fontes-de-financiamento/oportunidades/",
+                    "Capta",
+                    ["div.post", "h3.arquivos a", "h3 a[href]", "div[class*=post]"])
+
+
+def fonte_rede_filantropia():
+    """Rede Filantropia: os editais são matérias em /informacao/<slug> espalhadas
+    numa grade Bootstrap (sem bloco limpo), então extraímos por LINK, não por
+    seletor de bloco. Corta o ruído de curso pago (links p/ dialogosocial.com.br)
+    e navegação curta. O filtro de relevância decide o que é captação de fato."""
+    base = "https://filantropia.ong/"
+    soup = pegar_soup(base)
+    if soup is None:
+        return []
+    itens, vistos = [], set()
+    for a in soup.find_all("a", href=True):
+        href = urljoin(base, (a.get("href") or "").strip())
+        # só matérias do próprio site; nunca o curso pago (dialogosocial)
+        if "/informacao/" not in href or "dialogosocial" in href.lower():
+            continue
+        titulo = limpar_texto(a.get_text())
+        if len(titulo) < 20 or href in vistos:
+            continue
+        vistos.add(href)
+        itens.append(montar_item(titulo, "", href, "Rede Filantropia"))
+        if len(itens) >= 40:
+            break
+    return itens
 
 
 # --- Órgãos públicos ---------------------------------------------------------
@@ -175,6 +213,8 @@ FONTES = {
     "Observatório 3º Setor": fonte_observatorio3setor,
     "ABCR": fonte_abcr,
     "Mapa das OSC (IPEA)": fonte_mapaosc,
+    "Capta": fonte_capta,
+    "Rede Filantropia": fonte_rede_filantropia,
     "CNPq": fonte_cnpq,
     "FAPESP": fonte_fapesp,
     "Finep": fonte_finep,
@@ -204,6 +244,8 @@ ANCORA_URLS = [
     "https://observatorio3setor.org.br/",
     "https://captadores.org.br/editais/",
     "https://mapaosc.ipea.gov.br/editais",
+    "https://www.capta.org.br/fontes-de-financiamento/oportunidades/",
+    "https://filantropia.ong/",
     "https://www.gov.br/cnpq/pt-br/chamadas/abertas-para-submissao",
     "https://fapesp.br/chamadas/",
     "http://www.finep.gov.br/chamadas-publicas/chamadaspublicas?situacao=aberta",
