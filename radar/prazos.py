@@ -45,24 +45,31 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s.lower())
 
 
-def _montar_data(dia: int, mes: int, ano: int | None, hoje: datetime.date):
-    """Valida a data; sem ano, assume o próximo ano em que ela ainda é futura."""
-    if ano is not None and ano < 100:
+def _montar_data(dia: int, mes: int, ano: int | None):
+    """Valida a data. SEM ano explícito -> None (NUNCA inventa o ano).
+
+    O chute de ano ("assume o próximo ano em que a data é futura") era a
+    causa-raiz do bug do 2027: uma data "6 de junho" sem ano, com junho já
+    passado, virava 2027. Melhor não ter data (o app mostra "prazo a confirmar")
+    do que fabricar uma errada — uma data errada é pior que nenhuma.
+    """
+    if ano is None:
+        return None
+    if ano < 100:
         ano += 2000
-    if ano is not None:
-        try:
-            return datetime.date(ano, mes, dia)
-        except ValueError:
-            return None
     try:
-        d = datetime.date(hoje.year, mes, dia)
+        return datetime.date(ano, mes, dia)
     except ValueError:
         return None
-    return d if d >= hoje else datetime.date(hoje.year + 1, mes, dia)
 
 
 def extrair_prazo(texto: str, url: str = "") -> str | None:
-    """Data-limite em ISO (AAAA-MM-DD) achada no texto, ou None."""
+    """Data-limite em ISO (AAAA-MM-DD) achada no texto, ou None.
+
+    Só devolve data quando o ANO está explícito no texto (ver _montar_data).
+    Descarta data antiga demais (fantasma de página velha, ex.: um "2022"
+    solto numa listagem) — segue procurando um casamento melhor no texto.
+    """
     t = _norm(texto)[:30000]
     if not t:
         return None
@@ -73,15 +80,20 @@ def extrair_prazo(texto: str, url: str = "") -> str | None:
             if mes is None:                  # "12 meses", "10 cidades"… não é data
                 continue
             data = _montar_data(int(m.group(1)), mes,
-                                int(m.group(3)) if m.group(3) else None, hoje)
+                                int(m.group(3)) if m.group(3) else None)
         else:                                # data numérica DD/MM[/AAAA]
             dia, mes = int(m.group(4)), int(m.group(5))
             if not (1 <= mes <= 12):
                 continue
             data = _montar_data(dia, mes,
-                                int(m.group(6)) if m.group(6) else None, hoje)
-        if data is not None:
-            return data.isoformat()
+                                int(m.group(6)) if m.group(6) else None)
+        if data is None:
+            continue
+        # Sanidade: prazo que "venceu" há muito (>120 dias) não é prazo — é data
+        # de publicação/edição antiga. Ignora e procura outra data no texto.
+        if (data - hoje).days < -120:
+            continue
+        return data.isoformat()
     return None
 
 

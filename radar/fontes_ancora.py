@@ -121,17 +121,7 @@ def fonte_parque_sorocaba():
                     ["article", "div[class*=card]", "div[class*=noticia]", ".elementor-post"])
 
 
-# --- Ciência jovem / feiras / prêmios / educação -----------------------------
-def fonte_febrace():
-    return _coletar("https://febrace.org.br/noticias/", "FEBRACE",
-                    ["article", "div[class*=card]", "div[class*=noticia]", ".elementor-post", "div[class*=post]"])
-
-
-def fonte_mostratec():
-    return _coletar("https://www.mostratec.com.br/", "MOSTRATEC",
-                    ["article", "div[class*=card]", "div[class*=noticia]", "div[class*=post]", ".elementor-post"])
-
-
+# --- Ciência jovem / prêmios / educação --------------------------------------
 def fonte_mcti():
     return _coletar("https://www.gov.br/mcti/pt-br/acompanhe-o-mcti/noticias", "MCTI",
                     ["article", ".tileItem", "li[class*=item]", "div[class*=noticia]", "div[class*=card]"])
@@ -152,29 +142,12 @@ def fonte_instituto_votorantim():
                     ["article", "div[class*=card]", "div[class*=noticia]", "div[class*=post]", ".elementor-post"])
 
 
-# --- Olimpíadas científicas (núcleo do PFC: 6º ano-EM de escola pública) -----
-def fonte_obmep():
-    return _coletar("https://www.obmep.org.br/", "OBMEP",
-                    ["article", "div[class*=card]", "div[class*=noticia]",
-                     "div[class*=post]", "li[class*=item]", "div[class*=destaque]"])
-
-
-def fonte_oba():
-    return _coletar("https://www.oba.org.br/", "OBA",
-                    ["article", "div[class*=card]", "div[class*=noticia]",
-                     "div[class*=post]", "li[class*=item]", "div[class*=destaque]"])
-
-
-def fonte_obbiotec():
-    return _coletar("https://www.obbiotec.com.br/", "OBBiotec",
-                    ["article", "div[class*=card]", "div[class*=noticia]",
-                     "div[class*=post]", ".elementor-post", "li[class*=item]"])
-
-
-def fonte_comunidade_cientifica_jr():
-    return _coletar("https://comunidadecientificajr.com.br/", "Comunidade Científica Jr",
-                    ["article", "div[class*=card]", "div[class*=post]",
-                     ".elementor-post", "div[class*=noticia]", "li[class*=item]"])
+# NOTA: as fontes de OLIMPÍADA (OBMEP, OBA, OBBiotec, Comunidade Científica Jr)
+# e as FEIRAS de ciências (FEBRACE, MOSTRATEC) foram REMOVIDAS deste radar. Elas
+# servem à MISSÃO do PFC (alunos fazendo ciência), não à CAPTAÇÃO (dinheiro que a
+# organização levanta): no diagnóstico traziam 43 itens e ZERO captação. Se um
+# dia o PFC quiser um radar de "oportunidades para alunos", ele é OUTRO produto,
+# com outra régua.
 
 
 # --- Pesquisa / institutos de educação ---------------------------------------
@@ -216,16 +189,10 @@ FONTES = {
     "Fundação Bradesco": fonte_fund_bradesco,
     "Fundação Roberto Marinho": fonte_frm,
     "Parque Tecnológico de Sorocaba": fonte_parque_sorocaba,
-    "FEBRACE": fonte_febrace,
-    "MOSTRATEC": fonte_mostratec,
     "MCTI": fonte_mcti,
     "Prêmio Itaú-Unicef": fonte_premio_itau_unicef,
     "PORVIR": fonte_porvir,
     "Instituto Votorantim": fonte_instituto_votorantim,
-    "OBMEP": fonte_obmep,
-    "OBA": fonte_oba,
-    "OBBiotec": fonte_obbiotec,
-    "Comunidade Científica Jr": fonte_comunidade_cientifica_jr,
     "IMPA": fonte_impa,
     "Instituto Península": fonte_instituto_peninsula,
     "Fundação Educar DPaschoal": fonte_educar_dpaschoal,
@@ -251,16 +218,10 @@ ANCORA_URLS = [
     "https://fundacao.bradesco/instituicoes",
     "https://www.frm.org.br/",
     "https://www.parquetecsorocaba.com.br/",
-    "https://febrace.org.br/noticias/",
-    "https://www.mostratec.com.br/",
     "https://www.gov.br/mcti/pt-br/acompanhe-o-mcti/noticias",
     "https://premioitauunicef.org.br/",
     "https://porvir.org/",
     "https://www.institutovotorantim.org.br/",
-    "https://www.obmep.org.br/",
-    "https://www.oba.org.br/",
-    "https://www.obbiotec.com.br/",
-    "https://comunidadecientificajr.com.br/",
     "https://impa.br/noticias/",
     "https://www.institutopeninsula.org.br/",
     "https://educar.org.br/",

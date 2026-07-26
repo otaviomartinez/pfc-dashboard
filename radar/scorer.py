@@ -16,14 +16,30 @@ POSITIVAS_FORTES = [
     "permanencia escolar", "tecnologia social", "formacao de professores",
     "equidade educacional",
 ]
+# TEMA do fomento (o QUE o edital financia) — puxa aderência para cima.
+# NÃO inclui "estudante/jovem/cientista/olimpiada": esses descrevem QUEM
+# participa, não o tema do projeto, e eram o que puxava oportunidade-para-aluno
+# para dentro da captação. Ficaram de fora de propósito (ver NEGATIVAS_ALUNO).
 POSITIVAS = POSITIVAS_FORTES + [
     "educacao", "juventude", "vulnerabilidade social", "ciencia", "stem",
-    "estudante", "jovem", "cientista", "olimpiada", "projeto de vida",
+    "projeto de vida",
 ]
 NEGATIVAS = [
     "pos-graduacao", "mestrado", "doutorado", "curso pago", "mensalidade",
     "vestibular preparatorio", "ensino superior privado", "patrocinio esportivo",
     "cupom", "desconto",
+]
+# OPORTUNIDADE PARA ALUNO (não é captação): olimpíadas, competições, premiação
+# de estudantes, bolsa/vaga para participante. O PFC CAPTA recurso para a
+# organização — quem premia/inscreve alunos é a missão, não a captação. Estes
+# sinais barram o item no pré-filtro (avaliar_sinal) e derrubam a aderência.
+NEGATIVAS_ALUNO = [
+    "olimpiada", "olimpiadas", "olimpico", "medalha", "medalhista", "medalhistas",
+    "estudantes premiados", "alunos premiados", "estudante premiado",
+    "premiacao de estudante", "premia estudantes", "premia os estudantes",
+    "premia alunos", "bolsa para aluno", "bolsa para estudante",
+    "bolsa de estudo", "inscricao de participante", "inscricoes de participantes",
+    "competicao estudantil", "gabarito", "prova classificatoria",
 ]
 
 # --- Região (20%) ------------------------------------------------------------
@@ -49,16 +65,11 @@ SINAIS_FRACOS = [
 ]
 _RE_VALOR = re.compile(r"r\$\s?[\d.,]+")
 
-# Fontes cujas páginas são 100% de editais/chamadas: o CONTEXTO já é prova de
-# oportunidade, então itens delas pulam o filtro de sinal (mas a EXCLUSAO ainda
-# vale, para barrar menus/manuais que também aparecem nessas páginas).
-FONTES_CONTEXTO_EDITAL = {
-    "FAPESP", "CNPq", "Finep", "Fundação Banco do Brasil",
-    "Itaú Social", "Instituto Unibanco",
-    "FEBRACE", "Prêmio Itaú-Unicef", "PORVIR",
-    # olimpíadas científicas p/ 6º ano-EM de escola pública = núcleo do PFC
-    "OBMEP", "OBA", "OBBiotec", "Comunidade Científica Jr",
-}
+# NOTA: a antiga whitelist FONTES_CONTEXTO_EDITAL foi REMOVIDA. Ela dava passe
+# livre no filtro de sinal a certas fontes — o que deixava até página de menu
+# ("Tire suas Dúvidas", "Materiais de Comunicação") entrar na fila, e blindava
+# o catálogo de modalidades da FAPESP. Agora TODA fonte passa pelo mesmo filtro
+# de sinal; quem não tem sinal de oportunidade (edital/chamada/valor) cai.
 
 # Títulos genéricos/administrativos descartados sempre (camada extra de segurança).
 # Reforçado com termos de manual/procedimento comuns na FAPESP/CNPq.
@@ -91,18 +102,29 @@ def tem_sinal_de_oportunidade(titulo: str, descricao: str) -> bool:
     return False
 
 
+def e_oportunidade_aluno(titulo: str, descricao: str) -> bool:
+    """True se o item é OPORTUNIDADE PARA ALUNO (olimpíada, medalha, premiação
+    de estudante, bolsa/vaga de participante) — isso é missão, não captação.
+    Normaliza acentos (_norm) porque as chaves em NEGATIVAS_ALUNO são sem acento
+    ('olimpiada' precisa casar com 'Olimpíada')."""
+    texto = _norm(f"{titulo or ''} {descricao or ''}")
+    return any(k in texto for k in NEGATIVAS_ALUNO)
+
+
 def avaliar_sinal(op: dict) -> tuple[bool, str]:
     """Decisão do pré-filtro. Retorna (passa, motivo_descarte).
 
-    Ordem: exclusão (sempre vence) -> fonte de contexto (passe livre) ->
-    filtro de sinal forte/fraco (agregadores, institutos, genéricas).
+    Ordem: exclusão administrativa -> exclusão de oportunidade-para-aluno ->
+    filtro de sinal forte/fraco. Sem whitelist: toda fonte passa pelo mesmo
+    crivo (o radar de captação só deixa passar captação de recurso).
     """
     titulo = op.get("titulo", "")
+    descricao = op.get("descricao", "")
     if titulo_excluido(titulo):
         return False, "título genérico/administrativo excluído"
-    if op.get("fonte", "") in FONTES_CONTEXTO_EDITAL:
-        return True, ""
-    if tem_sinal_de_oportunidade(titulo, op.get("descricao", "")):
+    if e_oportunidade_aluno(titulo, descricao):
+        return False, "oportunidade para aluno (olimpíada/medalha/bolsa), não captação"
+    if tem_sinal_de_oportunidade(titulo, descricao):
         return True, ""
     return False, "sem sinal de oportunidade"
 
@@ -144,6 +166,11 @@ def _score_aderencia(texto: str):
     fortes = sum(1 for k in POSITIVAS_FORTES if k in t)
     pos = sum(1 for k in POSITIVAS if k in t)
     neg = sum(1 for k in NEGATIVAS if k in t)
+    aluno = sum(1 for k in NEGATIVAS_ALUNO if k in t)
+    # Oportunidade PARA ALUNO (olimpíada/medalha/bolsa de participante) não é
+    # captação: aderência ao chão (2ª linha de defesa; a 1ª é avaliar_sinal).
+    if aluno >= 1:
+        return max(0, 10 - aluno * 5), f"oportunidade para aluno, não captação ({aluno} sinal)"
     # 2+ negativas sem positiva forte => descarte automático (0-20)
     if neg >= 2 and fortes == 0:
         return max(0, 20 - neg * 3), f"{neg} termos fora de escopo, sem aderência forte"
