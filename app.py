@@ -162,7 +162,7 @@ def css_icones_botoes(mapa: dict, rotulos: dict | None = None) -> str:
         "-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;"
         "-webkit-mask-size:contain;mask-size:contain;"
         "-webkit-mask-position:center;mask-position:center}",
-        # modo ícone: o texto some (o modo expandido devolve em _SIDEBAR_EXPANDIDA_CSS)
+        # modo ícone: o texto some (o modo expandido devolve em _SIDEBAR_OPEN_CSS)
         ", ".join(f".st-key-{k} .stButton>button {alvo}>p" for k in mapa) +
         "{display:none}",
     ]
@@ -547,25 +547,20 @@ body{background:var(--bg)}
 /* ATENÇÃO — leia antes de mexer nas regras abaixo.
    A sidebar tem DOIS modos e o padrão é o estreito:
      ÍCONES (60px)   -> este bloco. Só os SVGs, com tooltip no hover.
-     EXPANDIDA (250px)-> _SIDEBAR_EXPANDIDA_CSS, que sobrescreve este bloco.
-   Quem manda é o Python: st.session_state["sidebar_expandida"], alternado pelo
-   botão .tn-sb da barra fixa superior. A barra NUNCA some por completo — foi
-   decisão de projeto: menos estados, e nenhum caminho em que o usuário fique
-   sem navegação (antes existia um modo "escondida", aposentado de propósito).
-
-   O CONTRATO que faz o modo expandido funcionar (dois lados frágeis):
-     1. ORDEM — _SIDEBAR_EXPANDIDA_CSS só vence as larguras !important daqui
-        porque é injetado DEPOIS, em _preparar_sidebar(), no render de cada
-        sidebar. Injetado antes deste bloco, o botão de expandir não faz nada.
-     2. ESPECIFICIDADE — a variante [aria-expanded="false"] logo abaixo é mais
-        específica; lá os seletores são repetidos para empatar com ela.
-   Quebrar qualquer um dos dois NÃO gera erro: a barra apenas deixa de expandir,
-   e o bug parece estar no botão.
-   Ver: _SIDEBAR_EXPANDIDA_CSS, _preparar_sidebar, render_topnav. */
+     EXPANDIDA (250px)-> _SIDEBAR_OPEN_CSS, ativado pela classe html.pfc-sb-open.
+   O toggle é CLIENT-SIDE (setinha na borda -> _SIDEBAR_ARROW_JS), SEM rerun: o
+   estado vive na classe pfc-sb-open do <html> (não no Python), que sobrevive
+   aos reruns. A barra NUNCA some por completo — decisão de projeto: nenhum
+   caminho em que o usuário fique sem navegação (o modo "escondida" foi
+   aposentado de propósito).
+   Especificidade: _SIDEBAR_OPEN_CSS usa "html.pfc-sb-open [data-testid=...]",
+   mais específico que este bloco — vence SEM depender da ordem de injeção
+   (a antiga fragilidade de ordem deixou de existir).
+   Ver: _SIDEBAR_OPEN_CSS, _SIDEBAR_ARROW_JS, _preparar_sidebar. */
 [data-testid="stSidebar"]{background:var(--surface)!important;border-right:1px solid var(--line);
   width:60px!important;min-width:60px!important;max-width:60px!important;
   transform:none!important;margin-left:0!important;visibility:visible!important;
-  transition:width .18s var(--ease),min-width .18s var(--ease),max-width .18s var(--ease)}
+  transition:none!important}  /* largura NÃO anima por CSS: a setinha anima por timer JS */
 [data-testid="stSidebar"][aria-expanded="false"]{transform:none!important;margin-left:0!important}
 /* o tooltip do modo ícone precisa vazar dos 60px: nenhum ancestral pode cortar */
 [data-testid="stSidebar"],
@@ -573,10 +568,8 @@ body{background:var(--bg)}
 [data-testid="stSidebar"] [data-testid="stVerticalBlock"],
 [data-testid="stSidebar"] .stElementContainer,
 [data-testid="stSidebar"] .stButton{overflow:visible!important}
-/* O botão nativo de recolher fica escondido porque quem controla a barra é o
-   nosso .tn-sb, na barra fixa superior: ele vive fora da sidebar, então segue
-   clicável em qualquer modo. Dois controles com comportamentos diferentes só
-   confundiriam.
+/* O botão nativo de recolher fica escondido porque quem controla a barra é a
+   nossa SETINHA na borda (client-side, _SIDEBAR_ARROW_JS).
    O botão nativo de REABRIR (stExpandSidebarButton) continua visível e
    estilizado mais abaixo: é a rede de segurança para quando o Streamlit
    colapsa a barra por conta própria (o bug dela sumir). */
@@ -1780,56 +1773,129 @@ _SIDEBAR_FIX_JS = """
 """
 
 
-# Modo EXPANDIDO (250px, com os nomes). O padrão é o modo ícone, no CSS global;
-# este bloco é o override — desfaz a largura estreita e devolve tudo que o modo
-# ícone esconde: rótulo dos botões, marca, cabeçalho de seção e rodapé.
+# Modo EXPANDIDO (250px, com os nomes), agora dirigido por uma CLASSE no <html>:
+# html.pfc-sb-open. O padrão (sem a classe) é o modo ícone, no CSS global.
 #
-# CONTRATO com o bloco SIDEBAR do CSS global (procure por "ATENÇÃO" lá):
-#   1. ORDEM — lá a largura é 60px !important. Estas regras só vencem porque são
-#      injetadas DEPOIS, em _preparar_sidebar(), no render de cada sidebar.
-#      Injetar antes daquele bloco = o botão de expandir não faz nada.
-#   2. ESPECIFICIDADE — lá existe a variante [aria-expanded="false"], mais
-#      específica. Os três seletores de largura abaixo repetem o atributo para
-#      empatar com ela.
-# Quebrar qualquer um dos dois não gera erro: a barra apenas deixa de expandir.
-_SIDEBAR_EXPANDIDA_CSS = """
+# Por que a classe no <html> (e não estado do Python):
+#   * O TOGGLE é 100% client-side (setinha -> _SIDEBAR_ARROW_JS), SEM rerun. A
+#     classe fica em document.documentElement, que o React do Streamlit NÃO
+#     gerencia — então ela SOBREVIVE aos reruns (persiste ao trocar de painel) e
+#     não é limpa a cada render (sem flicker de conteúdo).
+#   * Especificidade: "html.pfc-sb-open [data-testid=stSidebar]" (classe + html +
+#     atributo) vence o global "[data-testid=stSidebar]" (60px !important) SEM
+#     depender da ORDEM de injeção — some a antiga fragilidade documentada.
+# A LARGURA de descanso vem daqui; a ANIMAÇÃO 60<->250 é por timer JS (inline),
+# não por transition:width (que congela nos componentes deste projeto).
+_SIDEBAR_OPEN_CSS = """
 <style>
-[data-testid="stSidebar"],
-[data-testid="stSidebar"][aria-expanded="true"],
-[data-testid="stSidebar"][aria-expanded="false"]{
+html.pfc-sb-open [data-testid="stSidebar"]{
   width:250px!important;min-width:250px!important;max-width:250px!important}
-[data-testid="stSidebar"]>div:first-child{padding-left:14px!important;padding-right:14px!important}
+html.pfc-sb-open [data-testid="stSidebar"]>div:first-child{padding-left:14px!important;padding-right:14px!important}
 /* devolve o texto dos botões e alinha à esquerda */
-[data-testid="stSidebar"] .stButton>button{justify-content:flex-start!important;
+html.pfc-sb-open [data-testid="stSidebar"] .stButton>button{justify-content:flex-start!important;
   padding:10px 14px!important}
-[data-testid="stSidebar"] .stButton>button [data-testid="stMarkdownContainer"]>p{display:block!important}
+html.pfc-sb-open [data-testid="stSidebar"] .stButton>button [data-testid="stMarkdownContainer"]>p{display:block!important}
 /* com o nome à vista, o tooltip vira ruído */
-[data-testid="stSidebar"] .stButton>button::after{display:none!important}
+html.pfc-sb-open [data-testid="stSidebar"] .stButton>button::after{display:none!important}
 /* marca, cabeçalho de seção e rodapé voltam ao formato com texto */
-[data-testid="stSidebar"] .sb-brand{justify-content:flex-start;padding:2px 8px 14px}
-[data-testid="stSidebar"] .sb-brand .bt{display:block}
-[data-testid="stSidebar"] .sb-sec{height:auto;padding:22px 8px 9px;margin:0;background:none;
+html.pfc-sb-open [data-testid="stSidebar"] .sb-brand{justify-content:flex-start;padding:2px 8px 14px}
+html.pfc-sb-open [data-testid="stSidebar"] .sb-brand .bt{display:block}
+html.pfc-sb-open [data-testid="stSidebar"] .sb-sec{height:auto;padding:22px 8px 9px;margin:0;background:none;
   font-size:10.5px;letter-spacing:1.4px;overflow:visible}
-[data-testid="stSidebar"] .sb-foot{margin-top:26px;padding:16px 8px 6px}
-[data-testid="stSidebar"] .sf{justify-content:flex-start;font-size:11px;gap:9px}
+html.pfc-sb-open [data-testid="stSidebar"] .sb-foot{margin-top:26px;padding:16px 8px 6px}
+html.pfc-sb-open [data-testid="stSidebar"] .sf{justify-content:flex-start;font-size:11px;gap:9px}
 /* Escopo (só Emendas): volta o nome e a legenda */
-[data-testid="stSidebar"] .esc-item{justify-content:flex-start;padding:10px 14px;gap:11px}
-[data-testid="stSidebar"] .esc-item .esc-nome{display:inline}
-[data-testid="stSidebar"] .esc-item .esc-leg{display:inline;margin-left:auto}
+html.pfc-sb-open [data-testid="stSidebar"] .esc-item{justify-content:flex-start;padding:10px 14px;gap:11px}
+html.pfc-sb-open [data-testid="stSidebar"] .esc-item .esc-nome{display:inline}
+html.pfc-sb-open [data-testid="stSidebar"] .esc-item .esc-leg{display:inline;margin-left:auto}
 </style>
 """
 
 
-def _preparar_sidebar():
-    """Aplica o modo da sidebar e roda a recuperação do bug dela não montar.
+# SETINHA na borda da sidebar — toggle 100% CLIENT-SIDE (sem rerun, sem botão
+# oculto). Estado = classe pfc-sb-open no <html> (sobrevive a reruns). Animação
+# da largura por TIMER (setInterval + easeOutCubic), NÃO por transition:width.
+# Roda no documento-pai (mesma origem) a cada render; é idempotente.
+_SIDEBAR_ARROW_JS = """
+<script>
+(function(){
+  var P = window.parent; if(!P || !P.document){ return; }
+  var doc = P.document, html = doc.documentElement;
+  var SZ = 26, DUR = 260, CLS = 'pfc-sb-open';
 
-    A recuperação roda SEMPRE: como a barra nunca fica escondida por completo
-    (o modo estreito é o padrão), não existe mais o caso em que forçá-la a
-    aparecer contrariaria uma escolha do usuário.
+  function sb(){ return doc.querySelector('[data-testid="stSidebar"]'); }
+  function aberta(){ return html.classList.contains(CLS); }
+  function chev(dir){
+    var d = (dir === 'l') ? 'M15 18l-6-6 6-6' : 'M9 18l6-6-6-6';
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
+      'stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="' + d + '"/></svg>';
+  }
+  function inlineLarg(s, w){
+    if(w == null){ s.style.removeProperty('width'); s.style.removeProperty('min-width'); s.style.removeProperty('max-width'); return; }
+    s.style.setProperty('width', w + 'px', 'important');
+    s.style.setProperty('min-width', w + 'px', 'important');
+    s.style.setProperty('max-width', w + 'px', 'important');
+  }
+  function borda(){ var s = sb(); return s ? s.getBoundingClientRect().right : 60; }
+  function posic(a){ a.style.left = (borda() - SZ / 2) + 'px'; }
+
+  var a = doc.getElementById('pfc-sb-arrow');
+  if(!a){
+    a = doc.createElement('button');
+    a.id = 'pfc-sb-arrow'; a.type = 'button';
+    a.title = 'Recolher ou expandir a barra lateral';
+    a.setAttribute('aria-label', 'Recolher ou expandir a barra lateral');
+    a.style.cssText = 'position:fixed;top:50%;transform:translateY(-50%);z-index:1000;' +
+      'width:' + SZ + 'px;height:' + SZ + 'px;display:flex;align-items:center;justify-content:center;' +
+      'border-radius:50%;cursor:pointer;padding:0;color:#8A93A3;background:#1C222B;' +
+      'border:1px solid rgba(255,255,255,.16);box-shadow:0 2px 10px rgba(0,0,0,.45);' +
+      'transition:color .15s,border-color .15s,background .15s';
+    a.addEventListener('mouseenter', function(){ a.style.color='#F5F7FA'; a.style.borderColor='rgba(255,255,255,.34)'; a.style.background='#232A35'; });
+    a.addEventListener('mouseleave', function(){ a.style.color='#8A93A3'; a.style.borderColor='rgba(255,255,255,.16)'; a.style.background='#1C222B'; });
+    a.addEventListener('click', function(){
+      var s = sb(); if(!s || P.__pfcSbAnim){ return; }
+      var w0 = Math.round(s.getBoundingClientRect().width);
+      var abrir = !aberta(), para = abrir ? 250 : 60;
+      s.style.setProperty('transition', 'none', 'important');  // anima por timer, não por CSS
+      inlineLarg(s, w0);                       // congela na largura atual
+      html.classList.toggle(CLS, abrir);       // conteúdo (textos) + largura de descanso
+      a.innerHTML = chev(abrir ? 'l' : 'r');
+      P.__pfcSbAnim = true;
+      var ini = Date.now();
+      var iv = P.setInterval(function(){       // timer no PAI: sobrevive à troca do iframe
+        var p = Math.min(1, (Date.now() - ini) / DUR);
+        var e = 1 - Math.pow(1 - p, 3);        // easeOutCubic
+        var w = Math.round(w0 + (para - w0) * e);
+        inlineLarg(s, w); a.style.left = (s.getBoundingClientRect().right - SZ / 2) + 'px';
+        if(p >= 1){ P.clearInterval(iv); P.__pfcSbAnim = false; inlineLarg(s, null); posic(a); }
+      }, 16);
+    });
+    doc.body.appendChild(a);
+  }
+  // Sync a cada render (idempotente): direção + posição na borda REAL da sidebar.
+  // Nunca mexe durante a animação (o próprio timer reposiciona quadro a quadro).
+  if(!P.__pfcSbAnim){ a.innerHTML = chev(aberta() ? 'l' : 'r'); posic(a); }
+  if(!P.__pfcSbArrowResize){
+    P.__pfcSbArrowResize = true;
+    P.addEventListener('resize', function(){ if(!P.__pfcSbAnim){ posic(a); } });
+  }
+})();
+</script>
+"""
+
+
+def _preparar_sidebar():
+    """Prepara a sidebar: CSS do modo expandido (por classe), recuperação do bug
+    de não-montar, e a SETINHA client-side de recolher/expandir.
+
+    O estado do expandir/recolher NÃO é do Python: vive na classe pfc-sb-open do
+    <html> (client-side, sem rerun). Por isso o CSS do modo aberto é injetado
+    SEMPRE (a classe é que decide se aplica), e a recuperação roda SEMPRE — a
+    barra nunca fica escondida por completo (o modo ícone é o padrão).
     """
-    if st.session_state.get("sidebar_expandida"):
-        st.markdown(_SIDEBAR_EXPANDIDA_CSS, unsafe_allow_html=True)
+    st.markdown(_SIDEBAR_OPEN_CSS, unsafe_allow_html=True)
     components.html(_SIDEBAR_FIX_JS, height=0)
+    components.html(_SIDEBAR_ARROW_JS, height=0)
 
 
 def _cards_deputados(lista, extras=()):
@@ -2741,17 +2807,6 @@ _TOPNAV_CSS = """
   font-family:'Inter',system-ui,sans-serif;--acc:#E8873A;--acc-soft:rgba(232,135,58,.14)}
 .tn *{box-sizing:border-box}
 .tn-left{display:flex;align-items:center;gap:13px;min-width:0}
-/* controle da sidebar: mora na barra fixa de propósito — é o único lugar que
-   continua visível com a sidebar recolhida (e sobrevive ao bug dela sumir). */
-.tn-sb{display:flex;align-items:center;gap:8px;height:34px;flex:none;
-  background:var(--acc-soft);border:1px solid color-mix(in srgb,var(--acc) 34%,transparent);
-  border-radius:9px;cursor:pointer;padding:0 12px 0 10px;transition:.16s cubic-bezier(.16,1,.3,1)}
-.tn-sb:hover{background:color-mix(in srgb,var(--acc) 22%,transparent);
-  border-color:color-mix(in srgb,var(--acc) 60%,transparent)}
-.tn-sb svg{width:18px;height:18px;fill:none;stroke:var(--acc);stroke-width:1.8;
-  stroke-linecap:round;stroke-linejoin:round}
-.tn-sb-lbl{font-family:'Inter',system-ui,sans-serif;font-size:12.5px;font-weight:600;
-  color:var(--acc);white-space:nowrap;letter-spacing:.2px}
 .tn-crumb{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.8px;
   color:var(--dim,#6B7688);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tn-crumb b{color:var(--acc);font-weight:600}
@@ -2829,19 +2884,10 @@ export default function(component){
       (atual ? ck : '') + '</button>';
   }
 
-  // controle da sidebar: alterna ícones (60px) <-> nomes (250px). A barra nunca
-  // some — o chevron aponta para o lado em que ela vai se mover.
-  const sbAberta = !!d.sb_aberta;
-  const iSb = '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/>' +
-    '<path d="M9 4v16"/><path d="M' + (sbAberta ? '16.3 9.5 13.8 12l2.5 2.5' : '13.8 9.5 16.3 12l-2.5 2.5') + '"/></svg>';
-  const sbTitulo = sbAberta ? 'Encolher a barra lateral (só ícones)'
-                            : 'Expandir a barra lateral (ver os nomes)';
-
+  // A sidebar é recolhida/expandida pela SETINHA na borda da própria barra
+  // (client-side puro, sem rerun — ver _SIDEBAR_ARROW_JS), não mais por aqui.
   root.innerHTML =
     '<div class="tn-left">' +
-    '<button class="tn-sb" data-act="sidebar" title="' + sbTitulo + '" aria-label="' + sbTitulo +
-    '" aria-expanded="' + (sbAberta ? 'true' : 'false') + '">' + iSb +
-    '<span class="tn-sb-lbl">Menu</span></button>' +
     '<div class="tn-crumb"><b>' + esc((nomeAtual || '').toUpperCase()) + '</b>' +
     (d.crumb ? ' · ' + esc(d.crumb) : '') + '</div></div>' +
     '<div class="tn-right"><div class="tn-sel">' +
@@ -2893,12 +2939,12 @@ _TOPNAV_OFFSET_CSS = f"""
 
 
 def render_topnav(radar_atual: str, crumb: str = ""):
-    """Barra fixa no topo com o seletor de radar. Trata trocar/hub/sair/sidebar."""
+    """Barra fixa no topo com o seletor de radar. Trata trocar/hub/sair.
+    (A sidebar é controlada pela setinha client-side, não pela topnav.)"""
     st.markdown(_TOPNAV_OFFSET_CSS, unsafe_allow_html=True)
     res = _topnav_v2(
         data={"radar": radar_atual, "crumb": crumb,
-              "inicial": USER.get("inicial", ""), "email": USER.get("email", ""),
-              "sb_aberta": bool(st.session_state.get("sidebar_expandida"))},
+              "inicial": USER.get("inicial", ""), "email": USER.get("email", "")},
         key="topnav", on_acao_change=lambda: None)
     ac = getattr(res, "acao", None)
     if not isinstance(ac, dict):
@@ -2912,11 +2958,6 @@ def render_topnav(radar_atual: str, crumb: str = ""):
         st.rerun()
     elif t == "hub":
         st.session_state["radar_escolhido"] = None
-        st.rerun()
-    elif t == "sidebar":
-        # o Python é o dono do estado: o rerun seguinte injeta (ou não) o CSS
-        # do modo expandido. Padrão ausente = modo ícone.
-        st.session_state["sidebar_expandida"] = not st.session_state.get("sidebar_expandida")
         st.rerun()
     elif t == "sair":
         for k in ("user", "page", "login_email", "login_senha", "radar_escolhido"):
