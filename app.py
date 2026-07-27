@@ -586,11 +586,13 @@ body{background:var(--bg)}
    Modo ícone (padrão): só o ícone "abrir" (»), centralizado. O modo expandido
    (html.pfc-sb-open, em _SIDEBAR_OPEN_CSS) troca para o ícone "recolher" («) + rótulo. */
 .pfc-sb-toggle{display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;
-  color:var(--dim);border-radius:9px;padding:9px;margin-bottom:6px;user-select:none;
+  color:var(--dim);border-radius:9px;padding:9px;margin:2px 0 0;user-select:none;
   border:1px solid transparent;transition:background .15s,color .15s,border-color .15s}
 .pfc-sb-toggle:hover{background:rgba(255,255,255,.05);color:var(--ink);border-color:var(--line)}
 .pfc-sb-toggle .pfc-ic{width:20px;height:20px;flex:none}
 .pfc-sb-toggle .pfc-ic-fechar,.pfc-sb-toggle .pfc-sb-toggle-lbl{display:none}
+/* divisor: respiro acima/abaixo, separando o controle do topo dos itens */
+.pfc-sb-sep{height:1px;background:var(--line);margin:12px 4px 14px}
 /* cabeçalho de seção vira um traço divisor (o rótulo não cabe em 60px) */
 [data-testid="stSidebar"] .sb-sec{height:1px;padding:0;margin:12px 6px;overflow:hidden;
   background:var(--line);font-size:0;letter-spacing:0}
@@ -1827,54 +1829,69 @@ html.pfc-sb-open [data-testid="stSidebar"] .esc-item .esc-leg{display:inline;mar
 """
 
 
-# TOGGLE da sidebar — 100% CLIENT-SIDE (sem rerun). O CONTROLE é um botão em
-# fluxo no topo da barra (_sidebar_toggle_html, renderizado via st.markdown); o
-# clique é tratado aqui por DELEGAÇÃO num listener único no documento-pai, que
-# sobrevive ao React recriar o botão a cada render. Estado = classe pfc-sb-open
-# no <html> (sobrevive a reruns; dirige ícone/rótulo e conteúdo via CSS). A
-# largura anima por TIMER (setInterval + easeOutCubic), NÃO por transition:width.
-_SIDEBAR_TOGGLE_JS = """
-<script>
+# TOGGLE da sidebar — 100% CLIENT-SIDE (sem rerun), consistente nos dois painéis.
+#
+# LIÇÃO da versão anterior (bug em cadeia): o listener era registrado DENTRO do
+# iframe do components.html. Ao trocar de painel, o Streamlit destrói e recria
+# esse iframe (render_sidebar vs render_sidebar_emendas -> posição diferente na
+# árvore). O listener, sendo uma closure do realm do iframe MORTO, parava de
+# funcionar; e a trava única (__pfcSbToggleWired) no window-pai impedia
+# re-registrar. Resultado: Captação funcionava até você ir a Emendas (novo
+# iframe, listener morto, trava impede re-vincular) e voltava quebrado.
+#
+# CORREÇÃO: instalar o listener no REALM DO DOCUMENTO-PAI, via um <script> no
+# <head> do pai. Esse script roda no realm do pai (não do iframe), então o
+# listener é DONO do window-pai e sobrevive a qualquer recriação de iframe /
+# rerun / troca de painel. Instalado UMA vez (o window-pai persiste na sessão).
+_SIDEBAR_TOGGLE_CORE = r"""
 (function(){
-  var P = window.parent; if(!P || !P.document){ return; }
-  var doc = P.document, html = doc.documentElement;
-  var DUR = 260, CLS = 'pfc-sb-open';
-
+  if (window.__pfcSbCoreOn) { return; }   // idempotente no realm do pai
+  window.__pfcSbCoreOn = true;
+  var doc = document, html = document.documentElement, DUR = 260, CLS = 'pfc-sb-open';
   function sb(){ return doc.querySelector('[data-testid="stSidebar"]'); }
-  function inlineLarg(s, w){
+  function inl(s, w){
     if(w == null){ s.style.removeProperty('width'); s.style.removeProperty('min-width'); s.style.removeProperty('max-width'); return; }
     s.style.setProperty('width', w + 'px', 'important');
     s.style.setProperty('min-width', w + 'px', 'important');
     s.style.setProperty('max-width', w + 'px', 'important');
   }
   function toggle(){
-    var s = sb(); if(!s || P.__pfcSbAnim){ return; }
+    var s = sb(); if(!s || window.__pfcSbAnim){ return; }
     var w0 = Math.round(s.getBoundingClientRect().width);
     var abrir = !html.classList.contains(CLS), para = abrir ? 250 : 60;
-    s.style.setProperty('transition', 'none', 'important');  // anima por timer, não por CSS
-    inlineLarg(s, w0);                        // congela na largura atual
-    html.classList.toggle(CLS, abrir);        // conteúdo/ícone/rótulo (CSS) + largura de descanso
-    P.__pfcSbAnim = true;
+    s.style.setProperty('transition', 'none', 'important');   // anima por timer, não por CSS
+    inl(s, w0);                              // congela na largura atual
+    html.classList.toggle(CLS, abrir);       // conteúdo/ícone/rótulo (CSS) + largura de descanso
+    window.__pfcSbAnim = true;
     var ini = Date.now();
-    var iv = P.setInterval(function(){        // timer no PAI: sobrevive à troca do iframe
+    var iv = setInterval(function(){         // timer no realm do PAI (persistente)
       var p = Math.min(1, (Date.now() - ini) / DUR);
-      var e = 1 - Math.pow(1 - p, 3);         // easeOutCubic
-      inlineLarg(s, Math.round(w0 + (para - w0) * e));
-      if(p >= 1){ P.clearInterval(iv); P.__pfcSbAnim = false; inlineLarg(s, null); }
+      var e = 1 - Math.pow(1 - p, 3);        // easeOutCubic
+      inl(s, Math.round(w0 + (para - w0) * e));
+      if(p >= 1){ clearInterval(iv); window.__pfcSbAnim = false; inl(s, null); }
     }, 16);
   }
-  // Listener DELEGADO, uma vez só: o botão .pfc-sb-toggle é recriado pelo React
-  // a cada render, mas o clique sempre borbulha até aqui.
-  if(!P.__pfcSbToggleWired){
-    P.__pfcSbToggleWired = true;
-    doc.addEventListener('click', function(e){
-      var alvo = (e.target && e.target.closest) ? e.target.closest('.pfc-sb-toggle') : null;
-      if(alvo){ e.preventDefault(); toggle(); }
-    }, true);
-  }
+  // DELEGAÇÃO: o botão .pfc-sb-toggle é recriado pelo React a cada render, mas o
+  // clique (inclusive no ícone interno) sempre borbulha até este listener do pai.
+  doc.addEventListener('click', function(e){
+    var alvo = (e.target && e.target.closest) ? e.target.closest('.pfc-sb-toggle') : null;
+    if(alvo){ e.preventDefault(); toggle(); }
+  }, true);
 })();
-</script>
 """
+
+# Wrapper (roda no iframe): injeta o CORE no <head> do PAI, uma única vez. O
+# core é embutido como string literal via json.dumps (sem dor de escape).
+_SIDEBAR_TOGGLE_JS = (
+    "<script>\n(function(){\n"
+    "  var P = window.parent; if(!P || !P.document){ return; }\n"
+    "  if(P.__pfcSbInstalled){ return; }\n"
+    "  P.__pfcSbInstalled = true;\n"
+    "  var sc = P.document.createElement('script');\n"
+    "  sc.textContent = " + json.dumps(_SIDEBAR_TOGGLE_CORE) + ";\n"
+    "  P.document.head.appendChild(sc);\n"
+    "})();\n</script>"
+)
 
 
 def _sidebar_toggle_html() -> str:
@@ -1893,7 +1910,9 @@ def _sidebar_toggle_html() -> str:
         'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
         '<path d="M11 17l-5-5 5-5"/><path d="M18 17l-5-5 5-5"/></svg>'
         '<span class="pfc-sb-toggle-lbl">Recolher</span>'
-        '</div>')
+        '</div>'
+        # divisor: dá respiro e separa o controle dos itens de navegação
+        '<div class="pfc-sb-sep"></div>')
 
 
 def _preparar_sidebar():
