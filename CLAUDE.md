@@ -4,7 +4,7 @@ Sistema de captação de recursos do **Programa Futuro Cientista** (UFSCar Soroc
 Streamlit + Google Sheets + GitHub Actions. Coordenador do projeto: Prof. Fábio Leite.
 
 Duas frentes, escolhidas num **hub** de entrada:
-- **Captação Privada** — radar automático que varre 38 fontes/dia atrás de editais e prêmios (identidade âmbar)
+- **Captação Privada** — radar automático que varre dezenas de fontes/dia atrás de **captação** (editais, chamadas, prêmios institucionais, patrocínio — só dinheiro que o PFC pode captar, com filtro de elegibilidade); identidade âmbar
 - **Emendas Parlamentares** — CRM de relacionamento com deputados (manual) **+** levantamento automático de "quem abordar" a partir da execução de emendas e dos contatos oficiais da ALESP (identidade violeta)
 
 ## Como trabalhar comigo
@@ -36,10 +36,10 @@ Duas frentes, escolhidas num **hub** de entrada:
 ### Sidebar dos painéis — dois modos, nunca escondida
 
 - **Ícones (60px)** é o padrão: só os SVGs das telas, item ativo com fundo no acento do painel + barrinha lateral, e o nome aparecendo como tooltip no hover.
-- **Expandida (250px)** mostra os nomes. Alterna pelo botão `.tn-sb`, na barra fixa superior — que fica **fora** da sidebar de propósito, para continuar clicável em qualquer modo.
+- **Expandida (250px)** mostra os nomes. Alterna por um **botão de recolher no TOPO do rail** (`.pfc-sb-toggle`, dentro da própria sidebar, com respiro e um divisor `.pfc-sb-sep` separando dos itens). Chevron `»` no modo ícone (expandir) / `«` + rótulo no modo expandido (recolher).
+- **O toggle é 100% CLIENT-SIDE, sem rerun** (`_SIDEBAR_TOGGLE_JS` + `_SIDEBAR_TOGGLE_CORE`): o estado vive na classe **`pfc-sb-open` no `<html>`** (o React do Streamlit não gerencia o `<html>`, então a classe **sobrevive aos reruns** e não pisca). A largura anima por **timer JS** (`setInterval` + easeOutCubic), NÃO por `transition:width`. O CSS do modo aberto é o `_SIDEBAR_OPEN_CSS`, keyed em `html.pfc-sb-open …` (especificidade maior — vence sem depender da ordem de injeção). **Não há mais estado Python** (`sidebar_expandida` foi aposentado).
 - **Não existe modo "escondida".** Existiu por um commit e foi aposentado: menos estados, e nenhum caminho em que o usuário fique sem navegação. Se pedirem "recolher a sidebar de vez", lembre que isso reabre o risco de ficar preso.
-- Quem manda é o Python: `st.session_state["sidebar_expandida"]`, alternado em `render_topnav`. Ausente = modo ícone.
-- O rótulo de `st.button` é texto puro e **não aceita HTML** — por isso ícone e tooltip entram por CSS, via a classe `st-key-<chave>` que o Streamlit põe no container. Ver `css_icones_botoes`. Por isso também as chaves dos botões são slugs ASCII: chave com espaço ou acento não vira seletor válido.
+- O rótulo de `st.button` é texto puro e **não aceita HTML** — por isso ícone e tooltip dos itens de navegação entram por CSS, via a classe `st-key-<chave>` que o Streamlit põe no container. Ver `css_icones_botoes`. Por isso também as chaves dos botões são slugs ASCII: chave com espaço ou acento não vira seletor válido.
 
 ## Emendas — como o painel está montado
 
@@ -48,9 +48,12 @@ Duas coisas convivem no painel de Emendas e **não se misturam**:
 **1. CRM dos deputados do Fábio** — aba `Deputados` no Google Sheets (mesma
 planilha das empresas). Relacionamento manual: diálogo, temperatura, status,
 contatos pessoais/de assessor. Sensível (regra 2). Porta única: leitura
-`dados.carregar_deputados`; escrita `dados.adicionar_deputado_crm` (puxar) e
-`dados.atualizar_status_deputado` (arrastar no funil). Detalhes de gravação nas
-Armadilhas.
+`dados.carregar_deputados`; escrita `dados.adicionar_deputado_crm` (puxar),
+`dados.atualizar_status_deputado` (arrastar no funil), `dados.atualizar_deputado`
+(editar diálogo/temperatura/status/observações no **dossiê**, só as células que
+mudaram) e `dados.anexar_dialogo_deputado` (**observação rápida** clicando num
+card do funil — anexa datado ao mesmo campo Diálogo). Edição só para logado
+(regra 2); contatos OFICIAIS da ALESP são só-leitura. Detalhes na seção Armadilhas.
 
 **2. Levantamento público "quem abordar"** — descoberta automática, separada do
 CRM, a partir de dado oficial:
@@ -72,9 +75,13 @@ CRM, a partir de dado oficial:
 
 **Tela "Descobrir"** (aba do painel): as duas seções, cada deputado num
 **card clicável por inteiro** (abre o dossiê; o botão "Puxar" é a exceção,
-z-index acima do overlay). O dossiê traz score, autorizado vs pago (rotulados,
-nunca somados), municípios diretos/vizinhos e o contato OFICIAL. **"Puxar para
-o CRM"** grava o deputado como nova linha na aba `Deputados`.
+z-index acima do overlay). No topo do dossiê, o **"melhor argumento de abordagem"**
+(`_argumento_abordagem`): uma frase-gancho composta só do dado real (município do
+PFC, valor edu/social, fatia, vizinhança), escolhendo o argumento mais forte
+disponível (território direto > vizinhança > alinhamento proporcional > volume);
+sem gancho forte, diz algo honesto — nunca inventa. Abaixo: score, autorizado vs
+pago (rotulados, nunca somados), municípios diretos/vizinhos e o contato OFICIAL.
+**"Puxar para o CRM"** grava o deputado como nova linha na aba `Deputados`.
 
 **Contatos: dois tipos que não se misturam.** Os 3 campos OFICIAIS (`Email
 Oficial`, `Telefone Gabinete`, `Página ALESP`) são públicos, da ALESP,
@@ -82,13 +89,46 @@ preenchidos por código (marca "não encontrado" quem não é titular). Os campo
 `Email`, `Telefones`, `WhatsApp`, `Instagram` são do Fábio (pessoal/assessor,
 sensível) — o código **nunca** escreve por cima deles.
 
+## Radar de Captação — como está
+
+Pipeline em `radar/` (roda no GitHub Actions, `radar.yml`, cron 06:00 Brasília;
+`python -m radar.main`). Grava na aba `Novidades_pendentes` do Sheets. **Escrita
+é append-only + dedup** — nunca apaga linha; o filtro novo só barra lixo NOVO, o
+antigo fica até ser triado no app (rodar o radar não "substitui" a fila).
+
+- **Só captação, por ELEGIBILIDADE (não tema estreito).** Vale qualquer dinheiro
+  que o PFC pode captar: educação, ciência, juventude, impacto social,
+  comunitário, inovação, formação, prêmio institucional, patrocínio. O filtro
+  (`radar/scorer.py`) barra no pré-filtro: oportunidade-para-aluno
+  (`NEGATIVAS_ALUNO`: olimpíada, medalha, premiação de estudante, bolsa de
+  participante) e o inaplicável (`NAO_ELEGIVEL`: bem-estar animal, saúde
+  hospitalar/clínica, recorte étnico/aldeia indígena). A antiga whitelist
+  `FONTES_CONTEXTO_EDITAL` foi removida — toda fonte passa pelo mesmo crivo.
+- **Fontes** (`radar/fontes_ancora.py`): removidas as de olimpíada (OBMEP, OBA,
+  OBBiotec, Comunidade Científica Jr) e as feiras (FEBRACE, MOSTRATEC) — serviam
+  à missão, não à captação. Adicionadas **Capta** (via `www.capta.org.br` — o
+  apex falha DNS) e **Rede Filantropia** (editais em `/informacao/<slug>`, extraídos
+  por link, cortando o curso pago do dialogosocial).
+- **Datas v2** (`radar/prazos.py` + `radar/publicacao.py`), regra 3 — nunca chuta
+  o ano: **âncoras em camadas** (`prazo de inscrição`, `inscrições até`,
+  `recebimento de propostas`, `data limite`; descarta o "até" puro, que pegava a
+  data de execução errada). Ano do prazo por extenso vem do texto; se faltar,
+  é inferido da **data de publicação SÓ de metadado estruturado**
+  (`publicacao.data_publicacao`: JSON-LD `datePublished`/og/`<time>`). Sem ano e
+  sem metadado → "a confirmar". `_prazo_confiavel` (−60..180) + corte de vencido
+  antigo são a 3ª linha.
+- **Relatório de Prioridades** (tela + PDF, `src/relatorios.py` com ReportLab):
+  cada painel tem o seu. Captação = editais futuros por urgência (respeita a
+  regra 3). Emendas = quem abordar (território + expansão), autorizado/pago
+  separados, contato oficial.
+
 ## Armadilhas conhecidas deste projeto
 
 - **Custom Components v2 travam certas animações CSS.** `transition:visibility`, `transition:width` e `animation` com `scaleX` já congelaram elementos (largura ficou em zero, dropdown abrindo e fechando sozinho) — e `!important` inline foi ignorado. O padrão não está totalmente mapeado. **Solução:** use valores diretos no HTML, `display` em vez de `visibility`, ou anime via `setInterval`/`setTimeout` no JS (funciona). Se um elemento parecer "morto", suspeite disso primeiro.
 - `requestAnimationFrame` **não roda** no runtime dos componentes v2. Use timers.
 - **A sidebar some intermitentemente** (o Streamlit não monta o elemento na transição hub → painel). Mitigado pela barra de navegação superior fixa, que é independente da sidebar — é a rede de segurança para o usuário nunca ficar preso. A recuperação automática (`_preparar_sidebar` → `_SIDEBAR_FIX_JS`, que clica no botão nativo de expandir até a barra aparecer) roda **em todo render, sem exceção**. Já houve uma versão em que ela era desligada quando o usuário recolhia de propósito; se voltar a existir um caso desses, esse desvio volta junto — evite. O bug em si ainda não foi eliminado.
-- **Dois pontos de CSS da sidebar quebram em silêncio** — nenhum dos dois gera erro, a interface só para de funcionar direito:
-  - **Ordem de injeção e especificidade** (bloco `SIDEBAR` do CSS global — procure por "ATENÇÃO"): o CSS global é o modo ícone (60px `!important`); o `_SIDEBAR_EXPANDIDA_CSS` só vence porque é injetado **depois**, em `_preparar_sidebar()`, e porque repete os seletores para empatar com a variante `[aria-expanded="false"]`. Mover a injeção para antes, ou baixar a especificidade, e o botão de expandir deixa de funcionar — parecendo bug no botão.
+- **Listener injetado por `components.html` MORRE ao trocar de painel — instale no realm do PAI.** Um `addEventListener` registrado de DENTRO do iframe do `components.html` (mesmo apontando para `window.parent.document`) é uma closure do realm daquele iframe. Ao trocar de painel, o Streamlit **destrói e recria** esse iframe (`render_sidebar` vs `render_sidebar_emendas` ocupam posições diferentes na árvore) e o listener **para de disparar**; uma trava única no `window`-pai ainda impede re-registrar → o controle quebra num painel e contamina o outro. **Solução (usada no toggle da sidebar):** injetar o núcleo como um `<script>` no `<head>` do PAI (`_SIDEBAR_TOGGLE_JS` faz isso uma vez, guard `__pfcSbInstalled`); aí o listener é dono do `window`-pai e sobrevive a qualquer recriação de iframe / rerun / troca de painel. Vale para QUALQUER listener persistente feito via `components.html`.
+- **Um ponto de CSS da sidebar ainda quebra em silêncio** (o outro, de ordem/especificidade, foi resolvido usando `html.pfc-sb-open …`, mais específico, que vence sem depender da ordem de injeção):
   - **`overflow:visible` na cadeia da sidebar**: o tooltip do modo ícone é um `::after` que precisa vazar para fora dos 60px. Ele depende de `overflow:visible` declarado em **todos** os ancestrais (sidebar → container → `stVerticalBlock` → `stElementContainer` → `stButton`). Um `overflow:hidden` em qualquer um deles corta o balão. Se um dia a sidebar precisar de scroll próprio, esse tooltip precisa de outra solução (por exemplo `position:fixed` posicionado por JS).
 - **Três paletas paralelas de cor de etapa** (`CORES_ETAPA`, `CORES_STATUS`, `ACENTOS_HEX`) precisam ser mantidas em sincronia manualmente. Frágil — deveriam virar uma só.
 - `app.py` passou de 3.600 linhas (componentes v2 com CSS/JS como strings Python). Quebrar em módulos é desejável, mas **não durante uma fase de entrega**.
@@ -99,22 +139,42 @@ sensível) — o código **nunca** escreve por cima deles.
 
 ## Fila de trabalho
 
-**Já feito (fase Emendas, esta leva):** CRM migrado para o Sheets; levantamento
-completo dos 94 (extrator Power BI 2023-25, rankings território/expansão, config
-editável, vizinhança IBGE); tela **Descobrir** com card clicável; ponte **puxar
-para o CRM**; **contatos oficiais** da ALESP; **drag-and-drop** no funil de
-Emendas. **Fase visual: encerrada** — mudança visual nova é escopo novo, não fila.
+**Já feito (última leva):**
+- **Emendas — levantamento completo dos 94:** extrator Power BI 2023-25, rankings
+  território/expansão, config editável, vizinhança IBGE; tela **Descobrir** com
+  card clicável; ponte **puxar para o CRM**; **contatos oficiais** da ALESP;
+  **drag-and-drop** no funil; **melhor argumento de abordagem** no dossiê.
+- **CRM migrado para o Sheets** (aba `Deputados`) e **edição pela tela**: editar
+  diálogo/temperatura/status/observações no dossiê (`atualizar_deputado`) e
+  **observação rápida** no card do funil (`anexar_dialogo_deputado`).
+- **Relatório de Prioridades** (tela + PDF) nos dois painéis (ReportLab).
+- **Radar de Captação:** limpeza (só captação + filtro de elegibilidade, fim das
+  fontes de olimpíada/feira), fontes **Capta** e **Rede Filantropia**, e
+  **enriquecimento de datas v2** (âncoras em camadas + inferência de ano por
+  metadado, nunca chuta). Ver "Radar de Captação — como está".
+- **Sidebar:** botão de recolher/expandir **no topo do rail**, 100% client-side
+  (sem rerun); pontinho de status = cor de saúde (verde/vermelho).
 
-**Próximo trabalho — nesta ordem:**
-1. **Editar informações do deputado pela tela.** Hoje dá para puxar e arrastar a
-   etapa; falta editar diálogo, temperatura e contatos pelo app, gravando no
-   Sheets pela porta única (`dados`), respeitando o campo sensível (regra 2).
-2. **Relatório de Prioridades** — botão que gera página/PDF do que está vencendo
-   (instituição, data final, valor).
-3. **Acurácia das datas dos editais** (frente Captação; regra 3 — uma data
-   errada é pior que nenhuma). Ainda pendente.
-4. Notificação por **e-mail** quando faltarem 15 dias para um prazo.
-5. **Deputado federal e senador** (aguardando as tabelas do Fábio).
+**Próximo trabalho — EM ANDAMENTO: melhorar a cobertura de datas do radar.**
+Diagnóstico feito (fila real: 31 itens, só **7 com data**). **7 NÃO é o teto** —
+dos 24 sem data, quase nenhum é impossível: ~16-18 são recuperáveis, e o grosso
+com engenharia BARATA. Duas correções pendentes, nesta ordem:
+1. **Usar a data "post publicado: 2026" do CORPO dos posts da captadores/ABCR como
+   âncora do ano**, em vez do JSON-LD `datePublished` (que fica STALE no ano
+   original, 2021/2017, e faz a inferência resolver pro passado e ser descartada).
+   A data real de 2026 está visível no corpo — parsear ela recupera ~13 itens
+   sem sair da página.
+2. **Ampliar as âncoras de prazo, que estão estreitas demais** — perdem frases
+   comuns MESMO com o ano escrito (ex.: "inscrições podem ser feitas até 22 de
+   julho **de 2026**", "inscrições: em andamento, até 17 de julho **de 2026**").
+   Recupera Glocal, Cecierj, tidesetubal etc.
+Só isso levaria de **7 para ~20+**. (3ª camada, mais pesada: seguir o link ao
+edital original — confirmado que funciona. Caso difícil de verdade: as ~5 notícias
+do MCTI que não trazem o prazo na página, só no sistema de chamadas.)
+
+**Depois:**
+- Notificação por **e-mail** quando faltarem 15 dias para um prazo.
+- **Deputado federal e senador** (aguardando as tabelas do Fábio).
 
 **Futuro (conversar antes):**
 - Aba "Prefeituras": escolas (estaduais e municipais) e unidades do CRAS por cidade de SP, para plano de expansão.
