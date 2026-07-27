@@ -548,15 +548,15 @@ body{background:var(--bg)}
    A sidebar tem DOIS modos e o padrão é o estreito:
      ÍCONES (60px)   -> este bloco. Só os SVGs, com tooltip no hover.
      EXPANDIDA (250px)-> _SIDEBAR_OPEN_CSS, ativado pela classe html.pfc-sb-open.
-   O toggle é CLIENT-SIDE (setinha na borda -> _SIDEBAR_ARROW_JS), SEM rerun: o
-   estado vive na classe pfc-sb-open do <html> (não no Python), que sobrevive
-   aos reruns. A barra NUNCA some por completo — decisão de projeto: nenhum
-   caminho em que o usuário fique sem navegação (o modo "escondida" foi
+   O toggle é CLIENT-SIDE (botão no TOPO da barra -> _SIDEBAR_TOGGLE_JS), SEM
+   rerun: o estado vive na classe pfc-sb-open do <html> (não no Python), que
+   sobrevive aos reruns. A barra NUNCA some por completo — decisão de projeto:
+   nenhum caminho em que o usuário fique sem navegação (o modo "escondida" foi
    aposentado de propósito).
    Especificidade: _SIDEBAR_OPEN_CSS usa "html.pfc-sb-open [data-testid=...]",
    mais específico que este bloco — vence SEM depender da ordem de injeção
    (a antiga fragilidade de ordem deixou de existir).
-   Ver: _SIDEBAR_OPEN_CSS, _SIDEBAR_ARROW_JS, _preparar_sidebar. */
+   Ver: _SIDEBAR_OPEN_CSS, _SIDEBAR_TOGGLE_JS, _preparar_sidebar. */
 [data-testid="stSidebar"]{background:var(--surface)!important;border-right:1px solid var(--line);
   width:60px!important;min-width:60px!important;max-width:60px!important;
   transform:none!important;margin-left:0!important;visibility:visible!important;
@@ -568,8 +568,8 @@ body{background:var(--bg)}
 [data-testid="stSidebar"] [data-testid="stVerticalBlock"],
 [data-testid="stSidebar"] .stElementContainer,
 [data-testid="stSidebar"] .stButton{overflow:visible!important}
-/* O botão nativo de recolher fica escondido porque quem controla a barra é a
-   nossa SETINHA na borda (client-side, _SIDEBAR_ARROW_JS).
+/* O botão nativo de recolher fica escondido porque quem controla a barra é o
+   nosso botão no topo do rail (client-side, _SIDEBAR_TOGGLE_JS).
    O botão nativo de REABRIR (stExpandSidebarButton) continua visível e
    estilizado mais abaixo: é a rede de segurança para quando o Streamlit
    colapsa a barra por conta própria (o bug dela sumir). */
@@ -582,6 +582,15 @@ body{background:var(--bg)}
 [data-testid="stSidebar"] .stButton>button{justify-content:center!important;padding:10px 0!important}
 [data-testid="stSidebar"] .sb-brand{justify-content:center;padding:2px 0 14px}
 [data-testid="stSidebar"] .sb-brand .bt{display:none}
+/* controle recolher/expandir no TOPO do rail (clique tratado por delegação JS).
+   Modo ícone (padrão): só o ícone "abrir" (»), centralizado. O modo expandido
+   (html.pfc-sb-open, em _SIDEBAR_OPEN_CSS) troca para o ícone "recolher" («) + rótulo. */
+.pfc-sb-toggle{display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;
+  color:var(--dim);border-radius:9px;padding:9px;margin-bottom:6px;user-select:none;
+  border:1px solid transparent;transition:background .15s,color .15s,border-color .15s}
+.pfc-sb-toggle:hover{background:rgba(255,255,255,.05);color:var(--ink);border-color:var(--line)}
+.pfc-sb-toggle .pfc-ic{width:20px;height:20px;flex:none}
+.pfc-sb-toggle .pfc-ic-fechar,.pfc-sb-toggle .pfc-sb-toggle-lbl{display:none}
 /* cabeçalho de seção vira um traço divisor (o rótulo não cabe em 60px) */
 [data-testid="stSidebar"] .sb-sec{height:1px;padding:0;margin:12px 6px;overflow:hidden;
   background:var(--line);font-size:0;letter-spacing:0}
@@ -1777,7 +1786,7 @@ _SIDEBAR_FIX_JS = """
 # html.pfc-sb-open. O padrão (sem a classe) é o modo ícone, no CSS global.
 #
 # Por que a classe no <html> (e não estado do Python):
-#   * O TOGGLE é 100% client-side (setinha -> _SIDEBAR_ARROW_JS), SEM rerun. A
+#   * O TOGGLE é 100% client-side (botão no topo -> _SIDEBAR_TOGGLE_JS), SEM rerun. A
 #     classe fica em document.documentElement, que o React do Streamlit NÃO
 #     gerencia — então ela SOBREVIVE aos reruns (persiste ao trocar de painel) e
 #     não é limpa a cada render (sem flicker de conteúdo).
@@ -1791,6 +1800,12 @@ _SIDEBAR_OPEN_CSS = """
 html.pfc-sb-open [data-testid="stSidebar"]{
   width:250px!important;min-width:250px!important;max-width:250px!important}
 html.pfc-sb-open [data-testid="stSidebar"]>div:first-child{padding-left:14px!important;padding-right:14px!important}
+/* controle de recolher no topo: no modo expandido, ícone «-recolher + rótulo, à esquerda */
+html.pfc-sb-open [data-testid="stSidebar"] .pfc-sb-toggle{justify-content:flex-start;padding:9px 11px}
+html.pfc-sb-open [data-testid="stSidebar"] .pfc-sb-toggle .pfc-ic-abrir{display:none}
+html.pfc-sb-open [data-testid="stSidebar"] .pfc-sb-toggle .pfc-ic-fechar{display:block}
+html.pfc-sb-open [data-testid="stSidebar"] .pfc-sb-toggle .pfc-sb-toggle-lbl{display:inline;
+  font-family:'Inter',system-ui,sans-serif;font-size:12.5px;font-weight:600;letter-spacing:.2px}
 /* devolve o texto dos botões e alinha à esquerda */
 html.pfc-sb-open [data-testid="stSidebar"] .stButton>button{justify-content:flex-start!important;
   padding:10px 14px!important}
@@ -1812,76 +1827,73 @@ html.pfc-sb-open [data-testid="stSidebar"] .esc-item .esc-leg{display:inline;mar
 """
 
 
-# SETINHA na borda da sidebar — toggle 100% CLIENT-SIDE (sem rerun, sem botão
-# oculto). Estado = classe pfc-sb-open no <html> (sobrevive a reruns). Animação
-# da largura por TIMER (setInterval + easeOutCubic), NÃO por transition:width.
-# Roda no documento-pai (mesma origem) a cada render; é idempotente.
-_SIDEBAR_ARROW_JS = """
+# TOGGLE da sidebar — 100% CLIENT-SIDE (sem rerun). O CONTROLE é um botão em
+# fluxo no topo da barra (_sidebar_toggle_html, renderizado via st.markdown); o
+# clique é tratado aqui por DELEGAÇÃO num listener único no documento-pai, que
+# sobrevive ao React recriar o botão a cada render. Estado = classe pfc-sb-open
+# no <html> (sobrevive a reruns; dirige ícone/rótulo e conteúdo via CSS). A
+# largura anima por TIMER (setInterval + easeOutCubic), NÃO por transition:width.
+_SIDEBAR_TOGGLE_JS = """
 <script>
 (function(){
   var P = window.parent; if(!P || !P.document){ return; }
   var doc = P.document, html = doc.documentElement;
-  var SZ = 26, DUR = 260, CLS = 'pfc-sb-open';
+  var DUR = 260, CLS = 'pfc-sb-open';
 
   function sb(){ return doc.querySelector('[data-testid="stSidebar"]'); }
-  function aberta(){ return html.classList.contains(CLS); }
-  function chev(dir){
-    var d = (dir === 'l') ? 'M15 18l-6-6 6-6' : 'M9 18l6-6-6-6';
-    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
-      'stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="' + d + '"/></svg>';
-  }
   function inlineLarg(s, w){
     if(w == null){ s.style.removeProperty('width'); s.style.removeProperty('min-width'); s.style.removeProperty('max-width'); return; }
     s.style.setProperty('width', w + 'px', 'important');
     s.style.setProperty('min-width', w + 'px', 'important');
     s.style.setProperty('max-width', w + 'px', 'important');
   }
-  function borda(){ var s = sb(); return s ? s.getBoundingClientRect().right : 60; }
-  function posic(a){ a.style.left = (borda() - SZ / 2) + 'px'; }
-
-  var a = doc.getElementById('pfc-sb-arrow');
-  if(!a){
-    a = doc.createElement('button');
-    a.id = 'pfc-sb-arrow'; a.type = 'button';
-    a.title = 'Recolher ou expandir a barra lateral';
-    a.setAttribute('aria-label', 'Recolher ou expandir a barra lateral');
-    a.style.cssText = 'position:fixed;top:50%;transform:translateY(-50%);z-index:1000;' +
-      'width:' + SZ + 'px;height:' + SZ + 'px;display:flex;align-items:center;justify-content:center;' +
-      'border-radius:50%;cursor:pointer;padding:0;color:#8A93A3;background:#1C222B;' +
-      'border:1px solid rgba(255,255,255,.16);box-shadow:0 2px 10px rgba(0,0,0,.45);' +
-      'transition:color .15s,border-color .15s,background .15s';
-    a.addEventListener('mouseenter', function(){ a.style.color='#F5F7FA'; a.style.borderColor='rgba(255,255,255,.34)'; a.style.background='#232A35'; });
-    a.addEventListener('mouseleave', function(){ a.style.color='#8A93A3'; a.style.borderColor='rgba(255,255,255,.16)'; a.style.background='#1C222B'; });
-    a.addEventListener('click', function(){
-      var s = sb(); if(!s || P.__pfcSbAnim){ return; }
-      var w0 = Math.round(s.getBoundingClientRect().width);
-      var abrir = !aberta(), para = abrir ? 250 : 60;
-      s.style.setProperty('transition', 'none', 'important');  // anima por timer, não por CSS
-      inlineLarg(s, w0);                       // congela na largura atual
-      html.classList.toggle(CLS, abrir);       // conteúdo (textos) + largura de descanso
-      a.innerHTML = chev(abrir ? 'l' : 'r');
-      P.__pfcSbAnim = true;
-      var ini = Date.now();
-      var iv = P.setInterval(function(){       // timer no PAI: sobrevive à troca do iframe
-        var p = Math.min(1, (Date.now() - ini) / DUR);
-        var e = 1 - Math.pow(1 - p, 3);        // easeOutCubic
-        var w = Math.round(w0 + (para - w0) * e);
-        inlineLarg(s, w); a.style.left = (s.getBoundingClientRect().right - SZ / 2) + 'px';
-        if(p >= 1){ P.clearInterval(iv); P.__pfcSbAnim = false; inlineLarg(s, null); posic(a); }
-      }, 16);
-    });
-    doc.body.appendChild(a);
+  function toggle(){
+    var s = sb(); if(!s || P.__pfcSbAnim){ return; }
+    var w0 = Math.round(s.getBoundingClientRect().width);
+    var abrir = !html.classList.contains(CLS), para = abrir ? 250 : 60;
+    s.style.setProperty('transition', 'none', 'important');  // anima por timer, não por CSS
+    inlineLarg(s, w0);                        // congela na largura atual
+    html.classList.toggle(CLS, abrir);        // conteúdo/ícone/rótulo (CSS) + largura de descanso
+    P.__pfcSbAnim = true;
+    var ini = Date.now();
+    var iv = P.setInterval(function(){        // timer no PAI: sobrevive à troca do iframe
+      var p = Math.min(1, (Date.now() - ini) / DUR);
+      var e = 1 - Math.pow(1 - p, 3);         // easeOutCubic
+      inlineLarg(s, Math.round(w0 + (para - w0) * e));
+      if(p >= 1){ P.clearInterval(iv); P.__pfcSbAnim = false; inlineLarg(s, null); }
+    }, 16);
   }
-  // Sync a cada render (idempotente): direção + posição na borda REAL da sidebar.
-  // Nunca mexe durante a animação (o próprio timer reposiciona quadro a quadro).
-  if(!P.__pfcSbAnim){ a.innerHTML = chev(aberta() ? 'l' : 'r'); posic(a); }
-  if(!P.__pfcSbArrowResize){
-    P.__pfcSbArrowResize = true;
-    P.addEventListener('resize', function(){ if(!P.__pfcSbAnim){ posic(a); } });
+  // Listener DELEGADO, uma vez só: o botão .pfc-sb-toggle é recriado pelo React
+  // a cada render, mas o clique sempre borbulha até aqui.
+  if(!P.__pfcSbToggleWired){
+    P.__pfcSbToggleWired = true;
+    doc.addEventListener('click', function(e){
+      var alvo = (e.target && e.target.closest) ? e.target.closest('.pfc-sb-toggle') : null;
+      if(alvo){ e.preventDefault(); toggle(); }
+    }, true);
   }
 })();
 </script>
 """
+
+
+def _sidebar_toggle_html() -> str:
+    """Botão de recolher/expandir no TOPO da sidebar (em fluxo, dentro da barra).
+    Clique tratado por delegação (_SIDEBAR_TOGGLE_JS); ícone/rótulo são dirigidos
+    por CSS conforme html.pfc-sb-open — sem JS mexendo no innerHTML (não briga
+    com o React que recria o elemento)."""
+    return (
+        '<div class="pfc-sb-toggle" role="button" tabindex="0" '
+        'title="Recolher ou expandir a barra lateral" '
+        'aria-label="Recolher ou expandir a barra lateral">'
+        '<svg class="pfc-ic pfc-ic-abrir" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M13 17l5-5-5-5"/><path d="M6 17l5-5-5-5"/></svg>'
+        '<svg class="pfc-ic pfc-ic-fechar" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M11 17l-5-5 5-5"/><path d="M18 17l-5-5 5-5"/></svg>'
+        '<span class="pfc-sb-toggle-lbl">Recolher</span>'
+        '</div>')
 
 
 def _preparar_sidebar():
@@ -1895,7 +1907,7 @@ def _preparar_sidebar():
     """
     st.markdown(_SIDEBAR_OPEN_CSS, unsafe_allow_html=True)
     components.html(_SIDEBAR_FIX_JS, height=0)
-    components.html(_SIDEBAR_ARROW_JS, height=0)
+    components.html(_SIDEBAR_TOGGLE_JS, height=0)
 
 
 def _cards_deputados(lista, extras=()):
@@ -2006,6 +2018,7 @@ def render_sidebar_emendas():
     with st.sidebar:
         st.markdown(f"<style>{css_icones_botoes(EMENDA_ICONES, EMENDA_ROTULOS)}</style>",
                     unsafe_allow_html=True)
+        st.markdown(_sidebar_toggle_html(), unsafe_allow_html=True)  # recolher/expandir no topo
         st.markdown(
             '<div class="sb-brand em-brand"><div class="rings em-rings"><span></span><span></span><span></span></div>'
             '<div class="bt">Futuro Cientista<small>EMENDAS PARLAMENTARES</small></div></div>',
@@ -2885,7 +2898,7 @@ export default function(component){
   }
 
   // A sidebar é recolhida/expandida pela SETINHA na borda da própria barra
-  // (client-side puro, sem rerun — ver _SIDEBAR_ARROW_JS), não mais por aqui.
+  // (client-side puro, sem rerun — ver _SIDEBAR_TOGGLE_JS), não mais por aqui.
   root.innerHTML =
     '<div class="tn-left">' +
     '<div class="tn-crumb"><b>' + esc((nomeAtual || '').toUpperCase()) + '</b>' +
@@ -3023,6 +3036,7 @@ def render_sidebar():
     with st.sidebar:
         st.markdown(f"<style>{css_icones_botoes(NAV_ICONES, NAV_ROTULOS)}</style>",
                     unsafe_allow_html=True)
+        st.markdown(_sidebar_toggle_html(), unsafe_allow_html=True)  # recolher/expandir no topo
         st.markdown(
             '<div class="sb-brand"><div class="rings"><span></span><span></span><span></span></div>'
             '<div class="bt">Futuro Cientista<small>CAPTAÇÃO PRIVADA</small></div></div>',
