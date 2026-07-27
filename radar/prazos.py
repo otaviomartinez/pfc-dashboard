@@ -53,13 +53,32 @@ _ANCORAS = [
     ("data limite", 1), ("data-limite", 1), ("prazo final", 1),
 ]
 
+# ÂNCORAS FLEXÍVEIS (fragmentos regex, já normalizados — NÃO passam por
+# re.escape). Amarram o "ate" ao termo de inscrição/candidatura/proposta MESMO
+# com palavras no meio, recuperando frases comuns que a lista literal perdia:
+#   "inscricoes podem ser feitas ate 22 de julho de 2026"
+#   "inscricoes: em andamento, ate 17 de julho de 2026"
+#   "candidaturas seguem ate ..."
+# O gap [^0-9]{0,30} é curto DE PROPÓSITO: prende o "ate" ao termo e nunca vira
+# o "ate" PURO (que pegava data de execução, ex.: "recursos ate 31 de dezembro").
+# IMPORTANTE: sem grupos de captura aqui — a numeração de grupos de _candidatos
+# conta com _D_EXT (1-3) e _D_NUM (4-6) intactos.
+_ANCORAS_RX = [
+    (r"inscric\w*[^0-9]{0,40}?\bate\b", 0),
+    (r"candidatur\w*[^0-9]{0,40}?\bate\b", 0),
+    (r"propostas?[^0-9]{0,30}?\bate\b", 0),
+    (r"submiss\w*[^0-9]{0,30}?\bate\b", 0),
+]
+
 # data por extenso ("3 de agosto [de 2026]") OU numérica ("03/08[/2026]")
 _D_EXT = r"(\d{1,2})\s*(?:o|º)?\s*(?:de\s+)?([a-z]{3,9})\.?(?:\s+de\s+(\d{4}))?"
 _D_NUM = r"(\d{1,2})[/\-.](\d{1,2})(?:[/\-.](\d{2,4}))?"
-# âncora -> até 40 chars sem dígito -> data
+_D_QUALQUER = r"[^0-9]{0,40}?(?:" + _D_EXT + r"|" + _D_NUM + r")"
+# âncora -> até 40 chars sem dígito -> data (literais escapadas + flexíveis regex)
 _RE_ANCORAS = [
-    (re.compile(re.escape(anc) + r"[^0-9]{0,40}?(?:" + _D_EXT + r"|" + _D_NUM + r")"), pri)
-    for anc, pri in _ANCORAS
+    (re.compile(re.escape(anc) + _D_QUALQUER), pri) for anc, pri in _ANCORAS
+] + [
+    (re.compile(rx + _D_QUALQUER), pri) for rx, pri in _ANCORAS_RX
 ]
 
 

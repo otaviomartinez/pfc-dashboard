@@ -16,7 +16,7 @@ import json
 import os
 import threading
 
-from radar import dedup, descoberta, enriquecimento, prazos
+from radar import dedup, descoberta, enriquecimento, prazos, publicacao
 from radar.fontes_ancora import ANCORA_URLS, FONTES
 from radar.fontes_genericas import dominio_de, extrair_generico
 from radar.scorer import avaliar_sinal, pontuacao
@@ -183,9 +183,14 @@ def executar():
             descartados.append((op, motivo))
 
     # Prazo real (data-limite) extraído do texto da listagem, quando houver.
+    # Muitos posts da ABCR/captadores já trazem na própria descrição o carimbo
+    # "Post publicado: … de 2026" — usa-se como âncora de ANO aqui, sem precisar
+    # visitar a página (recupera quem tem o prazo na listagem, ex.: Somando
+    # Impactos, Renner). Sem carimbo -> pub=None -> só data com ano escrito.
     for op in com_sinal:
-        iso = prazos.extrair_prazo(
-            f"{op.get('titulo', '')} {op.get('descricao', '')} {op.get('prazo', '')}")
+        texto = f"{op.get('titulo', '')} {op.get('descricao', '')} {op.get('prazo', '')}"
+        pub = publicacao.data_publicacao_corpo(texto)
+        iso = prazos.extrair_prazo(texto, pub=pub)
         if iso:
             op["prazo"] = iso
             op["dias_restantes"] = prazos.dias_restantes(iso)

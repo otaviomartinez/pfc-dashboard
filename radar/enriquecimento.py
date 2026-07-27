@@ -74,10 +74,13 @@ def enriquecer(op: dict) -> dict:
                 ganho["valor"] = True
 
         # prazo: a página do edital costuma ter a data que a listagem omite.
-        # A data de publicação (SÓ de metadado, do HTML cru — o soup acima já
-        # perdeu <script>/<time>) ancora o ano de um prazo escrito sem ano.
+        # Âncora de ANO em duas fontes, o CORPO vence o metadado: o carimbo
+        # "Post publicado: … de 2026" do corpo é explícito e datado, enquanto o
+        # metadado do captadores/ABCR fica STALE (2022/2023) e jogava o ano do
+        # prazo para o passado. Só cai no metadado quem não tem o carimbo.
         if not isinstance(op.get("dias_restantes"), int):
-            pub = publicacao.data_publicacao(r.text)
+            pub = (publicacao.data_publicacao_corpo(texto_pagina)
+                   or publicacao.data_publicacao(r.text))
             iso = prazos.extrair_prazo(texto_pagina, url, pub=pub)
             if iso:
                 op["prazo"] = iso
