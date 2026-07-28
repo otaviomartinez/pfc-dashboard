@@ -1988,12 +1988,14 @@ def dlg_em_articulacao(lista):
 
 # Navegação do painel de Emendas (páginas próprias + escopo).
 # "Descobrir" é a tela de PLANEJAMENTO (quem abordar), separada do CRM dos 16.
-EMENDA_PAGES = ["Visão geral", "Deputados", "Descobrir", "Funil de negociação", "Relatório"]
+EMENDA_PAGES = ["Visão geral", "Deputados", "Descobrir", "Municípios órfãos",
+                "Funil de negociação", "Relatório"]
 EMENDA_ESCOPO = [("Estadual", "ALESP · {n}", True), ("Federal", "em breve", False),
                  ("Senadores", "em breve", False)]
 # chave do botão -> ícone (a chave vira a classe st-key-<chave> que o CSS usa)
 EMENDA_ICONES = {"emnav_visao-geral": "visao-geral", "emnav_deputados": "deputados",
                  "emnav_descobrir": "descobrir",
+                 "emnav_municipios-orfaos": "local",
                  "emnav_funil-de-negociacao": "funil-negociacao",
                  "emnav_relatorio": "relatorio",
                  "emenda_trocar": "trocar-radar", "emenda_logout": "sair"}
@@ -2600,6 +2602,170 @@ def render_descobrir() -> None:
             _linha_descobrir(row, "expansao", i, no_crm(row["deputado"]))
 
 
+# =========================================================================== #
+# TELA "MUNICÍPIOS ÓRFÃOS" — oportunidade de captação
+# ---------------------------------------------------------------------------
+# Municípios do PFC que NÃO recebem NENHUMA emenda de educação/social. Para cada
+# um, cruza com o levantamento e mostra os deputados que já atuam na REGIÃO
+# (mesma Região Imediata do IBGE) e são candidatos a levar emenda para lá.
+# Só dado real: se um órfão não tem candidato plausível no levantamento, diz isso
+# honestamente. AUTORIZADO e PAGO sempre separados (nunca somados).
+# =========================================================================== #
+_EDUSOC_SLUGS = {"educacao", "assistencia-social"}
+
+
+def _orfaos_com_candidatos(orfaos_df, base_df, ibge_df, terr_df, exp_df) -> list:
+    """Para cada município órfão, os deputados do levantamento que financiam
+    educação/social na mesma Região Imediata (IBGE). Ordenados por autorizado na
+    região (desc). Função pura — só cruza os dados reais que já temos."""
+    if orfaos_df is None or orfaos_df.empty:
+        return []
+    # deputado (slug) -> (linha do ranking, seção). Território sobrepõe expansão.
+    lev = {}
+    if exp_df is not None and not exp_df.empty:
+        for _, r in exp_df.iterrows():
+            lev.setdefault(slug(str(r["deputado"])), (dict(r), "expansao"))
+    if terr_df is not None and not terr_df.empty:
+        for _, r in terr_df.iterrows():
+            lev[slug(str(r["deputado"]))] = (dict(r), "territorio")
+
+    ibge = ibge_df.copy()
+    ibge["mslug"] = ibge["municipio"].map(lambda x: slug(str(x)))
+    por_mun = {r["mslug"]: (r["regiao_imediata_id"], r["regiao_imediata_nome"])
+               for _, r in ibge.iterrows()}
+    por_regiao = {}
+    for _, r in ibge.iterrows():
+        por_regiao.setdefault(r["regiao_imediata_id"], set()).add(r["mslug"])
+
+    base = base_df.copy()
+    base["aslug"] = base["area"].map(lambda x: slug(str(x)))
+    base["mslug"] = base["municipio"].map(lambda x: slug(str(x)))
+    base["aut"] = pd.to_numeric(base["valor_autorizado"], errors="coerce").fillna(0)
+    base["pago"] = pd.to_numeric(base["valor_pago"], errors="coerce").fillna(0)
+    edusoc = base[base["aslug"].isin(_EDUSOC_SLUGS)]
+
+    resultado = []
+    for _, o in orfaos_df.iterrows():
+        nome = str(o.get("municipio", "")).strip()
+        osl = slug(nome)
+        reg = por_mun.get(osl)
+        item = {"municipio": nome, "grupo": str(o.get("grupo", "")).strip(),
+                "regiao_nome": "", "n_regiao": 0, "candidatos": [],
+                "fora_lev": 0, "sem_regiao": reg is None}
+        if reg is None:
+            resultado.append(item)
+            continue
+        rid, rnome = reg
+        reg_muns = por_regiao.get(rid, set()) - {osl}
+        item["regiao_nome"], item["n_regiao"] = rnome, len(reg_muns)
+        sub = edusoc[edusoc["mslug"].isin(reg_muns)]
+        for dep, g in sub.groupby("deputado"):
+            dsl = slug(str(dep))
+            if dsl not in lev:
+                item["fora_lev"] += 1  # financia a região, mas fora do levantamento
+                continue
+            row, secao = lev[dsl]
+            item["candidatos"].append({
+                "deputado": dep, "partido": str(g["partido"].iloc[0]),
+                "aut": float(g["aut"].sum()), "pago": float(g["pago"].sum()),
+                "muns": sorted({str(m) for m in g["municipio"]}),
+                "score": float(row.get("score_pfc") or row.get("score_expansao") or 0),
+                "row": row, "secao": secao})
+        item["candidatos"].sort(key=lambda c: c["aut"], reverse=True)
+        resultado.append(item)
+    return resultado
+
+
+_ORFAOS_CSS = """
+<style>
+.orf-card{background:linear-gradient(135deg,rgba(139,123,240,.10),rgba(139,123,240,.02));
+  border:1px solid rgba(139,123,240,.30);border-left:3px solid #8B7BF0;border-radius:14px;
+  padding:18px 20px;margin:16px 0}
+.orf-h{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:700;color:var(--ink)}
+.orf-sub{font-family:var(--mono);font-size:11px;letter-spacing:.4px;color:var(--dim);
+  margin-top:6px;text-transform:uppercase}
+.orf-msg{font-size:13.5px;color:var(--muted);margin:12px 0 4px}
+.orf-cand{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  background:var(--surface2);border:1px solid var(--line);border-radius:10px;
+  padding:10px 14px;margin-top:8px}
+.orf-cand .nome{font-weight:600;color:var(--ink);font-size:14px}
+.orf-cand .sub{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:2px}
+.orf-val{text-align:right;font-size:12.5px;color:var(--ink);white-space:nowrap}
+.orf-val b{color:#b7abff}
+.orf-none{font-size:13.5px;color:var(--muted);background:var(--surface2);
+  border:1px dashed var(--line2);border-radius:10px;padding:12px 14px;margin-top:8px}
+</style>
+"""
+
+
+def render_orfaos() -> None:
+    st.markdown(_ORFAOS_CSS, unsafe_allow_html=True)
+    orfaos = dados.carregar_municipios_orfaos()
+    base = dados.carregar_emendas_base()
+    ibge = dados.carregar_regioes_ibge()
+    terr = dados.carregar_ranking_territorio()
+    exp = dados.carregar_ranking_expansao()
+
+    if orfaos.empty or base.empty or ibge.empty:
+        st.info("Dados do levantamento ainda não disponíveis. Rode `python -m src.emendas`.")
+        return
+
+    st.markdown(
+        '<div class="dd-intro">Municípios do PFC onde <b>ninguém</b> financia educação ou '
+        'assistência social hoje. Para cada um, os deputados que já atuam na mesma região '
+        '(Região Imediata · IBGE) — os candidatos a levar emenda para lá. '
+        'Baseado na execução real de 2023–2025 (Transparência SP).</div>',
+        unsafe_allow_html=True)
+
+    itens = _orfaos_com_candidatos(orfaos, base, ibge, terr, exp)
+    if not itens:
+        st.success("Nenhum município órfão: todos os municípios do PFC já recebem "
+                   "emenda de educação/social.")
+        return
+
+    for it in itens:
+        muni = esc(it["municipio"])
+        grupo = f' · {esc(it["grupo"])}' if it["grupo"] else ""
+        regiao = (f'Região {esc(it["regiao_nome"])} · {it["n_regiao"]} municípios vizinhos'
+                  if not it["sem_regiao"] else "região não mapeada no IBGE")
+        st.markdown(
+            f'<div class="orf-card"><div class="orf-h">{svg_icone("local")}'
+            f'Ninguém financia educação/social em {muni}</div>'
+            f'<div class="orf-sub">{regiao}{grupo}</div>'
+            f'<div class="orf-msg">Deputados que já atuam na região e são candidatos a '
+            f'mudar isso:</div></div>',
+            unsafe_allow_html=True)
+
+        if not it["candidatos"]:
+            extra = (f' ({it["fora_lev"]} financia(m) a região, mas está(ão) fora do '
+                     f'levantamento — não são titulares aproveitáveis)'
+                     if it["fora_lev"] else "")
+            st.markdown(
+                f'<div class="orf-none">Nenhum deputado do levantamento financia '
+                f'educação/social na região de {muni} — sem candidato óbvio pelo dado '
+                f'atual{extra}.</div>', unsafe_allow_html=True)
+            continue
+
+        for j, c in enumerate(it["candidatos"]):
+            muns_reg = "/".join(_cap_mun(m) for m in c["muns"][:3]) + (
+                f' +{len(c["muns"]) - 3}' if len(c["muns"]) > 3 else "")
+            st.markdown(
+                f'<div class="orf-cand"><div>'
+                f'<div class="nome">{esc(c["deputado"])} '
+                f'<span style="color:var(--dim);font-weight:400">· {esc(c["partido"])}</span></div>'
+                f'<div class="sub">score {round(c["score"])} · atua em {esc(muns_reg)}</div></div>'
+                f'<div class="orf-val"><b>aut. {brl_curto(c["aut"])}</b><br/>'
+                f'pago {brl_curto(c["pago"])} · edu/social na região</div></div>',
+                unsafe_allow_html=True)
+            if st.button(f"Abrir dossiê de {c['deputado']}",
+                         key=f"orf_{slug(it['municipio'])}_{j}", use_container_width=True):
+                dlg_descobrir_deputado(dict(c["row"]), c["secao"])
+        if it["fora_lev"]:
+            st.caption(f"+ {it['fora_lev']} deputado(s) financiam a região mas estão fora "
+                       "do levantamento (não titulares em exercício) — não listados como "
+                       "candidatos aproveitáveis.")
+
+
 def _mostrar_resultado(res):
     """Banner de resultado (verde/amarelo) a partir de {sucesso, mensagem}.
     Definido AQUI (e não lá embaixo) porque o painel de Emendas é renderizado
@@ -2796,7 +2962,8 @@ def render_emendas():
     st.markdown(_EMENDAS_CHROME_CSS, unsafe_allow_html=True)
     emenda_page = st.session_state.setdefault("emenda_page", "Visão geral")
     modo = {"Visão geral": "visao", "Deputados": "deputados", "Descobrir": "descobrir",
-            "Funil de negociação": "funil", "Relatório": "relatorio"}.get(emenda_page, "visao")
+            "Municípios órfãos": "orfaos", "Funil de negociação": "funil",
+            "Relatório": "relatorio"}.get(emenda_page, "visao")
     render_topnav("emendas", emenda_page.upper())
     render_sidebar_emendas()
 
@@ -2806,6 +2973,7 @@ def render_emendas():
     subttl = {"Visão geral": "Articulação política",
               "Deputados": "Base de deputados · ALESP",
               "Descobrir": "Levantamento de emendas · quem abordar",
+              "Municípios órfãos": "Oportunidade de captação · sem emenda edu/social",
               "Funil de negociação": "Negociações por temperatura",
               "Relatório": "Relatório de Prioridades · quem abordar"}.get(emenda_page, "")
     st.markdown(
@@ -2820,6 +2988,10 @@ def render_emendas():
     # Tela de PLANEJAMENTO (levantamento de emendas), separada do CRM dos 16.
     if modo == "descobrir":
         render_descobrir()
+        return
+    # Municípios do PFC sem emenda edu/social + candidatos da região.
+    if modo == "orfaos":
+        render_orfaos()
         return
     # Funil de negociação com drag-and-drop (grava a etapa na aba Deputados).
     if modo == "funil":

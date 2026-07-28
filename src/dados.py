@@ -356,6 +356,41 @@ def carregar_contatos_oficiais() -> pd.DataFrame:
         return pd.DataFrame()
 
 
+# Dados públicos (versionados) para a tela de MUNICÍPIOS ÓRFÃOS: municípios do
+# PFC sem emenda edu/social, a base de execução por deputado×município e o mapa
+# de Regiões Imediatas do IBGE. Todos gerados/mantidos por src/emendas.py.
+ORFAOS_CSV = Path(__file__).resolve().parent.parent / "data" / "municipios_pfc_sem_emenda.csv"
+EMENDAS_BASE_CSV = Path(__file__).resolve().parent.parent / "data" / "emendas_parlamentares.csv"
+REGIOES_IBGE_CSV = Path(__file__).resolve().parent.parent / "data" / "ibge_regioes_imediatas_sp.csv"
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def carregar_municipios_orfaos() -> pd.DataFrame:
+    """Municípios do PFC que NÃO recebem emenda de educação/social (órfãos)."""
+    try:
+        return pd.read_csv(ORFAOS_CSV, dtype=str).fillna("")
+    except Exception:
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def carregar_emendas_base() -> pd.DataFrame:
+    """Base de execução de emendas (deputado × município × área × valores)."""
+    try:
+        return pd.read_csv(EMENDAS_BASE_CSV, dtype=str).fillna("")
+    except Exception:
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def carregar_regioes_ibge() -> pd.DataFrame:
+    """Mapa município → Região Imediata (IBGE 2017), para a vizinhança."""
+    try:
+        return pd.read_csv(REGIOES_IBGE_CSV, dtype=str).fillna("")
+    except Exception:
+        return pd.DataFrame()
+
+
 def contato_oficial(nome: str) -> dict:
     """Email/telefone/página oficiais do deputado, casando por nome (contenção).
 
