@@ -364,11 +364,14 @@ EMENDAS_BASE_CSV = Path(__file__).resolve().parent.parent / "data" / "emendas_pa
 REGIOES_IBGE_CSV = Path(__file__).resolve().parent.parent / "data" / "ibge_regioes_imediatas_sp.csv"
 
 
+# encoding utf-8-sig: estes CSVs têm BOM; sem isso a 1ª coluna vira
+# "﻿municipio" em ambientes cujo pandas não descarta o BOM sozinho — uma
+# diferença local↔produção. Falha de leitura sempre degrada para DataFrame vazio.
 @st.cache_data(ttl=300, show_spinner=False)
 def carregar_municipios_orfaos() -> pd.DataFrame:
-    """Municípios do PFC que NÃO recebem emenda de educação/social (órfãos)."""
+    """Municípios do PFC que NÃO recebem emenda de educação/social."""
     try:
-        return pd.read_csv(ORFAOS_CSV, dtype=str).fillna("")
+        return pd.read_csv(ORFAOS_CSV, dtype=str, encoding="utf-8-sig").fillna("")
     except Exception:
         return pd.DataFrame()
 
@@ -377,7 +380,7 @@ def carregar_municipios_orfaos() -> pd.DataFrame:
 def carregar_emendas_base() -> pd.DataFrame:
     """Base de execução de emendas (deputado × município × área × valores)."""
     try:
-        return pd.read_csv(EMENDAS_BASE_CSV, dtype=str).fillna("")
+        return pd.read_csv(EMENDAS_BASE_CSV, dtype=str, encoding="utf-8-sig").fillna("")
     except Exception:
         return pd.DataFrame()
 
@@ -386,7 +389,7 @@ def carregar_emendas_base() -> pd.DataFrame:
 def carregar_regioes_ibge() -> pd.DataFrame:
     """Mapa município → Região Imediata (IBGE 2017), para a vizinhança."""
     try:
-        return pd.read_csv(REGIOES_IBGE_CSV, dtype=str).fillna("")
+        return pd.read_csv(REGIOES_IBGE_CSV, dtype=str, encoding="utf-8-sig").fillna("")
     except Exception:
         return pd.DataFrame()
 

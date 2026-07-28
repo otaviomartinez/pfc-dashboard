@@ -1362,6 +1362,46 @@ def dlg_deputado(dep: dict):
         for lab, val in linhas)
     st.markdown(corpo, unsafe_allow_html=True)
 
+    # ---- CONTATO OFICIAL (público, ALESP) — buscado POR NOME, separado dos
+    # campos pessoais/de assessor acima. Puxar do Descobrir não preenche os
+    # campos pessoais, então sem isto o card ficava com contato vazio ("—"). É
+    # só-leitura (regra 1): o mesmo casamento por nome do dossiê da Descobrir.
+    ct = dados.contato_oficial(str(dep["nome"]))
+    st.markdown('<div style="margin-top:18px;font-family:var(--mono);font-size:11px;'
+                'letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:7px">'
+                'Contato oficial · ALESP</div>', unsafe_allow_html=True)
+    _tem_ct = ct and (ct.get("email") not in ("", "não encontrado")
+                      or ct.get("telefone") not in ("", "não encontrado")
+                      or ct.get("pagina"))
+    if not _tem_ct:
+        st.markdown('<div style="font-size:13px;color:var(--dim)">Não encontrado na lista de '
+                    'titulares da ALESP.</div>', unsafe_allow_html=True)
+    else:
+        def _campo_ofc(rot, val, link=None):
+            if not val or val == "não encontrado":
+                v = '<span style="color:var(--dim)">não encontrado</span>'
+            elif link:
+                v = f'<a href="{esc(link)}" target="_blank" style="color:#b7abff">{esc(val)}</a>'
+            else:
+                v = esc(val)
+            return (f'<div style="display:flex;gap:8px;font-size:13px;margin-bottom:5px">'
+                    f'<span style="font-family:var(--mono);font-size:10px;letter-spacing:.5px;'
+                    f'text-transform:uppercase;color:var(--dim);min-width:78px;padding-top:2px">'
+                    f'{rot}</span><span style="color:var(--ink)">{v}</span></div>')
+        email = ct.get("email", "")
+        pag = ct.get("pagina", "")
+        st.markdown(
+            '<div style="background:var(--surface2);border:1px solid var(--line);'
+            'border-left:3px solid #8B7BF0;border-radius:0 10px 10px 0;padding:12px 15px">'
+            + _campo_ofc("Email", email,
+                         link=(f"mailto:{email}" if email and email != "não encontrado" else None))
+            + _campo_ofc("Telefone", ct.get("telefone", ""))
+            + _campo_ofc("Página", "abrir no site da ALESP" if pag else "", link=pag)
+            + '</div>'
+            '<div style="font-size:11px;color:var(--dim);margin-top:6px">Contato público de '
+            'gabinete (ALESP), preenchido por código — separado dos contatos pessoais/de '
+            'assessor acima.</div>', unsafe_allow_html=True)
+
     # ---- EDIÇÃO (sensível) — só para usuário autenticado (regra 4) ----------
     # Grava pela porta única dados.atualizar_deputado: só as células que MUDARAM,
     # preservando o resto (regra 2). O Status usa as MESMAS 5 etapas do funil,
@@ -1988,14 +2028,14 @@ def dlg_em_articulacao(lista):
 
 # Navegação do painel de Emendas (páginas próprias + escopo).
 # "Descobrir" é a tela de PLANEJAMENTO (quem abordar), separada do CRM dos 16.
-EMENDA_PAGES = ["Visão geral", "Deputados", "Descobrir", "Municípios órfãos",
+EMENDA_PAGES = ["Visão geral", "Deputados", "Descobrir", "Territórios em Aberto",
                 "Funil de negociação", "Relatório"]
 EMENDA_ESCOPO = [("Estadual", "ALESP · {n}", True), ("Federal", "em breve", False),
                  ("Senadores", "em breve", False)]
 # chave do botão -> ícone (a chave vira a classe st-key-<chave> que o CSS usa)
 EMENDA_ICONES = {"emnav_visao-geral": "visao-geral", "emnav_deputados": "deputados",
                  "emnav_descobrir": "descobrir",
-                 "emnav_municipios-orfaos": "local",
+                 "emnav_territorios-em-aberto": "local",
                  "emnav_funil-de-negociacao": "funil-negociacao",
                  "emnav_relatorio": "relatorio",
                  "emenda_trocar": "trocar-radar", "emenda_logout": "sair"}
@@ -2700,27 +2740,39 @@ _ORFAOS_CSS = """
 
 def render_orfaos() -> None:
     st.markdown(_ORFAOS_CSS, unsafe_allow_html=True)
-    orfaos = dados.carregar_municipios_orfaos()
-    base = dados.carregar_emendas_base()
-    ibge = dados.carregar_regioes_ibge()
-    terr = dados.carregar_ranking_territorio()
-    exp = dados.carregar_ranking_expansao()
-
-    if orfaos.empty or base.empty or ibge.empty:
-        st.info("Dados do levantamento ainda não disponíveis. Rode `python -m src.emendas`.")
-        return
-
     st.markdown(
-        '<div class="dd-intro">Municípios do PFC onde <b>ninguém</b> financia educação ou '
-        'assistência social hoje. Para cada um, os deputados que já atuam na mesma região '
-        '(Região Imediata · IBGE) — os candidatos a levar emenda para lá. '
-        'Baseado na execução real de 2023–2025 (Transparência SP).</div>',
+        '<div class="dd-intro"><b>Territórios em aberto</b>: municípios do PFC onde '
+        '<b>ninguém</b> financia educação ou assistência social hoje. Para cada um, os '
+        'deputados que já atuam na mesma região (Região Imediata · IBGE) — os candidatos a '
+        'levar emenda para lá. Baseado na execução real de 2023–2025 (Transparência SP).</div>',
         unsafe_allow_html=True)
 
-    itens = _orfaos_com_candidatos(orfaos, base, ibge, terr, exp)
+    # Carga + cruzamento BLINDADOS: qualquer falha (CSV ausente no deploy, módulo
+    # de dados defasado, erro de leitura) cai num estado vazio elegante — a tela
+    # NUNCA derruba o app. Era exatamente a causa do AttributeError em produção:
+    # a chamada ao loader acontecia sem proteção.
+    itens = None
+    try:
+        orfaos = dados.carregar_municipios_orfaos()
+        base = dados.carregar_emendas_base()
+        ibge = dados.carregar_regioes_ibge()
+        terr = dados.carregar_ranking_territorio()
+        exp = dados.carregar_ranking_expansao()
+        if not base.empty and not ibge.empty:
+            itens = _orfaos_com_candidatos(orfaos, base, ibge, terr, exp)
+    except Exception:
+        itens = None
+
+    if itens is None:
+        st.markdown(
+            '<div class="orf-none">Levantamento de emendas ainda não disponível aqui. '
+            'Gere os dados com <code>python -m src.emendas</code> e recarregue a página.</div>',
+            unsafe_allow_html=True)
+        return
     if not itens:
-        st.success("Nenhum município órfão: todos os municípios do PFC já recebem "
-                   "emenda de educação/social.")
+        st.markdown(
+            '<div class="orf-none">Nenhum território em aberto — todos os municípios do PFC '
+            'já recebem emenda de educação/social.</div>', unsafe_allow_html=True)
         return
 
     for it in itens:
@@ -2962,7 +3014,7 @@ def render_emendas():
     st.markdown(_EMENDAS_CHROME_CSS, unsafe_allow_html=True)
     emenda_page = st.session_state.setdefault("emenda_page", "Visão geral")
     modo = {"Visão geral": "visao", "Deputados": "deputados", "Descobrir": "descobrir",
-            "Municípios órfãos": "orfaos", "Funil de negociação": "funil",
+            "Territórios em Aberto": "orfaos", "Funil de negociação": "funil",
             "Relatório": "relatorio"}.get(emenda_page, "visao")
     render_topnav("emendas", emenda_page.upper())
     render_sidebar_emendas()
@@ -2973,7 +3025,7 @@ def render_emendas():
     subttl = {"Visão geral": "Articulação política",
               "Deputados": "Base de deputados · ALESP",
               "Descobrir": "Levantamento de emendas · quem abordar",
-              "Municípios órfãos": "Oportunidade de captação · sem emenda edu/social",
+              "Territórios em Aberto": "Oportunidade de captação · sem emenda edu/social",
               "Funil de negociação": "Negociações por temperatura",
               "Relatório": "Relatório de Prioridades · quem abordar"}.get(emenda_page, "")
     st.markdown(
