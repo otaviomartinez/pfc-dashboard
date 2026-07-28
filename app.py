@@ -2439,6 +2439,43 @@ def _linha_mun(rotulo: str, municipios, cor: str, valor=None) -> None:
         unsafe_allow_html=True)
 
 
+@st.cache_data(ttl=600, show_spinner=False)
+def _municipios_pfc_lista() -> list:
+    """Municípios do PFC (lista canônica do config), para o filtro da Descobrir."""
+    try:
+        import tomllib
+        caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "config", "pfc_municipios.toml")
+        with open(caminho, "rb") as f:
+            cfg = tomllib.load(f)
+        muns = []
+        for g in cfg.get("grupos", []):
+            muns += [str(m).strip() for m in g.get("municipios", []) if str(m).strip()]
+        return sorted(set(muns))
+    except Exception:
+        return []
+
+
+def _filtrar_descobrir(df, busca: str, partido: str, municipio: str, cols_mun: list):
+    """Filtra o ranking por nome (contém), partido (exato) e município do PFC
+    onde atua (casa por slug, ignorando acento/caixa). Só leitura — não altera
+    dado. 'Todos'/'' desligam o respectivo filtro."""
+    if df.empty:
+        return df
+    out = df
+    if busca and busca.strip():
+        out = out[out["deputado"].astype(str).str.contains(
+            busca.strip(), case=False, na=False, regex=False)]
+    if partido and partido != "Todos":
+        out = out[out["partido"].astype(str) == partido]
+    if municipio and municipio != "Todos":
+        alvo = slug(municipio)
+        cols = [c for c in cols_mun if c in out.columns]
+        out = out[out.apply(
+            lambda r: any(alvo in slug(str(r.get(c, ""))) for c in cols), axis=1)]
+    return out
+
+
 def render_descobrir() -> None:
     st.markdown(_DESCOBRIR_CSS, unsafe_allow_html=True)
     terr = dados.carregar_ranking_territorio()
@@ -2458,6 +2495,24 @@ def render_descobrir() -> None:
         '<span><span class="sw" style="background:var(--sem-mid)"></span>50–59 · médio</span>'
         '<span><span class="sw" style="background:var(--sem-low)"></span>&lt;50 · fraco</span>'
         '</div>', unsafe_allow_html=True)
+
+    # ---- Busca e filtros (só leitura — achar um deputado na hora na reunião) ----
+    partidos = sorted(set(terr.get("partido", pd.Series(dtype=str)).dropna())
+                      | set(exp.get("partido", pd.Series(dtype=str)).dropna()))
+    fc1, fc2, fc3 = st.columns([2, 1.2, 1.5])
+    busca = fc1.text_input("Buscar deputado", key="dd_busca",
+                           placeholder="digite parte do nome…")
+    f_part = fc2.selectbox("Partido", ["Todos"] + partidos, key="dd_partido")
+    f_mun = fc3.selectbox("Município do PFC onde atua",
+                          ["Todos"] + _municipios_pfc_lista(), key="dd_municipio")
+
+    terr = _filtrar_descobrir(terr, busca, f_part, f_mun, ["municipios_pfc"])
+    exp = _filtrar_descobrir(exp, busca, f_part, f_mun, ["municipios_pfc_diretos"])
+    if (busca and busca.strip()) or f_part != "Todos" or f_mun != "Todos":
+        st.caption(f"Filtro ativo · {len(terr)} em Abordar já · {len(exp)} em Cortejar. "
+                   "Limpe os campos para ver todos.")
+        if terr.empty and exp.empty:
+            st.info("Nenhum deputado bate com esses filtros. Afrouxe a busca.")
 
     # Checagem LIVE contra o CRM atual (não o flag estático do ranking, que fica
     # velho assim que se puxa alguém): decide o selo "NO CRM" e trava a duplicata.
