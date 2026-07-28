@@ -2722,6 +2722,9 @@ _ORFAOS_CSS = """
   border:1px solid rgba(139,123,240,.30);border-left:3px solid #8B7BF0;border-radius:14px;
   padding:18px 20px;margin:16px 0}
 .orf-h{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:700;color:var(--ink)}
+/* trava o tamanho do pin: SVG sem width/height fixo estica e vira fundo gigante
+   no runtime dos componentes v2. flex:none impede o flex de alongá-lo. */
+.orf-h svg{width:20px;height:20px;flex:none}
 .orf-sub{font-family:var(--mono);font-size:11px;letter-spacing:.4px;color:var(--dim);
   margin-top:6px;text-transform:uppercase}
 .orf-msg{font-size:13.5px;color:var(--muted);margin:12px 0 4px}
@@ -2736,6 +2739,12 @@ _ORFAOS_CSS = """
   border:1px dashed var(--line2);border-radius:10px;padding:12px 14px;margin-top:8px}
 </style>
 """
+
+# Pin do card com width/height EXPLÍCITOS no elemento (svg_icone não os põe, e sem
+# eles o SVG estica). É o mesmo ícone "local", só que com tamanho travado.
+_ORF_PIN = ("<svg width='20' height='20' viewBox='0 0 24 24' fill='none' "
+            "stroke='#b7abff' stroke-width='1.8' stroke-linecap='round' "
+            "stroke-linejoin='round' style='flex:none'>" + ICONES["local"] + "</svg>")
 
 
 def render_orfaos() -> None:
@@ -2781,7 +2790,7 @@ def render_orfaos() -> None:
         regiao = (f'Região {esc(it["regiao_nome"])} · {it["n_regiao"]} municípios vizinhos'
                   if not it["sem_regiao"] else "região não mapeada no IBGE")
         st.markdown(
-            f'<div class="orf-card"><div class="orf-h">{svg_icone("local")}'
+            f'<div class="orf-card"><div class="orf-h">{_ORF_PIN}'
             f'Ninguém financia educação/social em {muni}</div>'
             f'<div class="orf-sub">{regiao}{grupo}</div>'
             f'<div class="orf-msg">Deputados que já atuam na região e são candidatos a '
