@@ -246,6 +246,86 @@ def _tabela_emendas(secao_itens, est, cor):
     return tabela
 
 
+def pdf_resumo_deputado(dep: dict, gerado_em: str) -> bytes:
+    """Resumo pré-reunião de UM deputado — página limpa para o Fábio imprimir e
+    levar. Junta o que já temos do levantamento + CRM (nada inventado).
+
+    dep (montado pelo app):
+        {deputado, partido, camada, score, alinhamento, status_crm, argumento,
+         onde, autorizado, pago, municipios_diretos, municipios_vizinhos,
+         email, telefone, pagina}
+    Autorizado e pago vêm formatados e são impressos SEPARADOS (nunca somados).
+    """
+    est = _estilos()
+    buffer = BytesIO()
+    nome = dep.get("deputado") or "Deputado"
+    partido = dep.get("partido") or "—"
+    doc, rodape = _doc(buffer, _VIOLETA, "Resumo para reunião · %s" % nome, gerado_em)
+
+    story = _cabecalho(_VIOLETA, nome, "Resumo para reunião · %s · ALESP" % partido,
+                       gerado_em, est)
+    camada = dep.get("camada") or ""
+    story.append(_P("Score PFC: <b>%s</b>  ·  Fatia educação/social: <b>%s</b>  ·  "
+                    "Situação no CRM: <b>%s</b>%s"
+                    % (dep.get("score") or "—", dep.get("alinhamento") or "—",
+                       dep.get("status_crm") or "—",
+                       ("  ·  " + camada) if camada else ""), est["sub"]))
+    story.append(Spacer(1, 12))
+
+    # Melhor gancho de abordagem (a 1ª coisa que o Fábio lê).
+    story.append(_P("Melhor gancho de abordagem", est["secao"]))
+    story.append(_P(dep.get("argumento") or "—", est["cel"]))
+    story.append(Spacer(1, 12))
+
+    # Autorizado x Pago — sempre separados e rotulados.
+    story.append(_P("Emendas de educação / social", est["secao"]))
+    if dep.get("onde"):
+        story.append(_P(dep["onde"], est["secao_cap"]))
+    box = Table([[
+        _P("<b>Autorizado · proposta</b><br/>%s" % (dep.get("autorizado") or "—"), est["cel"]),
+        _P("<b>Pago · execução confirmada</b><br/>%s" % (dep.get("pago") or "—"), est["cel"]),
+    ]], colWidths=[(A4[0] - 2 * _MARGEM) / 2] * 2)
+    box.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.5, _LINHA),
+        ("INNERGRID", (0, 0), (-1, -1), 0.5, _LINHA),
+        ("LINEBEFORE", (0, 0), (0, -1), 2, _VIOLETA),
+        ("LINEBEFORE", (1, 0), (1, -1), 2, _VERDE),
+        ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10), ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    story.append(box)
+    story.append(_P("Autorizado é <b>proposta</b>; pago é <b>execução confirmada</b>. "
+                    "São medidas diferentes — nunca somadas.", est["secao_cap"]))
+    story.append(Spacer(1, 12))
+
+    # Municípios do PFC.
+    story.append(_P("Municípios do PFC", est["secao"]))
+    story.append(_P("<b>Direto</b> (onde o PFC atua): %s"
+                    % (dep.get("municipios_diretos") or "nenhum"), est["cel"]))
+    story.append(_P("<b>Vizinho</b> (mesma Região Imediata · IBGE): %s"
+                    % (dep.get("municipios_vizinhos") or "nenhum"), est["cel"]))
+    story.append(Spacer(1, 12))
+
+    # Contato oficial (ALESP) — público, separado do contato pessoal do CRM.
+    story.append(_P("Contato oficial · ALESP", est["secao"]))
+    linhas_ct = []
+    if dep.get("email") and dep["email"] != "não encontrado":
+        linhas_ct.append("Email: %s" % dep["email"])
+    if dep.get("telefone") and dep["telefone"] != "não encontrado":
+        linhas_ct.append("Telefone: %s" % dep["telefone"])
+    if dep.get("pagina"):
+        linhas_ct.append("Página: %s" % dep["pagina"])
+    story.append(_P("<br/>".join(linhas_ct) if linhas_ct
+                    else "Não encontrado na lista de titulares da ALESP.", est["cel"]))
+    story.append(Spacer(1, 10))
+    story.append(_P("Contato público de gabinete (ALESP), não o contato pessoal do "
+                    "relacionamento. Valores da execução real de emendas estaduais "
+                    "2023–2025 (Transparência SP).", est["secao_cap"]))
+
+    doc.build(story, onFirstPage=rodape, onLaterPages=rodape)
+    return buffer.getvalue()
+
+
 def pdf_emendas(territorio: list[dict], expansao: list[dict], gerado_em: str,
                 resumo: str | None = None) -> bytes:
     """PDF dos deputados prioritários a abordar (território primeiro, depois expansão).

@@ -2313,6 +2313,49 @@ def _argumento_abordagem(row: dict, secao: str) -> str:
     return "Sem histórico direto nos nossos municípios ainda — abrir pela pauta do PFC."
 
 
+def _status_no_crm(nome: str, crm_df) -> str:
+    """Status atual do deputado no CRM (aba Deputados), ou 'No CRM' se sem status.
+    Casa por slug (tolerante a acento/caixa e nome contido)."""
+    if crm_df is None or crm_df.empty or "Deputado" not in crm_df:
+        return "No CRM do Fábio"
+    alvo = slug(str(nome))
+    for _, r in crm_df.iterrows():
+        outro = slug(str(r.get("Deputado", "")))
+        if outro and (outro == alvo or alvo in outro or outro in alvo):
+            return str(r.get("Status", "")).strip() or "No CRM (sem status)"
+    return "No CRM do Fábio"
+
+
+def _resumo_dep_dados(row: dict, secao: str, no_crm: bool, crm_df) -> dict:
+    """Monta o dicionário do resumo pré-reunião (só dado real do levantamento+CRM)."""
+    score = float(row.get("score_pfc") or row.get("score_expansao") or 0)
+    if secao == "territorio":
+        aut, pago = row.get("autorizado_pfc", 0), row.get("pago_pfc", 0)
+        onde = "nos municípios do PFC"
+        diretos = _fmt_muns(row.get("municipios_pfc", ""), limite=20)
+        vizinhos = "—"  # a seção território não avalia vizinhança
+    else:
+        aut, pago = row.get("autorizado_geral_edusoc", 0), row.get("pago_geral_edusoc", 0)
+        onde = "em educação/social no estado"
+        diretos = _fmt_muns(row.get("municipios_pfc_diretos", ""), limite=20)
+        vizinhos = _fmt_muns(row.get("municipios_vizinhos", ""), limite=20)
+    ct = dados.contato_oficial(str(row.get("deputado", ""))) or {}
+    return {
+        "deputado": row.get("deputado", ""), "partido": row.get("partido", ""),
+        "camada": row.get("camada", "") if secao == "expansao" else "No território",
+        "score": f"{score:.1f}".replace(".", ","),
+        "alinhamento": _pct_int(row.get("alinhamento_pct", 0)),
+        "status_crm": (_status_no_crm(str(row.get("deputado", "")), crm_df)
+                       if no_crm else "Fora do CRM"),
+        "argumento": _argumento_abordagem(row, secao),
+        "onde": onde, "autorizado": brl(aut), "pago": brl(pago),
+        "municipios_diretos": diretos or "nenhum",
+        "municipios_vizinhos": vizinhos or "nenhum",
+        "email": ct.get("email", ""), "telefone": ct.get("telefone", ""),
+        "pagina": ct.get("pagina", ""),
+    }
+
+
 @st.dialog("Dossiê do deputado", width="large")
 def dlg_descobrir_deputado(row: dict, secao: str) -> None:
     breadcrumb("Descobrir", str(row.get("deputado", "")))
@@ -2330,6 +2373,20 @@ def dlg_descobrir_deputado(row: dict, secao: str) -> None:
         f'{esc(camada)} · score <b style="color:{_cor_score(score)}">{("%.1f"%score).replace(".",",")}</b> '
         f'· fatia educação/social {esc(row.get("alinhamento_pct",0))}%</div>',
         unsafe_allow_html=True)
+
+    # ---- Resumo pré-reunião (PDF imprimível) — reusa o ReportLab dos relatórios ----
+    try:
+        _pdf_resumo = relatorios.pdf_resumo_deputado(
+            _resumo_dep_dados(row, secao, no_crm, dados.carregar_deputados()),
+            datetime.date.today().strftime("%d/%m/%Y"))
+        st.download_button(
+            "Resumo para reunião (PDF)", data=_pdf_resumo,
+            file_name=f"resumo-reuniao-{slug(str(row.get('deputado','')))}.pdf",
+            mime="application/pdf", use_container_width=True,
+            key=f"pdf_dep_{slug(str(row.get('deputado','')))}",
+            help="Página limpa com tudo do deputado, para imprimir e levar à reunião.")
+    except Exception as e:  # PDF nunca derruba o dossiê
+        st.caption(f"Não consegui gerar o PDF agora: {e}")
 
     # ---- MELHOR GANCHO DE ABORDAGEM — a 1ª coisa que o Fábio lê ----
     _chat_svg = ('<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#b7abff" '
