@@ -64,6 +64,42 @@ NAO_ELEGIVEL = [
     # recorte étnico/aldeia indígena específico
     "indigena", "indigenas", "aldeia", "povos originarios", "terra indigena",
 ]
+# PRÊMIO PARA PESSOA FÍSICA (não é captação da OSC): prêmio cujo laureado é um
+# INDIVÍDUO nomeado — professor/educador/jornalista. Quem recebe é a pessoa, não
+# a organização; o PFC capta prêmio INSTITUCIONAL (para o projeto/organização).
+# Régua estreita de propósito: só casa o prêmio-a-indivíduo, NUNCA "formação de
+# professores" (que é edital institucional e segue em POSITIVAS). Barra no
+# pré-filtro (avaliar_sinal).
+NEGATIVAS_PESSOA_FISICA = [
+    "premio professor", "premio ao professor", "premio para professor",
+    "premio educador", "premio ao educador", "premio para educador",
+    "melhor educador", "melhor professor", "educador nota", "professor nota",
+    "premio jornalista", "premio ao jornalista", "melhor jornalista",
+    "personalidade do ano",
+]
+# EDIÇÃO PASSADA / INSCRIÇÕES ENCERRADAS: listas de prêmio carregam muita coisa
+# de 2025 já fechada e notícia de resultado. Barram no pré-filtro dois grupos de
+# sinais textuais (o vencido-há-muito por prazo já cai em prazos.py):
+#  1) fechamento explícito das inscrições;
+#  2) anúncio de RESULTADO (edição passada). Aqui a régua é estreita para não
+#     barrar edital ABERTO que só descreve o prêmio ("os vencedores receberão"):
+#     só casa frase de resultado consumado ("conheça os vencedores", "aos
+#     vencedores", "ganhadores do prêmio"), não a palavra "vencedores" solta.
+ENCERRADO = [
+    # 1) fechamento explícito
+    "inscricoes encerradas", "inscricao encerrada", "encerradas as inscricoes",
+    "encerrada as inscricoes", "inscricoes encerram-se", "prazo encerrado",
+    "edital encerrado", "chamada encerrada", "selecao encerrada",
+    "inscricoes se encerraram",
+    # 2) anúncio de resultado (edição passada). Ancorado em VERBO de anúncio para
+    #    não pegar edital aberto que só descreve o benefício ("reconhecimento aos
+    #    vencedores", "os vencedores receberão"): a frase precisa afirmar o
+    #    resultado consumado, não a promessa.
+    "conheca os vencedores", "conheca os ganhadores", "conheca os premiados",
+    "anuncia os vencedores", "anuncia os ganhadores", "anunciados os vencedores",
+    "premiacao destaca", "entrega premiacao aos", "entrega da premiacao aos",
+    "vencedores da edicao", "ganhadores da edicao", "conheca as vencedoras",
+]
 
 # --- Região (20%) ------------------------------------------------------------
 REGIOES_PFC = [
@@ -139,6 +175,20 @@ def e_oportunidade_aluno(titulo: str, descricao: str) -> bool:
     return any(k in texto for k in NEGATIVAS_ALUNO)
 
 
+def e_premio_pessoa_fisica(titulo: str, descricao: str) -> bool:
+    """True se o prêmio é para PESSOA FÍSICA (professor/educador/jornalista
+    individual) — laureia o indivíduo, não a organização, então não é captação
+    do PFC. Normaliza acentos (chaves em NEGATIVAS_PESSOA_FISICA são sem acento)."""
+    texto = _norm(f"{titulo or ''} {descricao or ''}")
+    return any(k in texto for k in NEGATIVAS_PESSOA_FISICA)
+
+
+def e_encerrado(titulo: str, descricao: str) -> bool:
+    """True se o item sinaliza edição PASSADA / inscrições ENCERRADAS."""
+    texto = _norm(f"{titulo or ''} {descricao or ''}")
+    return any(k in texto for k in ENCERRADO)
+
+
 def e_nao_elegivel(titulo: str, descricao: str) -> bool:
     """True se é captação que o PFC genuinamente NÃO tem como concorrer
     (bem-estar animal, saúde hospitalar/clínica, recorte étnico/aldeia indígena).
@@ -151,17 +201,22 @@ def e_nao_elegivel(titulo: str, descricao: str) -> bool:
 def avaliar_sinal(op: dict) -> tuple[bool, str]:
     """Decisão do pré-filtro. Retorna (passa, motivo_descarte).
 
-    Ordem: exclusão administrativa -> oportunidade-para-aluno -> inelegível
-    (fora do que o PFC concorre) -> filtro de sinal. Sem whitelist: toda fonte
-    passa pelo mesmo crivo. A régua é ELEGIBILIDADE (dinheiro que o PFC pode
-    captar), não tema estreito — impacto social, comunitário e cultura entram.
+    Ordem: exclusão administrativa -> encerrado (edição passada) ->
+    oportunidade-para-aluno -> prêmio para pessoa física -> inelegível (fora do
+    que o PFC concorre) -> filtro de sinal. Sem whitelist: toda fonte passa pelo
+    mesmo crivo. A régua é ELEGIBILIDADE (dinheiro que o PFC pode captar), não
+    tema estreito — impacto social, comunitário e cultura entram.
     """
     titulo = op.get("titulo", "")
     descricao = op.get("descricao", "")
     if titulo_excluido(titulo):
         return False, "título genérico/administrativo excluído"
+    if e_encerrado(titulo, descricao):
+        return False, "edição passada / inscrições encerradas"
     if e_oportunidade_aluno(titulo, descricao):
         return False, "oportunidade para aluno (olimpíada/medalha/bolsa), não captação"
+    if e_premio_pessoa_fisica(titulo, descricao):
+        return False, "prêmio para pessoa física (professor/indivíduo), não captação institucional"
     if e_nao_elegivel(titulo, descricao):
         return False, "inaplicável ao PFC (bem-estar animal/saúde hospitalar/aldeia indígena)"
     if tem_sinal_de_oportunidade(titulo, descricao):

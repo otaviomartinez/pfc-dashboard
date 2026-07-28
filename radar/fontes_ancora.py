@@ -32,9 +32,27 @@ def fonte_prosas():
                     ["div[class*=card]", "div[class*=edital]", "article", "li.item"])
 
 
+# Home traz mais notícia que prêmio; as seções /tag/premio/ e a de editais
+# carregam os prêmios institucionais (BRB Impacto Social, LED, FEAC, BNDES,
+# prêmio internacional) que a home não destaca. Raspa as três e dedup por URL.
+_OBS3_URLS = [
+    "https://observatorio3setor.org.br/",
+    "https://observatorio3setor.org.br/tag/premio/",
+    "https://observatorio3setor.org.br/secoes_tematicas/editais/",
+]
+_OBS3_SELETORES = ["article", "div[class*=post]", "div[class*=card]",
+                   ".elementor-post", "h2 a[href]", "h3 a[href]"]
+
+
 def fonte_observatorio3setor():
-    return _coletar("https://observatorio3setor.org.br/", "Observatório 3º Setor",
-                    ["article", "div[class*=post]", "div[class*=card]", ".elementor-post"])
+    itens, vistos = [], set()
+    for url in _OBS3_URLS:
+        for it in _coletar(url, "Observatório 3º Setor", _OBS3_SELETORES):
+            u = it.get("url", "")
+            if u and u not in vistos:
+                vistos.add(u)
+                itens.append(it)
+    return itens
 
 
 def fonte_abcr():
