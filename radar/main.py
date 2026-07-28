@@ -227,6 +227,17 @@ def executar():
         destino = "preview_local.csv (sem credenciais Google)"
         _salvar_csv(PREVIEW_CSV, HEADERS, [_linha(o) for o in unicas])
 
+    # Alerta de editais por e-mail (passo pós-gravação). BLINDADO: e-mail nunca
+    # derruba o radar — qualquer falha aqui é engolida e o radar segue normal.
+    stats_alerta = {"selecionados": [], "enviados": 0, "marcados": 0, "erro": None}
+    if ws is not None:
+        try:
+            from radar import alertas
+            stats_alerta = alertas.executar_alertas(ws.spreadsheet)
+        except Exception as e:  # dupla blindagem, além do try interno do módulo
+            stats_alerta = {"selecionados": [], "enviados": 0, "marcados": 0,
+                            "erro": f"{type(e).__name__}: {str(e)[:100]}"}
+
     # Log de filtradas (passaram no sinal, mas score < limiar).
     _salvar_csv(FILTRADOS_CSV, ["data", "fonte", "titulo", "url", "score_total", "motivo"],
                 [[o.get("data_encontrada", ""), o.get("fonte", ""), o.get("titulo", ""),
@@ -242,11 +253,12 @@ def executar():
     t_desc.join(timeout=90)
 
     _resumo(ancora_ok, generica_ok, brutos, com_sinal, descartados, unicas, filtradas,
-            {**ancora_falhas, **generica_falhas}, resultado_desc["n"], destino, stats_enr)
+            {**ancora_falhas, **generica_falhas}, resultado_desc["n"], destino, stats_enr,
+            stats_alerta)
 
 
 def _resumo(ancora_ok, generica_ok, brutos, com_sinal, descartados, unicas, filtradas,
-            falhas, n_cand, destino, stats_enr):
+            falhas, n_cand, destino, stats_enr, stats_alerta=None):
     n_com_prazo = sum(1 for o in unicas if isinstance(o.get("dias_restantes"), int))
     n_vencidas = sum(1 for o in unicas
                      if isinstance(o.get("dias_restantes"), int) and o["dias_restantes"] < 0)
@@ -261,6 +273,13 @@ def _resumo(ancora_ok, generica_ok, brutos, com_sinal, descartados, unicas, filt
           f"{stats_enr['enriquecidas']} fichas melhoradas · "
           f"{stats_enr['com_prazo']} ganharam prazo · "
           f"{stats_enr['com_valor']} ganharam valor")
+    if stats_alerta:
+        n_sel = len(stats_alerta.get("selecionados", []))
+        erro = stats_alerta.get("erro")
+        detalhe = (f"erro/pulado: {erro}" if erro else
+                   f"{stats_alerta.get('enviados', 0)} e-mail(s) enviado(s) · "
+                   f"{stats_alerta.get('marcados', 0)} marcado(s)")
+        print(f"Alertas de editais: {n_sel} edital(is) no gatilho (<=14d) · {detalhe}")
     print(f"Destino da fila: {destino}")
     print(f"{n_cand} novas fontes candidatas descobertas -> "
           f"{os.path.basename(CANDIDATAS_CSV)}")

@@ -4224,6 +4224,19 @@ def page_radar():
         if isinstance(i, int) and 0 <= i < len(visiveis):
             dlg_oportunidade(visiveis[i])
 
+    # Cadastro no alerta de editais por e-mail (o radar 06:00 envia os avisos).
+    with st.expander("Receber alertas de editais por e-mail"):
+        st.caption("Avisamos por e-mail quando um edital com data confiável estiver a "
+                   "14 dias ou menos do prazo. Um aviso por edital, sem repetição.")
+        with st.form("form_alerta_editais", clear_on_submit=True):
+            email_in = st.text_input("Seu e-mail", placeholder="voce@exemplo.com")
+            c1, c2 = st.columns(2)
+            inscrever = c1.form_submit_button("Inscrever", use_container_width=True)
+            sair = c2.form_submit_button("Sair da lista", use_container_width=True)
+        if inscrever or sair:
+            res_al = (dados.adicionar_inscrito if inscrever else dados.desinscrever)(email_in)
+            (st.success if res_al["sucesso"] else st.error)(res_al["mensagem"])
+
 
 # =========================================================================== #
 # PÁGINA · FUNIL

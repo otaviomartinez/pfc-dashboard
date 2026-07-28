@@ -26,6 +26,10 @@ jobs:
         env:
           GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
           SPREADSHEET_KEY: ${{ secrets.SPREADSHEET_KEY }}
+          # Alerta de editais por e-mail (opcional): se estes secrets não
+          # existirem, o GitHub injeta vazio e o passo de alerta pula sem quebrar.
+          GMAIL_SENDER: ${{ secrets.GMAIL_SENDER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         run: python -m radar.main
 
       - name: Publicar CSVs de saída (artefatos)

@@ -46,6 +46,10 @@ ABA_EDITAIS = "Editais_Privados"
 # Aba do CRM de deputados (radar de Emendas). Contém o Diálogo sensível — a
 # planilha inteira deve permanecer restrita; no app o Diálogo só renderiza logado.
 ABA_DEPUTADOS = "Deputados"
+# Aba de inscritos no alerta de editais por e-mail (cadastro pelo próprio app).
+# Só e-mail + data + flag Ativo — nada sensível. O radar lê daqui para enviar.
+ABA_INSCRITOS = "Inscritos Alerta"
+HEADERS_INSCRITOS = ["Email", "Data inscrição", "Ativo"]
 # Cabeçalho EXATO da aba de novidades.
 HEADERS_NOVIDADES = [
     "Data", "Fonte", "Título", "Descrição", "Score Aderência",
@@ -606,6 +610,121 @@ def carregar_novidades_pendentes() -> list[dict]:
         return []
     return [r for r in registros
             if str(r.get("Status aprovação", "")).strip().lower() == "pendente de revisão"]
+
+
+# --------------------------------------------------------------------------- #
+# Inscritos no alerta de editais por e-mail (cadastro pelo app)
+# --------------------------------------------------------------------------- #
+import re as _re
+
+_RE_EMAIL = _re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _email_valido(email: str) -> bool:
+    return bool(_RE_EMAIL.match(str(email or "").strip()))
+
+
+def _inscrito_ativo(valor: str) -> bool:
+    """Trata Ativo vazio/'Sim'/'True'/'1' como ativo; só 'Não'/'False'/'0' saem."""
+    return str(valor or "").strip().lower() not in ("não", "nao", "false", "0", "inativo")
+
+
+def criar_aba_inscritos() -> bool:
+    """Garante a aba 'Inscritos Alerta' com o cabeçalho padrão. True se criada agora."""
+    sh = _conectar()
+    if sh is None:
+        return False
+    try:
+        if ABA_INSCRITOS in [w.title for w in sh.worksheets()]:
+            return False
+        ws = sh.add_worksheet(title=ABA_INSCRITOS, rows=500, cols=len(HEADERS_INSCRITOS))
+        ws.append_row(HEADERS_INSCRITOS)
+        return True
+    except Exception:
+        return False
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def carregar_inscritos() -> pd.DataFrame:
+    """Lê a aba 'Inscritos Alerta' (Email, Data inscrição, Ativo). Vazio se não existir/CSV."""
+    sh = _conectar()
+    if sh is None:
+        return pd.DataFrame()
+    try:
+        if ABA_INSCRITOS not in [w.title for w in sh.worksheets()]:
+            return pd.DataFrame()
+        return pd.DataFrame(sh.worksheet(ABA_INSCRITOS).get_all_records())
+    except Exception:
+        return pd.DataFrame()
+
+
+def adicionar_inscrito(email: str) -> dict:
+    """Inscreve um e-mail no alerta de editais. Retorna {sucesso, mensagem}.
+
+    Valida o formato, evita duplicar (reativa se estava inativo) e grava
+    append-only RAW na aba 'Inscritos Alerta' — mesmo padrão da porta única.
+    Só grava conectado ao Sheets; no modo CSV a escrita fica bloqueada.
+    """
+    email = str(email or "").strip().lower()
+    if not _email_valido(email):
+        return {"sucesso": False, "mensagem": "E-mail inválido. Confira e tente de novo."}
+    sh = _conectar()
+    if sh is None:
+        return {"sucesso": False, "mensagem": "Sem conexão com o Google Sheets — a "
+                "inscrição não foi gravada (modo local)."}
+    try:
+        criar_aba_inscritos()  # idempotente
+        ws = sh.worksheet(ABA_INSCRITOS)
+        cabecalho = ws.row_values(1) or HEADERS_INSCRITOS
+        if not ws.row_values(1):
+            ws.append_row(HEADERS_INSCRITOS)
+            cabecalho = HEADERS_INSCRITOS
+        registros = ws.get_all_records()
+        for i, r in enumerate(registros, start=2):
+            if str(r.get("Email", "")).strip().lower() == email:
+                if _inscrito_ativo(r.get("Ativo", "")):
+                    return {"sucesso": True, "mensagem": "Esse e-mail já está inscrito."}
+                if "Ativo" in cabecalho:
+                    ws.update_cell(i, cabecalho.index("Ativo") + 1, "Sim")  # reativa
+                carregar_inscritos.clear()
+                return {"sucesso": True, "mensagem": "Pronto, sua inscrição foi reativada."}
+        linha_map = {"Email": email,
+                     "Data inscrição": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M"),
+                     "Ativo": "Sim"}
+        ws.append_row([str(linha_map.get(c, "")) for c in cabecalho], value_input_option="RAW")
+        carregar_inscritos.clear()
+        return {"sucesso": True,
+                "mensagem": "Pronto, você receberá os alertas de editais por e-mail."}
+    except Exception as e:  # noqa: BLE001
+        return {"sucesso": False, "mensagem": f"Erro ao gravar inscrição: {e}"}
+
+
+def desinscrever(email: str) -> dict:
+    """Sai da lista: marca Ativo='Não' na linha do e-mail (não apaga). {sucesso, mensagem}."""
+    email = str(email or "").strip().lower()
+    if not _email_valido(email):
+        return {"sucesso": False, "mensagem": "E-mail inválido."}
+    sh = _conectar()
+    if sh is None:
+        return {"sucesso": False, "mensagem": "Sem conexão com o Google Sheets — não "
+                "foi possível sair da lista agora (modo local)."}
+    try:
+        if ABA_INSCRITOS not in [w.title for w in sh.worksheets()]:
+            return {"sucesso": False, "mensagem": "Ninguém inscrito ainda."}
+        ws = sh.worksheet(ABA_INSCRITOS)
+        cab = [str(c).strip() for c in ws.row_values(1)]
+        if "Email" not in cab or "Ativo" not in cab:
+            return {"sucesso": False, "mensagem": "Aba de inscritos incompleta."}
+        emails = ws.col_values(cab.index("Email") + 1)
+        linha = next((i for i, v in enumerate(emails[1:], start=2)
+                      if str(v).strip().lower() == email), None)
+        if linha is None:
+            return {"sucesso": False, "mensagem": "Esse e-mail não está na lista."}
+        ws.update_cell(linha, cab.index("Ativo") + 1, "Não")
+        carregar_inscritos.clear()
+        return {"sucesso": True, "mensagem": "Pronto, você saiu da lista de alertas."}
+    except Exception as e:  # noqa: BLE001
+        return {"sucesso": False, "mensagem": f"Erro ao sair da lista: {e}"}
 
 
 # --------------------------------------------------------------------------- #
