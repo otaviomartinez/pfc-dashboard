@@ -276,9 +276,14 @@ def _resumo(ancora_ok, generica_ok, brutos, com_sinal, descartados, unicas, filt
     if stats_alerta:
         n_sel = len(stats_alerta.get("selecionados", []))
         erro = stats_alerta.get("erro")
-        detalhe = (f"erro/pulado: {erro}" if erro else
-                   f"{stats_alerta.get('enviados', 0)} e-mail(s) enviado(s) · "
-                   f"{stats_alerta.get('marcados', 0)} marcado(s)")
+        pulado = stats_alerta.get("pulado")
+        if erro:
+            detalhe = f"erro: {erro}"
+        elif pulado:
+            detalhe = f"não enviado ({pulado})"
+        else:
+            detalhe = (f"{stats_alerta.get('enviados', 0)} e-mail(s) enviado(s) · "
+                       f"{stats_alerta.get('marcados', 0)} marcado(s)")
         print(f"Alertas de editais: {n_sel} edital(is) no gatilho (<=14d) · {detalhe}")
     print(f"Destino da fila: {destino}")
     print(f"{n_cand} novas fontes candidatas descobertas -> "

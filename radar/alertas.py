@@ -6,6 +6,12 @@ seleciona editais com data CONFIÁVEL a <=14 dias do prazo, ainda não vencidos 
 ainda NÃO alertados (coluna 'Alertado em' vazia), e manda UM e-mail-resumo por
 inscrito, ordenado por urgência. Marca 'Alertado em' com a data para não repetir.
 
+ENVIO SEMANAL: o radar roda todo dia (06:00) para descobrir editais novos, mas o
+e-mail só sai às SEGUNDAS-FEIRAS, pelo calendário de BRASÍLIA (o Actions roda em
+UTC; usar a data UTC dispararia no dia errado perto da virada). Nos outros dias o
+passo não monta nem envia nada — e, como não marca 'Alertado em', os editais
+elegíveis ficam guardados e entram no e-mail da segunda seguinte.
+
 INVARIANTE CRÍTICA: nada aqui pode derrubar o radar. `executar_alertas` é
 blindada por try/except (e o main.py ainda a chama dentro de outro try/except);
 falta de secrets, falha de SMTP ou erro de rede => pula silenciosamente,
@@ -28,6 +34,33 @@ ABA_PENDENTES = "Novidades_pendentes"
 ABA_INSCRITOS = "Inscritos Alerta"
 COL_ALERTADO = "Alertado em"
 ALERTA_MAX_DIAS = 14  # avisa quando faltarem <= 14 dias (e ainda não venceu)
+DIA_DE_ENVIO = 0      # 0 = segunda-feira (datetime.date.weekday())
+TZ_BRASILIA = "America/Sao_Paulo"
+
+
+# --------------------------------------------------------------------------- #
+# Dia do envio (semanal, no calendário de Brasília)
+# --------------------------------------------------------------------------- #
+def hoje_brasilia() -> datetime.date:
+    """Data de HOJE no fuso de Brasília.
+
+    O radar roda no GitHub Actions em UTC: às 06:00 de Brasília já são 09:00 UTC
+    do mesmo dia, mas depender da data UTC deixaria o envio a um passo de cair no
+    dia errado se o horário do cron mudar. Sem a base de fusos (tzdata), cai no
+    offset fixo -03:00, que é o de Brasília o ano todo desde 2019 (sem horário
+    de verão)."""
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.datetime.now(ZoneInfo(TZ_BRASILIA)).date()
+    except Exception:
+        return (datetime.datetime.now(datetime.timezone.utc)
+                - datetime.timedelta(hours=3)).date()
+
+
+def e_dia_de_envio(hoje: datetime.date | None = None) -> bool:
+    """True só na SEGUNDA-FEIRA (calendário de Brasília) — o e-mail é semanal."""
+    hoje = hoje or hoje_brasilia()
+    return hoje.weekday() == DIA_DE_ENVIO
 
 
 # --------------------------------------------------------------------------- #
@@ -50,7 +83,7 @@ def selecionar_editais(registros: list[dict], hoje: datetime.date | None = None)
     (Prazo é ISO válido) a 0..ALERTA_MAX_DIAS dias (não vencido); ainda NÃO
     alertado (coluna 'Alertado em' vazia). Pura: não toca em rede/Sheets.
     """
-    hoje = hoje or datetime.date.today()
+    hoje = hoje or hoje_brasilia()
     selec = []
     for r in registros:
         if str(r.get("Status aprovação", "")).strip().lower() != "pendente de revisão":
@@ -80,7 +113,7 @@ def _fmt_prazo(prazo_iso: str) -> str:
 
 def montar_email(editais: list[dict], hoje: datetime.date | None = None) -> tuple[str, str]:
     """(assunto, corpo) do e-mail-resumo. Um item por linha, urgência primeiro."""
-    hoje = hoje or datetime.date.today()
+    hoje = hoje or hoje_brasilia()
     n = len(editais)
     plural = "edital" if n == 1 else "editais"
     assunto = f"[PFC] {n} {plural} com prazo em até {ALERTA_MAX_DIAS} dias"
@@ -171,19 +204,27 @@ def _marcar_alertados(ws, editais: list[dict], registros: list[dict],
 # Orquestração blindada
 # --------------------------------------------------------------------------- #
 def executar_alertas(sh, hoje: datetime.date | None = None, enviar: bool = True,
-                     destinatarios_override: list[str] | None = None) -> dict:
+                     destinatarios_override: list[str] | None = None,
+                     ignorar_dia: bool = False) -> dict:
     """Passo de alerta completo. NUNCA levanta exceção.
 
     sh = objeto Spreadsheet (gspread). Devolve um resumo:
-      {selecionados, assunto, corpo, inscritos, enviados, marcados, erro}
+      {selecionados, assunto, corpo, inscritos, enviados, marcados, erro, pulado}
+
+    O e-mail é SEMANAL: fora da segunda-feira (calendário de Brasília) o passo
+    não monta nem envia, e não marca nada — os elegíveis esperam a próxima
+    segunda. `pulado` diz o motivo quando isso acontece.
 
     enviar=False  -> modo TESTE: seleciona e monta o e-mail, mas NÃO envia e NÃO
                      marca (não escreve NADA no Sheets — nem a coluna).
+    ignorar_dia=True -> só para teste/preview: mostra o e-mail que sairia,
+                     mesmo num dia que não é segunda.
     destinatarios_override -> lista de e-mails para teste (ignora os inscritos).
     """
-    hoje = hoje or datetime.date.today()
+    hoje = hoje or hoje_brasilia()
     resumo = {"selecionados": [], "assunto": "", "corpo": "", "inscritos": 0,
-              "enviados": 0, "marcados": 0, "erro": None}
+              "enviados": 0, "marcados": 0, "erro": None, "pulado": None,
+              "dia_de_envio": e_dia_de_envio(hoje)}
     try:
         ws = sh.worksheet(ABA_PENDENTES)
         registros = ws.get_all_records()
@@ -191,6 +232,13 @@ def executar_alertas(sh, hoje: datetime.date | None = None, enviar: bool = True,
         resumo["selecionados"] = editais
         if not editais:
             return resumo  # nada a alertar hoje
+
+        # ENVIO SEMANAL: fora de segunda não monta, não envia e não marca.
+        # (ignorar_dia libera só o preview de teste, que nunca escreve.)
+        if not resumo["dia_de_envio"] and not ignorar_dia:
+            resumo["pulado"] = ("hoje não é segunda-feira — envio semanal; "
+                                f"{len(editais)} edital(is) aguardando a próxima")
+            return resumo
 
         assunto, corpo = montar_email(editais, hoje)
         resumo["assunto"], resumo["corpo"] = assunto, corpo
