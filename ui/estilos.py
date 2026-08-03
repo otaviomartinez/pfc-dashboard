@@ -1390,6 +1390,9 @@ _SELO_V2_CSS = """
 .rs-cap{font-size:13.5px;color:var(--muted,#A4AEBF);margin-top:7px}
 .rs-stats{margin-left:auto;display:flex;gap:26px;position:relative;z-index:1;flex:none}
 .rs-stat{text-align:center}
+/* "encerrando" clicável: leva aos editais que estão fechando */
+.rs-stat.rs-click{cursor:pointer;border-radius:9px;padding:4px 10px;margin:-4px -2px;transition:.15s}
+.rs-stat.rs-click:hover{background:rgba(240,102,63,.12)}
 .rs-stat .n{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
 .rs-stat .l{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.6px;
   text-transform:uppercase;color:var(--dim,#6B7688);margin-top:4px}
@@ -1425,7 +1428,9 @@ _SELO_JS_FN = r"""
       '<div class="rs-num"><b>' + (f.fila || 0) + '</b><span class="u">na fila</span></div>' +
       '<div class="rs-cap">oportunidades distribuídas por aderência ao PFC</div></div>' +
       '<div class="rs-stats">' +
-      '<div class="rs-stat"><div class="n" style="color:var(--sem-urgent,#F0663F)">' + (f.encerrando || 0) +
+      '<div class="rs-stat' + ((f.encerrando||0)>0?' rs-click':'') + '"' +
+        ((f.encerrando||0)>0?' data-act="encerrando" title="Ver os editais que estão encerrando"':'') +
+      '><div class="n" style="color:var(--sem-urgent,#F0663F)">' + (f.encerrando || 0) +
       '</div><div class="l">encerrando</div></div>' +
       '<div class="rs-stat"><div class="n">' + (f.fontes || 0) + '</div><div class="l">fontes</div></div>' +
       '</div></div>';

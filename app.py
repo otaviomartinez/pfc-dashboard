@@ -1975,6 +1975,9 @@ def page_visao():
             dlg_oportunidade(top)
         elif t == "prazo" and isinstance(i, int) and 0 <= i < len(prazo_items):
             dlg_oportunidade(prazo_items[i])
+        elif t == "encerrando" and prazo_items:
+            # clicar no "N encerrando" leva à oportunidade que fecha mais cedo
+            dlg_oportunidade(prazo_items[0])
         elif t == "stage" and k in STATUS_FUNIL:
             dlg_status_list(k)
 
@@ -2040,13 +2043,38 @@ _radar_v2 = components_v2.component("pfc_radar", css=_SELO_V2_CSS + _RADAR_V2_CS
 _RADAR_MAX_LISTA = 40  # itens visíveis na lista (o restante fica indicado no rodapé)
 
 
+def _ordenar_ops(ops: list, modo: str) -> list:
+    """Ordena as oportunidades do radar pelo critério escolhido.
+
+    'Dias restantes' = os que fecham ANTES primeiro. A ordem é: abertos por prazo
+    crescente (o que encerra antes no topo) -> vencidos (mais recentes primeiro)
+    -> 'prazo a confirmar' (sem data confiável) por ÚLTIMO. Assim os que estão
+    encerrando ficam à vista, e os sem data não somem nem quebram a ordenação.
+    'Valor' = maiores primeiro. 'Score' = relevância (padrão)."""
+    if modo == "Dias restantes":
+        def _chave(o):
+            d = o["dias"]
+            if _prazo_confiavel(d):
+                return (0, d) if d >= 0 else (1, -d)  # abertos; depois vencidos
+            return (2, 0)  # 'a confirmar' no fim
+        return sorted(ops, key=_chave)
+    if modo == "Valor":
+        return sorted(ops, key=lambda o: dados._valor_para_reais(o.get("valor", "")), reverse=True)
+    return sorted(ops, key=lambda o: _score_novidade(o["nv"]), reverse=True)
+
+
 def page_radar():
     _mostrar_resultado(st.session_state.pop("radar_msg", None))
     if not modo_conectado:
         st.caption(HINT_ESCRITA + " — aprovar/descartar grava na aba Novidades_pendentes.")
 
-    fila = sorted(dados.carregar_novidades_pendentes(), key=_score_novidade, reverse=True)
-    ops = [_op_de_novidade(nv) for nv in fila]
+    ordem = st.radio(
+        "Ordenar por", ["Score", "Dias restantes", "Valor"], horizontal=True, key="radar_ordem",
+        help="Score = relevância · Dias restantes = os que fecham antes primeiro "
+             "(prazo a confirmar vai para o fim) · Valor = maiores primeiro")
+    ops = [_op_de_novidade(nv) for nv in dados.carregar_novidades_pendentes()]
+    scores_spark = sorted((o["score"] for o in ops), reverse=True)[:16]  # sparkline por score
+    ops = _ordenar_ops(ops, ordem)
     visiveis = ops[:_RADAR_MAX_LISTA]
     n_fontes = _n_fontes_radar()
     encerrando = sum(1 for o in ops if _prazo_confiavel(o["dias"]) and 0 <= o["dias"] <= 7)
@@ -2069,15 +2097,20 @@ def page_radar():
                       "valor": o["valor"], "badge_txt": txt, "badge_cls": cls, "badge_tip": tip})
 
     res = _radar_v2(data={"itens": itens, "ocultos": max(0, len(ops) - len(visiveis)),
-                          "scores": [o["score"] for o in ops[:16]],
+                          "scores": scores_spark,
                           "foot": {"fila": len(ops), "encerrando": encerrando,
                                    "fontes": n_fontes}},
                     key="radar_v2", on_acao_change=lambda: None)
     ac = getattr(res, "acao", None)
-    if isinstance(ac, dict) and ac.get("t") == "op":
-        i = ac.get("i")
-        if isinstance(i, int) and 0 <= i < len(visiveis):
-            dlg_oportunidade(visiveis[i])
+    if isinstance(ac, dict):
+        if ac.get("t") == "op":
+            i = ac.get("i")
+            if isinstance(i, int) and 0 <= i < len(visiveis):
+                dlg_oportunidade(visiveis[i])
+        elif ac.get("t") == "encerrando":
+            # clicar no "N encerrando" reordena a lista pelos que fecham antes
+            st.session_state["radar_ordem"] = "Dias restantes"
+            st.rerun()
 
     # Cadastro no alerta de editais por e-mail (o radar 06:00 envia os avisos).
     with st.expander("Receber alertas de editais por e-mail"):
