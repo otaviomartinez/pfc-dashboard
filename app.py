@@ -1125,6 +1125,26 @@ PROSPECCAO_ETAPA_COR = {"Indicada": "#7C8698", "Aprovada": "#5B9BD5",
                         "Assinada": "#E8B54A", "Paga": "#4ADE80"}
 PROSPECCAO_TIPOS = ["Emenda", "Prêmio", "Patrocínio", "Outro"]
 
+# Placar de verba conquistada (verde = etapa final, mesma cor do "Paga").
+_PROSPECCAO_PLACAR_CSS = """
+<style>
+.plc{background:linear-gradient(135deg,rgba(74,222,128,.13),rgba(74,222,128,.02));
+  border:1px solid rgba(74,222,128,.32);border-left:3px solid #4ADE80;border-radius:16px;
+  padding:20px 22px;margin:6px 0 4px}
+.plc-lbl{font-family:var(--mono);font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:#4ADE80}
+.plc-total{font-size:38px;font-weight:800;color:var(--ink);line-height:1.05;margin-top:5px;
+  font-variant-numeric:tabular-nums}
+.plc-cap{font-size:12.5px;color:var(--muted);margin-top:5px}
+.plc-list{margin-top:14px;display:flex;flex-direction:column}
+.plc-row{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:10px 0;border-top:1px solid var(--line)}
+.plc-nome{font-weight:600;color:var(--ink);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.plc-sub{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:2px}
+.plc-val{font-weight:700;color:#4ADE80;font-size:15px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.plc-vazio{margin-top:12px;font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
+</style>
+"""
+
 
 def _prospeccao_etapa_de(status: str) -> str:
     """Enquadra o Status numa etapa canônica (fora da lista cai na primeira)."""
@@ -1151,6 +1171,16 @@ def _funil_prospeccao_colunas(itens: list) -> list:
     return colunas
 
 
+def _prospeccao_conquistado(itens: list) -> tuple:
+    """Verba JÁ CONQUISTADA = itens na etapa FINAL do funil (a última de
+    PROSPECCAO_ETAPAS, hoje 'Paga'). Lê os MESMOS dados da Prospecção — não é
+    base separada. Devolve (total_em_reais, lista de itens ganhos)."""
+    final = PROSPECCAO_ETAPAS[-1]
+    ganhos = [it for it in itens if _prospeccao_etapa_de(it.get("Status", "")) == final]
+    total = sum(dados._valor_para_reais(it.get("Valor", "")) for it in ganhos)
+    return total, ganhos
+
+
 def render_prospeccao():
     """Painel próprio de Prospecção: formulário de registro + funil por etapa
     (MESMO kanban drag-and-drop do funil de deputados). Arrastar grava só o
@@ -1165,6 +1195,34 @@ def render_prospeccao():
         st.rerun()
     if not modo_conectado:
         st.caption(HINT_ESCRITA + " — registrar e arrastar gravam na aba Prospecção.")
+
+    # ---- itens lidos UMA vez (os mesmos dados alimentam o placar e o funil) ----
+    df_p = dados.carregar_prospeccao()
+    itens = df_p.to_dict("records") if not df_p.empty else []
+
+    # ---- PARTE 2 · PLACAR: verba JÁ CONQUISTADA (itens na etapa final) ----
+    total_ganho, ganhos = _prospeccao_conquistado(itens)
+    etapa_final = PROSPECCAO_ETAPAS[-1]
+    if ganhos:
+        linhas = ""
+        for it in ganhos:
+            sub = " · ".join(x for x in (str(it.get("Tipo", "")).strip(),
+                             str(it.get("Financiador", "")).strip(),
+                             str(it.get("Previsão", "")).strip()) if x)
+            linhas += (f'<div class="plc-row"><div style="flex:1;min-width:0">'
+                       f'<div class="plc-nome">{esc(str(it.get("Nome", "")))}</div>'
+                       f'<div class="plc-sub">{esc(sub)}</div></div>'
+                       f'<div class="plc-val">{esc(str(it.get("Valor", "")).strip() or "—")}</div></div>')
+    else:
+        linhas = (f'<div class="plc-vazio">Nenhuma verba na etapa "{esc(etapa_final)}" ainda. '
+                  f'Arraste um item até lá quando o dinheiro entrar — ele vira vitória aqui.</div>')
+    st.markdown(
+        _PROSPECCAO_PLACAR_CSS +
+        '<div class="plc"><div class="plc-head"><div>'
+        '<div class="plc-lbl">🏆 Verba já conquistada</div>'
+        f'<div class="plc-total">{brl(total_ganho) if total_ganho else "R$ 0"}</div>'
+        f'<div class="plc-cap">{len(ganhos)} item(ns) na etapa final · "{esc(etapa_final)}"</div>'
+        f'</div></div><div class="plc-list">{linhas}</div></div>', unsafe_allow_html=True)
 
     # ---- formulário de inserção manual ----
     with st.expander("➕ Registrar nova verba", expanded=False):
@@ -1190,9 +1248,7 @@ def render_prospeccao():
             if res["sucesso"]:
                 st.rerun()
 
-    # ---- funil por etapa (reusa o kanban do funil de deputados) ----
-    df_p = dados.carregar_prospeccao()
-    itens = df_p.to_dict("records") if not df_p.empty else []
+    # ---- PARTE 1 · funil por etapa (reusa o kanban do funil de deputados) ----
     _mostrar_resultado(st.session_state.pop("kanban_prosp_msg", None))
     st.markdown('<div style="font-family:var(--mono);font-size:11px;letter-spacing:1px;'
                 'text-transform:uppercase;color:var(--dim);margin:8px 0 10px">'
