@@ -72,9 +72,11 @@ from ui.estilos import (
 
 # --- Helpers de formatação/lógica pura extraídos para ui/formato.py ---
 from ui.formato import (
+    EMENDA_ETAPA_COR,
     EMENDA_FUNIL_ETAPAS,
     _TEMP_COR,
     _TEMP_EMOJI,
+    _temp_nome,
     _argumento_abordagem,
     _cap_mun,
     _cards_deputados,
@@ -1366,35 +1368,290 @@ def render_relatorio_emendas():
                "separados, nunca somados. Contato oficial da ALESP (gabinete) — não o pessoal.")
 
 
+def _dep_federal_do_row(row) -> dict:
+    """Dicionário completo de um deputado federal a partir da linha da aba.
+    Score/aderência/chance/valor/estratégia JÁ vêm curados — só normaliza tipos."""
+    def g(k):
+        return str(row.get(k, "")).strip()
+
+    def ni(k):
+        try:
+            return int(float(g(k).replace(",", ".") or 0))
+        except (TypeError, ValueError):
+            return 0
+    return {
+        "id": g("ID"), "nome": g("Deputado Federal"), "partido": g("Partido"),
+        "score": ni("Score Integrado"), "chance": ni("Chance Emenda (0-100)"),
+        "ader": ni("Aderência PFC (0-100)"), "base": g("Base Regional"),
+        "proximidade": g("Proximidade Territorial"), "gabinete_camara": g("Gabinete Câmara"),
+        "endereco_regional": g("Endereço/Escritório Regional"),
+        "dialogo": g("Diálogo"), "status": g("Status CRM"),
+        "temp_raw": g("Temperatura"), "temp": _temp_nome(g("Temperatura")),
+        "telefones": g("Telefones"), "whatsapp": g("WhatsApp"), "email": g("Email"),
+        "instagram": g("Instagram"), "emenda": g("Emenda/Ação"),
+        "valor_sugerido": g("Valor sugerido"), "estrategia": g("Estratégia PFC"),
+        "obs": g("Observações"), "fonte_camara": g("Fonte oficial Câmara"),
+        "follow_up": g("Follow-up sugerido"),
+    }
+
+
 def _deputados_federais_ordenados() -> list:
     """Os 15 deputados federais (aba 'Deputados Federais'), ordenados por score.
     Score/estratégia/valor JÁ vêm curados da planilha — nada é recalculado."""
     df = dados.carregar_deputados_federais()
     if df.empty:
         return []
-    out = []
-    for _, r in df.iterrows():
-        try:
-            score = int(float(str(r.get("Score Integrado", 0)).replace(",", ".") or 0))
-        except (TypeError, ValueError):
-            score = 0
-        out.append({
-            "nome": str(r.get("Deputado Federal", "")).strip(),
-            "partido": str(r.get("Partido", "")).strip(),
-            "score": score,
-            "base": str(r.get("Base Regional", "")).strip(),
-            "valor_sugerido": str(r.get("Valor sugerido", "")).strip(),
-            "gabinete": str(r.get("Gabinete Câmara", "")).strip(),
-        })
+    out = [_dep_federal_do_row(r) for _, r in df.iterrows()]
     out.sort(key=lambda d: d["score"], reverse=True)
     return out
 
 
+def _argumento_federal(dep: dict) -> str:
+    """Melhor gancho de abordagem do FEDERAL, do sinal mais forte ao mais fraco,
+    só com dado real (base regional, proximidade, aderência, estratégia). Sem
+    gancho territorial, é honesto — nunca inventa."""
+    base = str(dep.get("base", "")).strip()
+    prox = str(dep.get("proximidade", "")).strip()
+    ader = dep.get("ader", 0)
+    terr = slug(f"{base} {prox}")
+    # município do PFC OU a região-sede (Sorocaba/RMS) citados no território?
+    termos = _municipios_pfc_lista() + ["Sorocaba", "Região Metropolitana de Sorocaba", "RMS"]
+    tem_regiao = any(slug(t) and slug(t) in terr for t in termos)
+    if tem_regiao:
+        extra = f" Aderência {ader}/100." if ader else ""
+        return (f"Base em {base or prox} — território-sede do PFC (Sorocaba/RMS), "
+                f"encaixe territorial forte.{extra}")
+    if prox:
+        return (f"Proximidade territorial: {prox}. Vale abrir pela agenda regional do PFC.")
+    if ader >= 80:
+        return (f"Aderência ao PFC alta ({ader}/100) — perfil fortemente alinhado, "
+                f"mesmo sem base direta na nossa região.")
+    if str(dep.get("estrategia", "")).strip():
+        return f"Abordagem sugerida (curada): {dep['estrategia'].strip()[:170]}"
+    return ("Sem gancho territorial forte pelos dados atuais — abrir pela pauta de "
+            "educação científica do PFC.")
+
+
+def _resumo_federal_dados(dep: dict) -> dict:
+    """Dicionário para o PDF federal (relatorios.pdf_resumo_federal)."""
+    return {
+        "deputado": dep["nome"], "partido": dep["partido"], "base": dep["base"],
+        "score": str(dep["score"]), "aderencia": str(dep["ader"]),
+        "status_crm": dep.get("status") or "—", "argumento": _argumento_federal(dep),
+        "valor_sugerido": dep["valor_sugerido"], "estrategia": dep["estrategia"],
+        "gabinete_camara": dep["gabinete_camara"], "telefone": dep["telefones"],
+        "email": dep["email"], "fonte_camara": dep["fonte_camara"],
+        "whatsapp": dep["whatsapp"], "instagram": dep["instagram"],
+    }
+
+
+@st.dialog("Dossiê do deputado federal", width="large")
+def dlg_deputado_federal(dep: dict) -> None:
+    breadcrumb("Federal", dep["nome"])
+    st.markdown(
+        f'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+        f'<span style="font-size:20px;font-weight:700;color:var(--ink)">{esc(dep["nome"])}</span>'
+        f'<span style="font-family:var(--mono);font-size:12px;color:var(--dim)">'
+        f'{esc(dep["partido"])} · Câmara · {esc(dep["base"]) or "base —"}</span></div>'
+        f'<div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:8px">'
+        f'score <b style="color:{_cor_score(dep["score"])}">{dep["score"]}</b> · '
+        f'aderência {dep["ader"]}/100 · chance de emenda {dep["chance"]}%</div>',
+        unsafe_allow_html=True)
+
+    # PDF resumo (federal) — reusa o ReportLab dos relatórios.
+    try:
+        _pdf = relatorios.pdf_resumo_federal(_resumo_federal_dados(dep),
+                                             datetime.date.today().strftime("%d/%m/%Y"))
+        st.download_button("Resumo para reunião (PDF)", data=_pdf,
+                           file_name=f"resumo-federal-{slug(dep['nome'])}.pdf",
+                           mime="application/pdf", use_container_width=True,
+                           key=f"pdf_fed_{slug(dep['nome'])}",
+                           help="Página limpa com tudo do deputado federal, para levar à reunião.")
+    except Exception as e:  # PDF nunca derruba o dossiê
+        st.caption(f"Não consegui gerar o PDF agora: {e}")
+
+    # Melhor gancho de abordagem.
+    st.markdown(
+        '<div style="background:linear-gradient(135deg,rgba(139,123,240,.16),rgba(139,123,240,.03));'
+        'border:1px solid rgba(139,123,240,.34);border-left:3px solid #8B7BF0;border-radius:12px;'
+        'padding:14px 16px;margin:18px 0 4px">'
+        '<div style="font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;'
+        'color:#b7abff;margin-bottom:7px">Melhor gancho de abordagem</div>'
+        f'<div style="font-size:15.5px;line-height:1.5;color:var(--ink);font-weight:500">'
+        f'{esc(_argumento_federal(dep))}</div></div>', unsafe_allow_html=True)
+
+    # Valor SUGERIDO (faixa/potencial) — nunca pago/autorizado.
+    st.markdown(
+        '<div class="dd-box aut" style="margin-top:14px"><div class="k">Valor sugerido · potencial</div>'
+        f'<div class="v" style="color:#b7abff">{esc(dep["valor_sugerido"]) or "—"}</div>'
+        '<div class="n">faixa de potencial de emenda (mín–máx), curada à mão — não é execução</div></div>',
+        unsafe_allow_html=True)
+
+    # Estratégia + emenda/ação + gabinete.
+    linhas = [("Estratégia PFC", esc(dep["estrategia"]) or "—"),
+              ("Emenda / ação sugerida", esc(dep["emenda"]) or "—"),
+              ("Gabinete / sala · Câmara", esc(dep["gabinete_camara"]) or "—"),
+              ("Base regional", esc(dep["base"]) or "—")]
+    st.markdown("".join(
+        f'<div style="margin-top:16px"><div style="font-family:var(--mono);font-size:11px;'
+        f'letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">{lab}</div>'
+        f'<div style="font-size:14px;color:var(--ink);line-height:1.6">{val}</div></div>'
+        for lab, val in linhas), unsafe_allow_html=True)
+
+    # Diálogo (sensível) — só logado.
+    st.markdown('<div style="font-family:var(--mono);font-size:11px;letter-spacing:1px;'
+                'text-transform:uppercase;color:var(--dim);margin:18px 0 8px">'
+                'Diálogo · andamento da negociação</div>', unsafe_allow_html=True)
+    if st.session_state.get("user"):
+        dlg = dep["dialogo"] or "Sem anotações de diálogo ainda."
+        st.markdown(f'<div style="background:var(--surface2);border:1px solid var(--line);'
+                    f'border-left:3px solid #8B7BF0;border-radius:0 10px 10px 0;padding:14px 16px;'
+                    f'font-size:14px;line-height:1.6;color:var(--muted);font-style:italic">'
+                    f'{esc(dlg)}</div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div style="font-size:13px;color:var(--dim)">🔒 Conteúdo restrito.</div>',
+                    unsafe_allow_html=True)
+
+    # Contato oficial · Câmara (público). WhatsApp/Instagram com ressalva "a validar".
+    st.markdown('<div style="margin-top:18px;font-family:var(--mono);font-size:11px;'
+                'letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:7px">'
+                'Contato oficial · Câmara</div>', unsafe_allow_html=True)
+
+    def _cf(rot, val, link=None, ressalva=False):
+        if not str(val).strip():
+            v = '<span style="color:var(--dim)">—</span>'
+        elif link:
+            v = f'<a href="{esc(link)}" target="_blank" style="color:#b7abff">{esc(val)}</a>'
+        else:
+            v = esc(val)
+        if ressalva:
+            v += ' <span style="color:var(--sem-mid);font-size:11px">(a validar)</span>'
+        return (f'<div style="display:flex;gap:8px;font-size:13px;margin-bottom:5px">'
+                f'<span style="font-family:var(--mono);font-size:10px;letter-spacing:.5px;'
+                f'text-transform:uppercase;color:var(--dim);min-width:88px;padding-top:2px">{rot}</span>'
+                f'<span style="color:var(--ink)">{v}</span></div>')
+    email = dep["email"]
+    _wa = dep["whatsapp"]
+    _ig = dep["instagram"]
+    _val = lambda x: str(x).strip().lower() in ("a validar", "avalidar", "validar")
+    st.markdown(
+        '<div style="background:var(--surface2);border:1px solid var(--line);'
+        'border-left:3px solid #8B7BF0;border-radius:0 10px 10px 0;padding:12px 15px">'
+        + _cf("Gabinete/sala", dep["gabinete_camara"])
+        + _cf("Telefone", dep["telefones"])
+        + _cf("Email", email, link=(f"mailto:{email}" if email else None))
+        + _cf("Página", "abrir no site da Câmara" if dep["fonte_camara"] else "", link=dep["fonte_camara"])
+        + (_cf("WhatsApp", _wa, ressalva=_val(_wa)) if _wa else "")
+        + (_cf("Instagram", _ig, ressalva=_val(_ig)) if _ig else "")
+        + '</div>'
+        '<div style="font-size:11px;color:var(--dim);margin-top:6px">Contato público de gabinete '
+        '(Câmara). WhatsApp/Instagram marcados <b>a validar</b> não são confirmados.</div>',
+        unsafe_allow_html=True)
+
+    # ---- EDIÇÃO do CRM (sensível) — grava por ID na aba Deputados Federais ----
+    if st.session_state.get("user"):
+        etapa_atual = _etapa_de_status(dep["status"])
+        idx_status = (EMENDA_FUNIL_ETAPAS.index(etapa_atual)
+                      if etapa_atual in EMENDA_FUNIL_ETAPAS else 0)
+        idx_temp = _TEMP_ORDEM.index(dep["temp"]) if dep["temp"] in _TEMP_ORDEM else 0
+        k = slug(dep["nome"])
+        st.markdown('<div style="margin-top:22px;padding-top:18px;border-top:1px solid var(--line);'
+                    'font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;'
+                    'color:#8B7BF0">✎ Atualizar relacionamento</div>', unsafe_allow_html=True)
+        ce1, ce2 = st.columns(2)
+        novo_status = ce1.selectbox("Status · etapa do funil", EMENDA_FUNIL_ETAPAS,
+                                    index=idx_status, key=f"edf_status_{k}")
+        nova_temp = ce2.selectbox("Temperatura", _TEMP_ORDEM, index=idx_temp, key=f"edf_temp_{k}")
+        novo_dialogo = st.text_area("Diálogo · anotações de negociação", value=dep["dialogo"],
+                                    height=120, key=f"edf_dialogo_{k}")
+        nova_obs = st.text_area("Registro de reunião / próximos passos", value=dep["obs"],
+                                height=80, key=f"edf_obs_{k}")
+        if st.button("Salvar alterações", type="primary", use_container_width=True,
+                     key=f"edf_salvar_{k}"):
+            campos = {}
+            if novo_status != etapa_atual:
+                campos["Status CRM"] = novo_status
+            if nova_temp != dep["temp"]:
+                campos["Temperatura"] = f"{_TEMP_EMOJI[nova_temp]} {nova_temp}"
+            if novo_dialogo.strip() != dep["dialogo"]:
+                campos["Diálogo"] = novo_dialogo.strip()
+            if nova_obs.strip() != dep["obs"]:
+                campos["Observações"] = nova_obs.strip()
+            if not campos:
+                st.info("Nenhuma alteração para salvar.")
+            else:
+                res = dados.atualizar_deputado_federal(dep["id"], campos)
+                if res.get("sucesso"):
+                    st.success(f"✓ {res['mensagem']} Os demais campos foram preservados.")
+                    st.toast("Deputado federal atualizado no Google Sheets.")
+                    st.caption("Feche o dossiê para ver a lista e o funil já atualizados.")
+                else:
+                    st.warning(res.get("mensagem", "Não foi possível gravar."))
+        st.caption("🔒 Edição restrita à equipe logada · grava na aba Deputados Federais. "
+                   "Score/estratégia/contato oficial não se editam aqui.")
+    else:
+        st.caption("ℹ️ A edição do relacionamento é restrita à equipe logada.")
+
+
+def _funil_federal_colunas(deps: list) -> list:
+    """Colunas do kanban dos federais. card.id = ID; card.cor = cor da etapa
+    (o kanban esconde 'SCORE' quando há cor). Status vem de 'Status CRM'."""
+    colunas = []
+    for etapa in EMENDA_FUNIL_ETAPAS:
+        cards = [{"id": d["id"], "status": etapa, "nome": d["nome"],
+                  "setor": d.get("partido") or "—",
+                  "valor": f'{_TEMP_EMOJI.get(d.get("temp", ""), "")} {d.get("valor_sugerido", "")}'.strip(),
+                  "cor": EMENDA_ETAPA_COR[etapa]}
+                 for d in deps if _etapa_de_status(d.get("status", "")) == etapa]
+        colunas.append({"status": etapa, "cor": EMENDA_ETAPA_COR[etapa], "cards": cards})
+    return colunas
+
+
+def _render_funil_federal(deps: list) -> None:
+    """Funil de negociação dos federais — MESMO kanban do funil de deputados.
+    Arrastar grava a etapa na coluna 'Status CRM' da aba Deputados Federais."""
+    colunas = _funil_federal_colunas(deps)
+    st.markdown('<div style="font-family:var(--mono);font-size:11px;letter-spacing:1px;'
+                'text-transform:uppercase;color:var(--dim);margin:8px 0 10px">'
+                f'{len(deps)} deputados federais · arraste um card para mudar a etapa</div>',
+                unsafe_allow_html=True)
+    if not KANBAN_DND_OK or not modo_conectado:
+        cols_html = ""
+        for c in colunas:
+            cards = "".join(
+                f'<div class="kcard"><div class="kn">{esc(cd["nome"])}</div>'
+                f'<div class="ks">{esc(cd["setor"])} · {esc(cd["valor"])}</div></div>'
+                for cd in c["cards"][:12]) or '<div class="kmore">vazio</div>'
+            cols_html += (f'<div class="kcol"><div class="kcol-h"><span>'
+                          f'<span class="accent" style="background:{c["cor"]}"></span>{esc(c["status"])}</span>'
+                          f'<span class="ct">{len(c["cards"])}</span></div>'
+                          f'<div class="kbody">{cards}</div></div>')
+        st.markdown(f'<div class="kan">{cols_html}</div>', unsafe_allow_html=True)
+        st.caption("Arrastar-e-soltar disponível só com o Google Sheets conectado.")
+        return
+    resultado = _kanban_component(colunas=colunas, editable=True, clicavel=False,
+                                  key="kanban_federal", default=None)
+    if isinstance(resultado, dict):
+        nonce = resultado.get("nonce")
+        if nonce and nonce != st.session_state.get("kanban_federal_nonce"):
+            st.session_state["kanban_federal_nonce"] = nonce
+            id_ = str(resultado.get("org_id", "")).strip()   # id do card = ID do federal
+            novo = str(resultado.get("novo_status", "")).strip()
+            if id_ and novo in EMENDA_FUNIL_ETAPAS:
+                res = dados.atualizar_deputado_federal(id_, {"Status CRM": novo})
+                st.session_state["kanban_federal_msg"] = res
+                st.toast(res.get("mensagem", ""))
+            else:
+                st.session_state["kanban_federal_msg"] = {
+                    "sucesso": False, "mensagem": "Movimento inválido (etapa fora do funil)."}
+            st.rerun()
+
+
 def render_federal() -> None:
-    """Escopo FEDERAL: lista os deputados federais de SP (aba 'Deputados
-    Federais'), no mesmo estilo dos cards do Estadual, ordenados por score.
-    Ainda SEM dossiê — só a listagem (cards estáticos, sem clique morto)."""
-    st.markdown(_DESCOBRIR_CSS, unsafe_allow_html=True)  # reusa o estilo dos cards
+    """Escopo FEDERAL: listagem (cards clicáveis → dossiê) + funil de negociação,
+    lendo da aba 'Deputados Federais'. Mesmo estilo visual do Estadual."""
+    st.markdown(_DESCOBRIR_CSS, unsafe_allow_html=True)
+    _mostrar_resultado(st.session_state.pop("kanban_federal_msg", None))
     primeiro = USER["nome"].split()[0]
     hora = datetime.datetime.now().hour
     saud = "Bom dia" if hora < 12 else "Boa tarde" if hora < 18 else "Boa noite"
@@ -1408,28 +1665,39 @@ def render_federal() -> None:
     if not deps:
         st.info("Aba 'Deputados Federais' vazia ou indisponível no Google Sheets.")
         return
+
+    vista = st.radio("Ver como", ["Lista", "Funil de negociação"], horizontal=True,
+                     key="federal_vista", label_visibility="collapsed")
+    if vista == "Funil de negociação":
+        _render_funil_federal(deps)
+        return
+
     st.markdown(
         f'<div class="dd-intro">{len(deps)} deputados federais de SP, curados à mão. '
         'Score, estratégia e valor <b>vêm da planilha</b> — não são recalculados. '
-        'Os valores são <b>faixas sugeridas</b> (potencial de emenda), não execução '
-        'histórica. Ordenados por score.</div>'
+        'Os valores são <b>faixas sugeridas</b> (potencial), não execução. '
+        'Clique num card para o dossiê. Ordenados por score.</div>'
         '<div class="dd-legend">'
         '<span><span class="sw" style="background:var(--sem-high)"></span>score 60+ · forte</span>'
         '<span><span class="sw" style="background:var(--sem-mid)"></span>50–59 · médio</span>'
         '<span><span class="sw" style="background:var(--sem-low)"></span>&lt;50 · fraco</span>'
         '</div>', unsafe_allow_html=True)
-    for d in deps:
-        st.markdown(
+    for i, d in enumerate(deps):
+        c_info, _c = st.columns([9, 0.3])
+        c_info.markdown(
             '<div class="dd-cell">'
             f'<div class="dd-nomecol"><div class="dd-top"><span class="dd-nome">{esc(d["nome"])}</span></div>'
             f'<div class="dd-sub">{esc(d["partido"])} · {esc(d["base"])}</div></div>'
             f'<div class="dd-scorecol"><div class="dd-score" style="color:{_cor_score(d["score"])}">'
             f'{d["score"]}</div><div class="dd-sub">score</div></div>'
             f'<div class="dd-valcol"><div class="dd-val">sugerido <b>{esc(d["valor_sugerido"]) or "—"}</b></div>'
-            f'<div class="dd-sub">{esc(d["gabinete"])}</div></div>'
+            f'<div class="dd-sub">{esc(d["gabinete_camara"])}</div></div>'
             '</div>', unsafe_allow_html=True)
-    st.caption("Valor sugerido = faixa de potencial de emenda (mín–máx), curada na "
-               "planilha do Fábio. Dossiê detalhado por deputado vem em seguida.")
+        if c_info.button(f"Abrir dossiê de {d['nome']}", key=f"dd_fed_{i}",
+                         use_container_width=True):
+            dlg_deputado_federal(dict(d))
+    st.caption("Valor sugerido = faixa de potencial de emenda (mín–máx), curada à mão. "
+               "Clique num card para o dossiê completo (gancho, contato, CRM e PDF).")
 
 
 def render_emendas():
