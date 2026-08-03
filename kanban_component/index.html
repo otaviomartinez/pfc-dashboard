@@ -84,11 +84,15 @@
   }
 
   function cardHTML(c) {
-    var meta = esc(String(c.setor || "—").toUpperCase()) + " · SCORE " + esc(c.score);
+    // Card com "cor" própria (prospecção): listra pela cor da etapa, sem "SCORE".
+    // Sem "cor" (deputados / Captação): comportamento original, listra por score.
+    var meta = esc(String(c.setor || "—").toUpperCase());
+    if (!c.cor) { meta += " · SCORE " + esc(c.score); }
     if (c.valor && c.valor !== "—") { meta += " · " + esc(c.valor); }
+    var cor = c.cor ? c.cor : corScore(c.score);
     var extra = clicavel ? ' class="kcard clicavel" title="Clique para anotar · arraste para mover de etapa"' : ' class="kcard"';
     return '<div' + extra + ' draggable="true" data-id="' + esc(c.id) + '" data-status="' + esc(c.status) + '"' +
-      ' style="--c:' + corScore(c.score) + '">' +
+      ' style="--c:' + cor + '">' +
       '<div class="kn">' + esc(c.nome) + '</div>' +
       '<div class="km">' + meta + '</div></div>';
   }

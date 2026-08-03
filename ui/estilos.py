@@ -663,6 +663,8 @@ export default function(component){
     '<span>Captação Privada</span></div>' +
     '<div class="hub-ritem" data-radar="emendas"><svg viewBox="0 0 24 24"><path d="M6 3h12l3 6-9 12L3 9z"/></svg>' +
     '<span>Emendas</span></div>' +
+    '<div class="hub-ritem" data-radar="prospeccao"><svg viewBox="0 0 24 24"><path d="M3 4h18l-7 8v6l-4 2v-8z"/></svg>' +
+    '<span>Prospecção</span></div>' +
     '<div class="hub-rfoot"><div class="hub-rstat"><span class="d"></span>' + esc(d.status || '') + '</div></div></aside>' +
     '<div class="hub-stage"><div class="hub-title"><div class="eye">Central de Captação</div>' +
     '<h1>Escolha seu radar</h1></div><div class="hub-arena">' +

@@ -50,6 +50,11 @@ ABA_DEPUTADOS = "Deputados"
 # Só e-mail + data + flag Ativo — nada sensível. O radar lê daqui para enviar.
 ABA_INSCRITOS = "Inscritos Alerta"
 HEADERS_INSCRITOS = ["Email", "Data inscrição", "Ativo"]
+# Aba de PROSPECÇÃO: verbas que o PFC busca (emenda/prêmio/patrocínio/outro),
+# registradas à mão pela equipe. Escrita pela porta única (append RAW + status).
+ABA_PROSPECCAO = "Prospecção"
+HEADERS_PROSPECCAO = ["ID", "Nome", "Tipo", "Valor", "Financiador", "Previsão",
+                      "Status", "Observações", "Registrado em"]
 # Cabeçalho EXATO da aba de novidades.
 HEADERS_NOVIDADES = [
     "Data", "Fonte", "Título", "Descrição", "Score Aderência",
@@ -192,6 +197,10 @@ def limpar_caches() -> None:
         pass
     try:
         carregar_novidades_pendentes.clear()
+    except Exception:
+        pass
+    try:
+        carregar_prospeccao.clear()
     except Exception:
         pass
     try:
@@ -517,6 +526,110 @@ def atualizar_status_deputado(nome: str, novo_status: str) -> dict:
         ws.update_cell(linha, col_status, novo_status)  # só a célula de Status
         carregar_deputados.clear()
         return {"sucesso": True, "mensagem": f"{nome}: etapa → {novo_status}."}
+    except Exception as e:  # noqa: BLE001
+        return {"sucesso": False, "mensagem": f"Erro ao gravar no Google Sheets: {e}"}
+
+
+def criar_aba_prospeccao() -> bool:
+    """Garante a aba 'Prospecção' com o cabeçalho padrão. True se criada agora."""
+    sh = _conectar()
+    if sh is None:
+        return False
+    try:
+        if ABA_PROSPECCAO in [w.title for w in sh.worksheets()]:
+            return False
+        ws = sh.add_worksheet(title=ABA_PROSPECCAO, rows=500, cols=len(HEADERS_PROSPECCAO))
+        ws.append_row(HEADERS_PROSPECCAO)
+        return True
+    except Exception:
+        return False
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def carregar_prospeccao() -> pd.DataFrame:
+    """Itens de prospecção (aba 'Prospecção'). Vazio se não existir/sem conexão."""
+    sh = _conectar()
+    if sh is None:
+        return pd.DataFrame()
+    try:
+        if ABA_PROSPECCAO not in [w.title for w in sh.worksheets()]:
+            return pd.DataFrame()
+        registros = sh.worksheet(ABA_PROSPECCAO).get_all_records()
+        return pd.DataFrame(registros).astype(str).replace({"None": "", "nan": ""}) if registros \
+            else pd.DataFrame(columns=HEADERS_PROSPECCAO)
+    except Exception:
+        return pd.DataFrame()
+
+
+def prospeccao_conectado() -> bool:
+    """True se dá para ler/gravar a aba Prospecção no Sheets (não modo CSV)."""
+    return _conectar() is not None
+
+
+def adicionar_prospeccao(novo: dict) -> dict:
+    """Acrescenta UM item à aba 'Prospecção'. {'sucesso','mensagem'}.
+
+    Append-only + RAW (guarda tudo como texto; um valor com '=' não vira
+    fórmula). Gera um ID sequencial próprio (a chave do card no funil). Escreve
+    POR NOME de coluna, então coluna nova na aba flui sozinha. Só grava conectado
+    ao Sheets; no modo CSV a escrita fica bloqueada.
+    """
+    nome = str(novo.get("Nome", "")).strip()
+    if not nome:
+        return {"sucesso": False, "mensagem": "Dê um nome/origem ao item."}
+    sh = _conectar()
+    if sh is None:
+        return {"sucesso": False, "mensagem": "Sem conexão com o Google Sheets — o item "
+                "não foi gravado (modo local)."}
+    try:
+        criar_aba_prospeccao()  # idempotente
+        ws = sh.worksheet(ABA_PROSPECCAO)
+        cabecalho = ws.row_values(1) or HEADERS_PROSPECCAO
+        if not ws.row_values(1):
+            ws.append_row(HEADERS_PROSPECCAO)
+            cabecalho = HEADERS_PROSPECCAO
+        # próximo ID numérico (a coluna ID é a chave do card no drag-and-drop)
+        ids = [int(x) for x in ws.col_values(cabecalho.index("ID") + 1)[1:]
+               if str(x).strip().isdigit()] if "ID" in cabecalho else []
+        novo = {**novo, "ID": (max(ids) + 1) if ids else 1,
+                "Registrado em": pd.Timestamp.now().strftime("%d/%m/%Y %H:%M")}
+        linha = [str(novo.get(col, "")) for col in cabecalho]
+        ws.append_row(linha, value_input_option="RAW")
+        carregar_prospeccao.clear()
+        return {"sucesso": True, "mensagem": f"'{nome}' adicionado à prospecção."}
+    except Exception as e:  # noqa: BLE001
+        return {"sucesso": False, "mensagem": f"Erro ao gravar na aba Prospecção: {e}"}
+
+
+def atualizar_status_prospeccao(id_item, novo_status: str) -> dict:
+    """Grava SÓ a célula de Status do item (casa por ID) na aba Prospecção.
+
+    Usado pelo drag-and-drop do funil de Prospecção. Escreve UMA célula — nome,
+    valor, observações e os demais campos ficam intactos (mesmo espírito de
+    atualizar_status_deputado). Não cria linha. Retorna {sucesso, mensagem}.
+    """
+    id_item = str(id_item or "").strip()
+    novo_status = str(novo_status or "").strip()
+    if not id_item or not novo_status:
+        return {"sucesso": False, "mensagem": "Item ou etapa em branco."}
+    sh = _conectar()
+    if sh is None:
+        return {"sucesso": False, "mensagem": "Sem conexão com o Google Sheets — a etapa "
+                "não foi gravada (modo local)."}
+    try:
+        ws = sh.worksheet(ABA_PROSPECCAO)
+        cab = [str(c).strip() for c in ws.row_values(1)]
+        if "ID" not in cab or "Status" not in cab:
+            return {"sucesso": False, "mensagem": "Aba Prospecção sem coluna ID/Status."}
+        col_id = cab.index("ID") + 1
+        ids = ws.col_values(col_id)  # ids[0] é o cabeçalho
+        linha = next((i for i, v in enumerate(ids[1:], start=2)
+                      if str(v).strip() == id_item), None)
+        if linha is None:
+            return {"sucesso": False, "mensagem": f"Item ID {id_item} não encontrado."}
+        ws.update_cell(linha, cab.index("Status") + 1, novo_status)  # só a célula de Status
+        carregar_prospeccao.clear()
+        return {"sucesso": True, "mensagem": f"Etapa → {novo_status}."}
     except Exception as e:  # noqa: BLE001
         return {"sucesso": False, "mensagem": f"Erro ao gravar no Google Sheets: {e}"}
 

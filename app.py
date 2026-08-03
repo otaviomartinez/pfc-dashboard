@@ -325,7 +325,7 @@ def render_hub():
     }
     res = _hub_component(data=payload, key="hub", on_escolha_change=lambda: None)
     esc = getattr(res, "escolha", None)
-    if isinstance(esc, dict) and esc.get("radar") in ("captacao", "emendas"):
+    if isinstance(esc, dict) and esc.get("radar") in ("captacao", "emendas", "prospeccao"):
         st.session_state["radar_escolhido"] = esc["radar"]
         st.rerun()
 
@@ -1113,6 +1113,128 @@ def render_funil_emendas() -> None:
             st.rerun()  # sucesso confirma a coluna; falha faz o card voltar à origem
 
 
+# =========================================================================== #
+# PROSPECÇÃO · funil de captação manual (emenda / prêmio / patrocínio / outro)
+# --------------------------------------------------------------------------- #
+# >>> ETAPAS DO FUNIL — LUGAR FÁCIL DE EDITAR. O Fábio pode renomear à vontade;
+# "Aprovada" e "Assinada" ele confirmou, "Indicada"/"Paga" são reconstrução do
+# ciclo. Mude os nomes aqui (e as cores, se quiser) — o funil e o formulário
+# seguem sozinhos. As chaves de PROSPECCAO_ETAPA_COR têm de bater com a lista.
+PROSPECCAO_ETAPAS = ["Indicada", "Aprovada", "Assinada", "Paga"]
+PROSPECCAO_ETAPA_COR = {"Indicada": "#7C8698", "Aprovada": "#5B9BD5",
+                        "Assinada": "#E8B54A", "Paga": "#4ADE80"}
+PROSPECCAO_TIPOS = ["Emenda", "Prêmio", "Patrocínio", "Outro"]
+
+
+def _prospeccao_etapa_de(status: str) -> str:
+    """Enquadra o Status numa etapa canônica (fora da lista cai na primeira)."""
+    s = str(status or "").strip()
+    return s if s in PROSPECCAO_ETAPAS else PROSPECCAO_ETAPAS[0]
+
+
+def _funil_prospeccao_colunas(itens: list) -> list:
+    """Colunas do kanban a partir dos itens. card.id = ID (chave da aba);
+    card.cor = cor da etapa (o kanban esconde 'SCORE' quando o card traz cor)."""
+    colunas = []
+    for etapa in PROSPECCAO_ETAPAS:
+        cards = []
+        for it in itens:
+            if _prospeccao_etapa_de(it.get("Status", "")) != etapa:
+                continue
+            resumo = " · ".join(x for x in (str(it.get("Valor", "")).strip(),
+                                            str(it.get("Previsão", "")).strip()) if x)
+            cards.append({"id": str(it.get("ID", "")).strip(), "status": etapa,
+                          "nome": str(it.get("Nome", "")).strip() or "(sem nome)",
+                          "setor": str(it.get("Tipo", "")).strip() or "—",
+                          "valor": resumo or "—", "cor": PROSPECCAO_ETAPA_COR[etapa]})
+        colunas.append({"status": etapa, "cor": PROSPECCAO_ETAPA_COR[etapa], "cards": cards})
+    return colunas
+
+
+def render_prospeccao():
+    """Painel próprio de Prospecção: formulário de registro + funil por etapa
+    (MESMO kanban drag-and-drop do funil de deputados). Arrastar grava só o
+    Status na aba Prospecção, sem tocar nos outros campos."""
+    top = st.columns([4, 1])
+    top[0].markdown(
+        '<div class="phead"><h1 style="color:var(--ink)">Prospecção</h1>'
+        '<p>Toda verba que o PFC está buscando — emendas, prêmios, patrocínios — '
+        'registrada à mão e acompanhada por etapa.</p></div>', unsafe_allow_html=True)
+    if top[1].button("← Central", use_container_width=True, key="prosp_voltar"):
+        st.session_state["radar_escolhido"] = None
+        st.rerun()
+    if not modo_conectado:
+        st.caption(HINT_ESCRITA + " — registrar e arrastar gravam na aba Prospecção.")
+
+    # ---- formulário de inserção manual ----
+    with st.expander("➕ Registrar nova verba", expanded=False):
+        with st.form("form_prospeccao", clear_on_submit=True):
+            c1, c2 = st.columns([2, 1])
+            nome = c1.text_input("Nome / origem", placeholder="Emenda Vitor Lippi · Prêmio X…")
+            tipo = c2.selectbox("Tipo", PROSPECCAO_TIPOS)
+            c3, c4 = st.columns(2)
+            valor = c3.text_input("Valor", placeholder="R$ 50 mil")
+            financiador = c4.text_input("Deputado / financiador", placeholder="quando aplicável")
+            c5, c6 = st.columns(2)
+            previsao = c5.text_input("Previsão / data esperada",
+                                     placeholder="setembro · após a eleição · pode deixar vazio")
+            status = c6.selectbox("Status", PROSPECCAO_ETAPAS)
+            obs = st.text_area("Observações", height=70)
+            enviar = st.form_submit_button("Adicionar à prospecção", type="primary",
+                                           use_container_width=True, disabled=not modo_conectado)
+        if enviar:
+            res = dados.adicionar_prospeccao({
+                "Nome": nome, "Tipo": tipo, "Valor": valor, "Financiador": financiador,
+                "Previsão": previsao, "Status": status, "Observações": obs})
+            (st.success if res["sucesso"] else st.error)(res["mensagem"])
+            if res["sucesso"]:
+                st.rerun()
+
+    # ---- funil por etapa (reusa o kanban do funil de deputados) ----
+    df_p = dados.carregar_prospeccao()
+    itens = df_p.to_dict("records") if not df_p.empty else []
+    _mostrar_resultado(st.session_state.pop("kanban_prosp_msg", None))
+    st.markdown('<div style="font-family:var(--mono);font-size:11px;letter-spacing:1px;'
+                'text-transform:uppercase;color:var(--dim);margin:8px 0 10px">'
+                f'{len(itens)} verba(s) em prospecção · arraste um card para mudar a etapa</div>',
+                unsafe_allow_html=True)
+    colunas = _funil_prospeccao_colunas(itens)
+
+    if not KANBAN_DND_OK or not modo_conectado:
+        cols_html = ""
+        for c in colunas:
+            cards = "".join(
+                f'<div class="kcard"><div class="kn">{esc(cd["nome"])}</div>'
+                f'<div class="ks">{esc(cd["setor"])} · {esc(cd["valor"])}</div></div>'
+                for cd in c["cards"][:12]) or '<div class="kmore">vazio</div>'
+            cols_html += (f'<div class="kcol"><div class="kcol-h"><span>'
+                          f'<span class="accent" style="background:{c["cor"]}"></span>{esc(c["status"])}</span>'
+                          f'<span class="ct">{len(c["cards"])}</span></div>'
+                          f'<div class="kbody">{cards}</div></div>')
+        st.markdown(f'<div class="kan">{cols_html}</div>', unsafe_allow_html=True)
+        st.caption("Arrastar-e-soltar disponível só com o Google Sheets conectado (a etapa "
+                   "grava na aba Prospecção)." if not modo_conectado
+                   else "Arrastar-e-soltar indisponível neste ambiente.")
+        return
+
+    resultado = _kanban_component(colunas=colunas, editable=True, clicavel=False,
+                                  key="kanban_prosp", default=None)
+    if isinstance(resultado, dict):
+        nonce = resultado.get("nonce")
+        if nonce and nonce != st.session_state.get("kanban_prosp_nonce"):
+            st.session_state["kanban_prosp_nonce"] = nonce
+            id_ = str(resultado.get("org_id", "")).strip()   # id do card = ID do item
+            novo = str(resultado.get("novo_status", "")).strip()
+            if id_ and novo in PROSPECCAO_ETAPAS:
+                res = dados.atualizar_status_prospeccao(id_, novo)
+                st.session_state["kanban_prosp_msg"] = res
+                st.toast(res.get("mensagem", ""))
+            else:
+                st.session_state["kanban_prosp_msg"] = {
+                    "sucesso": False, "mensagem": "Movimento inválido (etapa fora do funil)."}
+            st.rerun()  # sucesso confirma a coluna; falha faz o card voltar à origem
+
+
 # --------------------------------------------------------------------------- #
 # RELATÓRIO DE PRIORIDADES · EMENDAS (tela + PDF)
 # ---------------------------------------------------------------------------
@@ -1384,6 +1506,9 @@ if st.session_state["radar_escolhido"] is None:
     st.stop()
 if st.session_state["radar_escolhido"] == "emendas":
     render_emendas()
+    st.stop()
+if st.session_state["radar_escolhido"] == "prospeccao":
+    render_prospeccao()
     st.stop()
 
 
