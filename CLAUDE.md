@@ -89,6 +89,30 @@ preenchidos por código (marca "não encontrado" quem não é titular). Os campo
 `Email`, `Telefones`, `WhatsApp`, `Instagram` são do Fábio (pessoal/assessor,
 sensível) — o código **nunca** escreve por cima deles.
 
+**3. Painel Federal (escopo Federal, embaixo de Estadual na sidebar de Emendas).**
+Os **15 deputados federais de SP**, curados à mão pelo Fábio. Importados **UMA
+VEZ** de `DEPUTADOS_FEDERAIS.xlsx` (aba `MASTER_FEDERAL_PFC_SP`, 29 colunas) para
+a aba `Deputados Federais` do Sheets — o app **NÃO lê o xlsx em runtime**, lê a
+aba ao vivo pela porta única (`dados.carregar_deputados_federais`). Escopo
+Estadual/Federal são **botões** na sidebar (`ir_para_escopo`); `render_emendas`
+roteia para `render_federal` quando o escopo é Federal.
+- **Diferenças do Estadual (NÃO confundir):** score/aderência/chance/estratégia/
+  valor JÁ vêm curados — **nunca recalcular** (Vitor Lippi = 97). Os valores são
+  **faixa SUGERIDA** (mín–máx, potencial de emenda), rotulados "valor sugerido",
+  **nunca** "pago/autorizado" (aquilo é execução, do levantamento estadual).
+- **Tela `render_federal`:** alternador **Lista / Funil**. Lista = cards
+  clicáveis ordenados por score (reusa o estilo `.dd-cell` do Descobrir). Funil =
+  o MESMO kanban drag-and-drop (grava `Status CRM` por **ID**).
+- **Dossiê `dlg_deputado_federal`:** melhor gancho (`_argumento_federal`, usa base
+  regional/proximidade/aderência — territorial p/ Sorocaba-RMS e municípios PFC,
+  honesto quando não há); valor sugerido; estratégia; gabinete/sala da Câmara;
+  CRM editável (diálogo/status/temperatura/observações) que grava por ID via
+  `dados.atualizar_deputado_federal` (só as células que mudaram); contato oficial
+  da Câmara (gabinete, telefone, email, "Fonte oficial Câmara"); WhatsApp/Instagram
+  marcados **"A validar"** aparecem COM a ressalva, não confirmados; botão PDF
+  (`relatorios.pdf_resumo_federal`, com o gabinete/sala da Câmara e o valor sugerido).
+- **O que FALTA no Federal:** ver "Fila de trabalho".
+
 ## Radar de Captação — como está
 
 Pipeline em `radar/` (roda no GitHub Actions, `radar.yml`, cron 06:00 Brasília;
@@ -172,9 +196,24 @@ Só isso levaria de **7 para ~20+**. (3ª camada, mais pesada: seguir o link ao
 edital original — confirmado que funciona. Caso difícil de verdade: as ~5 notícias
 do MCTI que não trazem o prazo na página, só no sistema de chamadas.)
 
+**Painel Federal — o que falta (a Parte 1 e o dossiê JÁ estão feitos; ver seção
+"Emendas — Painel Federal").** Já pronto: importação do xlsx para a aba `Deputados
+Federais`, listagem dos 15 por score, dossiê completo (gancho, valor sugerido,
+estratégia, gabinete Câmara, CRM editável, contato Câmara, funil drag-and-drop,
+PDF). Pendências:
+1. **BUG — sidebar de Emendas não é sensível ao contexto.** No painel Federal ela
+   ainda mostra os botões de página (Visão/Descobrir/Territórios/Funil/Relatório) e
+   o rodapé "N DEPUTADOS · ALESP", que são do **Estadual**. Precisa reagir ao
+   `emenda_escopo`: no Federal, esconder/adaptar essas páginas e o rodapé (mostrar
+   contexto Câmara, não ALESP).
+2. **Enriquecer os 15 com contatos oficiais da Câmara** — a planilha já traz
+   telefone/email/gabinete/página; o que falta é **validar WhatsApp/Instagram**
+   (hoje "A validar") e completar o que estiver vazio.
+3. **Avaliar adicionar mais deputados federais** (hoje são 15 de SP curados à mão).
+
 **Depois:**
 - Notificação por **e-mail** quando faltarem 15 dias para um prazo.
-- **Deputado federal e senador** (aguardando as tabelas do Fábio).
+- **Senador** (aguardando a tabela do Fábio) — mesmo tratamento do Federal.
 
 **Futuro (conversar antes):**
 - Aba "Prefeituras": escolas (estaduais e municipais) e unidades do CRAS por cidade de SP, para plano de expansão.
