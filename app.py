@@ -1987,6 +1987,38 @@ def dlg_oportunidade(op: dict):
                 st.rerun()
 
 
+@st.dialog("Oportunidades encerrando", width="large")
+def dlg_encerrando(items: list):
+    """Lista TODAS as oportunidades que estão encerrando (prazo confiável a até 7
+    dias), da que fecha antes à que fecha depois. Cada uma com seus dados e o
+    link oficial — mostra todas de uma vez (não colapsa numa só)."""
+    breadcrumb("Visão geral", "Encerrando")
+    if not items:
+        st.info("Nenhuma oportunidade com prazo confiável nos próximos 7 dias.")
+        return
+    st.markdown(f'<div style="font-size:13px;color:var(--muted);margin-bottom:4px">'
+                f'{len(items)} edital(is) com prazo confiável em até 7 dias — '
+                f'do que fecha antes ao que fecha depois.</div>', unsafe_allow_html=True)
+    for it in items:
+        dias = it.get("dias")
+        cor = "var(--sem-urgent)" if isinstance(dias, int) and dias <= 3 else "var(--accent)"
+        dias_txt = ("vence hoje" if dias == 0 else f"faltam {dias} dias") \
+            if isinstance(dias, int) else "prazo a confirmar"
+        valor = str(it.get("valor", "")).strip()
+        st.markdown(
+            f'<div style="border:1px solid var(--line);border-left:3px solid {cor};'
+            f'border-radius:0 10px 10px 0;padding:12px 15px;margin-top:10px">'
+            f'<div style="font-size:15px;font-weight:600;color:var(--ink);line-height:1.35">'
+            f'{esc(it.get("titulo",""))}</div>'
+            f'<div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:6px">'
+            f'{esc(it.get("fonte",""))} · encerra {esc(_fmt_prazo(it.get("prazo","")))} · '
+            f'<b style="color:{cor}">{dias_txt}</b>'
+            + (f' · {esc(valor)}' if valor else "") + '</div></div>',
+            unsafe_allow_html=True)
+        if str(it.get("link", "")).startswith("http"):
+            st.link_button("↗ Abrir página oficial", it["link"], use_container_width=True)
+
+
 @st.dialog("Cobertura regional", width="large")
 def dlg_cobertura():
     breadcrumb("Visão geral", "Cobertura")
@@ -2026,7 +2058,11 @@ def page_visao():
     fila = sorted(dados.carregar_novidades_pendentes(), key=_score_novidade, reverse=True)
     ops = [_op_de_novidade(nv) for nv in fila]
     n_fontes = _n_fontes_radar()
-    encerrando = sum(1 for o in ops if isinstance(o["dias"], int) and 0 <= o["dias"] <= 7)
+    # Encerrando = prazo confiável a até 7 dias. Guarda a LISTA (não só a contagem)
+    # para o clique no "N encerrando" mostrar TODAS, não só a primeira.
+    encerrando_items = sorted((o for o in ops if isinstance(o["dias"], int)
+                               and 0 <= o["dias"] <= 7), key=lambda o: o["dias"])
+    encerrando = len(encerrando_items)
 
     top = ops[0] if ops else None
 
@@ -2100,9 +2136,9 @@ def page_visao():
             dlg_oportunidade(top)
         elif t == "prazo" and isinstance(i, int) and 0 <= i < len(prazo_items):
             dlg_oportunidade(prazo_items[i])
-        elif t == "encerrando" and prazo_items:
-            # clicar no "N encerrando" leva à oportunidade que fecha mais cedo
-            dlg_oportunidade(prazo_items[0])
+        elif t == "encerrando" and encerrando_items:
+            # clicar no "N encerrando" mostra TODAS as que estão fechando (não só uma)
+            dlg_encerrando(encerrando_items)
         elif t == "stage" and k in STATUS_FUNIL:
             dlg_status_list(k)
 
