@@ -46,6 +46,10 @@ ABA_EDITAIS = "Editais_Privados"
 # Aba do CRM de deputados (radar de Emendas). Contém o Diálogo sensível — a
 # planilha inteira deve permanecer restrita; no app o Diálogo só renderiza logado.
 ABA_DEPUTADOS = "Deputados"
+# Aba dos deputados FEDERAIS de SP (15 curados à mão na planilha do Fábio,
+# importada uma vez). Painel Federal lê daqui ao vivo, igual ao Estadual lê de
+# 'Deputados'. Score/estratégia/valor JÁ vêm curados — não se recalcula nada.
+ABA_DEPUTADOS_FEDERAIS = "Deputados Federais"
 # Aba de inscritos no alerta de editais por e-mail (cadastro pelo próprio app).
 # Só e-mail + data + flag Ativo — nada sensível. O radar lê daqui para enviar.
 ABA_INSCRITOS = "Inscritos Alerta"
@@ -204,6 +208,10 @@ def limpar_caches() -> None:
     except Exception:
         pass
     try:
+        carregar_deputados_federais.clear()
+    except Exception:
+        pass
+    try:
         carregar_deputados.clear()
     except Exception:
         pass
@@ -325,6 +333,27 @@ def deputados_conectado() -> bool:
         return bool(sh.worksheet(ABA_DEPUTADOS).get_all_records())
     except Exception:
         return False
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def carregar_deputados_federais() -> pd.DataFrame:
+    """Base dos deputados FEDERAIS (aba 'Deputados Federais' no Sheets).
+
+    Leitura POR NOME de coluna (coluna nova na aba flui sozinha). Dados JÁ
+    curados à mão — nada é recalculado aqui. Vazio se a aba não existir ou sem
+    conexão (o painel Federal mostra estado vazio, não quebra)."""
+    sh = _conectar()
+    if sh is None:
+        return pd.DataFrame()
+    try:
+        if ABA_DEPUTADOS_FEDERAIS not in [w.title for w in sh.worksheets()]:
+            return pd.DataFrame()
+        registros = sh.worksheet(ABA_DEPUTADOS_FEDERAIS).get_all_records()
+        if not registros:
+            return pd.DataFrame()
+        return pd.DataFrame(registros).astype(str).replace({"None": "", "nan": ""}).fillna("")
+    except Exception:
+        return pd.DataFrame()
 
 
 # Levantamento de emendas (tela "Descobrir"): rankings gerados por src/emendas.py.

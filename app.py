@@ -605,22 +605,33 @@ def dlg_em_articulacao(lista):
 # "Descobrir" é a tela de PLANEJAMENTO (quem abordar), separada do CRM dos 16.
 EMENDA_PAGES = ["Visão geral", "Deputados", "Descobrir", "Territórios em Aberto",
                 "Funil de negociação", "Relatório"]
-EMENDA_ESCOPO = [("Estadual", "ALESP · {n}", True), ("Federal", "em breve", False),
+# Escopo do painel: Estadual (ALESP) e Federal (Câmara) navegáveis; Senadores em
+# breve. (nome, legenda, ativo). O clicável vira botão; "em breve" fica markdown.
+EMENDA_ESCOPO = [("Estadual", "ALESP", True), ("Federal", "Câmara", True),
                  ("Senadores", "em breve", False)]
+EMENDA_ESCOPOS_ATIVOS = ["Estadual", "Federal"]
 # chave do botão -> ícone (a chave vira a classe st-key-<chave> que o CSS usa)
 EMENDA_ICONES = {"emnav_visao-geral": "visao-geral", "emnav_deputados": "deputados",
                  "emnav_descobrir": "descobrir",
                  "emnav_territorios-em-aberto": "local",
                  "emnav_funil-de-negociacao": "funil-negociacao",
                  "emnav_relatorio": "relatorio",
+                 "emesc_estadual": "local", "emesc_federal": "deputados",
                  "emenda_trocar": "trocar-radar", "emenda_logout": "sair"}
 # chave do botão -> nome no tooltip do modo ícone
 EMENDA_ROTULOS = {**{f"emnav_{slug(p)}": p for p in EMENDA_PAGES},
+                  "emesc_estadual": "Estadual · ALESP", "emesc_federal": "Federal · Câmara",
                   "emenda_trocar": "Trocar radar", "emenda_logout": "Sair"}
 
 
 def ir_para_emenda(pagina: str):
     st.session_state["emenda_page"] = pagina
+    # As páginas de Articulação são do Estadual; clicar numa delas volta ao Estadual.
+    st.session_state["emenda_escopo"] = "Estadual"
+
+
+def ir_para_escopo(escopo: str):
+    st.session_state["emenda_escopo"] = escopo
 
 
 def render_sidebar_emendas():
@@ -643,17 +654,21 @@ def render_sidebar_emendas():
             st.button(rotulo, key=f"emnav_{slug(p)}", use_container_width=True,
                       type="primary" if atual == p else "secondary",
                       on_click=ir_para_emenda, args=(p,))
-        # Escopo — Estadual ativo; Federal/Senadores em breve. Markdown (não
-        # botões) porque não são navegáveis: só Estadual existe.
+        # Escopo — Estadual (ALESP) e Federal (Câmara) navegáveis; Senadores em
+        # breve (markdown). O botão do escopo ativo fica em destaque (primary).
+        escopo_atual = st.session_state.get("emenda_escopo", "Estadual")
         st.markdown('<div class="sb-sec">Escopo</div>', unsafe_allow_html=True)
-        escopo_html = ""
         for nome, legenda, ativo in EMENDA_ESCOPO:
-            cls, ic = ("esc-on", "local") if ativo else ("esc-off", "bloqueado")
-            # nome em <span> (e não texto solto) para o modo ícone conseguir escondê-lo
-            escopo_html += (f'<div class="esc-item {cls}" title="{esc(nome)}">{svg_icone(ic)}'
-                            f'<span class="esc-nome">{esc(nome)}</span>'
-                            f'<span class="esc-leg">{esc(legenda.format(n=n_deps))}</span></div>')
-        st.markdown(escopo_html, unsafe_allow_html=True)
+            if ativo:
+                st.button(f"{nome} · {legenda}", key=f"emesc_{slug(nome)}",
+                          use_container_width=True,
+                          type="primary" if escopo_atual == nome else "secondary",
+                          on_click=ir_para_escopo, args=(nome,))
+            else:
+                st.markdown(f'<div class="esc-item esc-off" title="{esc(nome)}">'
+                            f'{svg_icone("bloqueado")}<span class="esc-nome">{esc(nome)}</span>'
+                            f'<span class="esc-leg">{esc(legenda)}</span></div>',
+                            unsafe_allow_html=True)
         # Status de conexão = cor de saúde (verde vivo / vermelho caiu), igual ao
         # Captação. A contagem de deputados desce para a 2ª linha (ponto neutro).
         conn = ('<div class="sf"><span class="d g"></span>SHEETS CONECTADO</div>'
@@ -1351,15 +1366,89 @@ def render_relatorio_emendas():
                "separados, nunca somados. Contato oficial da ALESP (gabinete) — não o pessoal.")
 
 
+def _deputados_federais_ordenados() -> list:
+    """Os 15 deputados federais (aba 'Deputados Federais'), ordenados por score.
+    Score/estratégia/valor JÁ vêm curados da planilha — nada é recalculado."""
+    df = dados.carregar_deputados_federais()
+    if df.empty:
+        return []
+    out = []
+    for _, r in df.iterrows():
+        try:
+            score = int(float(str(r.get("Score Integrado", 0)).replace(",", ".") or 0))
+        except (TypeError, ValueError):
+            score = 0
+        out.append({
+            "nome": str(r.get("Deputado Federal", "")).strip(),
+            "partido": str(r.get("Partido", "")).strip(),
+            "score": score,
+            "base": str(r.get("Base Regional", "")).strip(),
+            "valor_sugerido": str(r.get("Valor sugerido", "")).strip(),
+            "gabinete": str(r.get("Gabinete Câmara", "")).strip(),
+        })
+    out.sort(key=lambda d: d["score"], reverse=True)
+    return out
+
+
+def render_federal() -> None:
+    """Escopo FEDERAL: lista os deputados federais de SP (aba 'Deputados
+    Federais'), no mesmo estilo dos cards do Estadual, ordenados por score.
+    Ainda SEM dossiê — só a listagem (cards estáticos, sem clique morto)."""
+    st.markdown(_DESCOBRIR_CSS, unsafe_allow_html=True)  # reusa o estilo dos cards
+    primeiro = USER["nome"].split()[0]
+    hora = datetime.datetime.now().hour
+    saud = "Bom dia" if hora < 12 else "Boa tarde" if hora < 18 else "Boa noite"
+    st.markdown(
+        f'<div class="topbar"><div><div class="hi">{saud}, {esc(primeiro)}</div>'
+        f'<div class="cr" style="margin-top:6px">Deputados federais de SP · Câmara</div></div>'
+        f'<div class="tr-r"><div class="live">CÂMARA · FEDERAL</div></div></div>'
+        '<div class="hr-line"></div>', unsafe_allow_html=True)
+
+    deps = _deputados_federais_ordenados()
+    if not deps:
+        st.info("Aba 'Deputados Federais' vazia ou indisponível no Google Sheets.")
+        return
+    st.markdown(
+        f'<div class="dd-intro">{len(deps)} deputados federais de SP, curados à mão. '
+        'Score, estratégia e valor <b>vêm da planilha</b> — não são recalculados. '
+        'Os valores são <b>faixas sugeridas</b> (potencial de emenda), não execução '
+        'histórica. Ordenados por score.</div>'
+        '<div class="dd-legend">'
+        '<span><span class="sw" style="background:var(--sem-high)"></span>score 60+ · forte</span>'
+        '<span><span class="sw" style="background:var(--sem-mid)"></span>50–59 · médio</span>'
+        '<span><span class="sw" style="background:var(--sem-low)"></span>&lt;50 · fraco</span>'
+        '</div>', unsafe_allow_html=True)
+    for d in deps:
+        st.markdown(
+            '<div class="dd-cell">'
+            f'<div class="dd-nomecol"><div class="dd-top"><span class="dd-nome">{esc(d["nome"])}</span></div>'
+            f'<div class="dd-sub">{esc(d["partido"])} · {esc(d["base"])}</div></div>'
+            f'<div class="dd-scorecol"><div class="dd-score" style="color:{_cor_score(d["score"])}">'
+            f'{d["score"]}</div><div class="dd-sub">score</div></div>'
+            f'<div class="dd-valcol"><div class="dd-val">sugerido <b>{esc(d["valor_sugerido"]) or "—"}</b></div>'
+            f'<div class="dd-sub">{esc(d["gabinete"])}</div></div>'
+            '</div>', unsafe_allow_html=True)
+    st.caption("Valor sugerido = faixa de potencial de emenda (mín–máx), curada na "
+               "planilha do Fábio. Dossiê detalhado por deputado vem em seguida.")
+
+
 def render_emendas():
     """Painel do radar de Emendas Parlamentares (CRM de deputados)."""
     st.markdown(_EMENDAS_CHROME_CSS, unsafe_allow_html=True)
+    escopo = st.session_state.setdefault("emenda_escopo", "Estadual")
     emenda_page = st.session_state.setdefault("emenda_page", "Visão geral")
     modo = {"Visão geral": "visao", "Deputados": "deputados", "Descobrir": "descobrir",
             "Territórios em Aberto": "orfaos", "Funil de negociação": "funil",
             "Relatório": "relatorio"}.get(emenda_page, "visao")
-    render_topnav("emendas", emenda_page.upper())
+    render_topnav("emendas", "FEDERAL · CÂMARA" if escopo == "Federal" else emenda_page.upper())
     render_sidebar_emendas()
+
+    # Escopo FEDERAL: listagem própria (lê da aba 'Deputados Federais'). As páginas
+    # de Articulação (Visão/Descobrir/etc.) são do Estadual — o Federal ainda é só
+    # a listagem, então retorna aqui.
+    if escopo == "Federal":
+        render_federal()
+        return
 
     hora = datetime.datetime.now().hour
     saud = "Bom dia" if hora < 12 else "Boa tarde" if hora < 18 else "Boa noite"
