@@ -82,6 +82,7 @@ from ui.formato import (
     _cards_deputados,
     _contagens_emendas,
     _cor_score,
+    _deputados_federais_ordenados,
     _deputados_ordenados,
     _dias_texto,
     _etapa_de_status,
@@ -1395,44 +1396,6 @@ def render_relatorio_emendas():
                 unsafe_allow_html=True)
     st.caption("Valores da execução real 2023–2025 (Transparência SP). Autorizado e pago "
                "separados, nunca somados. Contato oficial da ALESP (gabinete) — não o pessoal.")
-
-
-def _dep_federal_do_row(row) -> dict:
-    """Dicionário completo de um deputado federal a partir da linha da aba.
-    Score/aderência/chance/valor/estratégia JÁ vêm curados — só normaliza tipos."""
-    def g(k):
-        return str(row.get(k, "")).strip()
-
-    def ni(k):
-        try:
-            return int(float(g(k).replace(",", ".") or 0))
-        except (TypeError, ValueError):
-            return 0
-    return {
-        "id": g("ID"), "nome": g("Deputado Federal"), "partido": g("Partido"),
-        "score": ni("Score Integrado"), "chance": ni("Chance Emenda (0-100)"),
-        "ader": ni("Aderência PFC (0-100)"), "base": g("Base Regional"),
-        "proximidade": g("Proximidade Territorial"), "gabinete_camara": g("Gabinete Câmara"),
-        "endereco_regional": g("Endereço/Escritório Regional"),
-        "dialogo": g("Diálogo"), "status": g("Status CRM"),
-        "temp_raw": g("Temperatura"), "temp": _temp_nome(g("Temperatura")),
-        "telefones": g("Telefones"), "whatsapp": g("WhatsApp"), "email": g("Email"),
-        "instagram": g("Instagram"), "emenda": g("Emenda/Ação"),
-        "valor_sugerido": g("Valor sugerido"), "estrategia": g("Estratégia PFC"),
-        "obs": g("Observações"), "fonte_camara": g("Fonte oficial Câmara"),
-        "follow_up": g("Follow-up sugerido"),
-    }
-
-
-def _deputados_federais_ordenados() -> list:
-    """Os 15 deputados federais (aba 'Deputados Federais'), ordenados por score.
-    Score/estratégia/valor JÁ vêm curados da planilha — nada é recalculado."""
-    df = dados.carregar_deputados_federais()
-    if df.empty:
-        return []
-    out = [_dep_federal_do_row(r) for _, r in df.iterrows()]
-    out.sort(key=lambda d: d["score"], reverse=True)
-    return out
 
 
 def _argumento_federal(dep: dict) -> str:

@@ -355,6 +355,164 @@ def _contagens_emendas(deps) -> dict:
     }
 
 
+# =========================================================================== #
+# FUNDAÇÃO UNIFICADA DE PARLAMENTARES (Passo 1 da reorganização "Escopo")
+# --------------------------------------------------------------------------- #
+# Junta as bases de RELACIONAMENTO (CRM) dos três escopos num formato único, para
+# que a Visão geral, o Funil etc. leiam UMA lista só, marcada por escopo.
+#
+#   estadual → aba 'Deputados'          (_deputados_ordenados)
+#   federal  → aba 'Deputados Federais' (_deputados_federais_ordenados)
+#   senador  → ainda vazio (o "lugar" já existe; devolve nada sem quebrar)
+#
+# REGRA DE OURO (não pode quebrar em NENHUMA tela): valor de EXECUÇÃO estadual
+# (autorizado/pago, do levantamento) e valor SUGERIDO federal (faixa curada) são
+# coisas diferentes — NUNCA somados, NUNCA rotulados como a mesma coisa. Quem
+# segura isso é o campo `valor_tipo` de cada registro + o rótulo de rotulo_valor().
+# Qualquer soma tem de ser agrupada por valor_tipo; some só dentro do mesmo tipo.
+# =========================================================================== #
+
+# Tipos de valor — a barreira que impede misturar execução com sugerido.
+VALOR_EXECUCAO = "execucao"   # aut/pago real (estadual, levantamento) — nunca no federal
+VALOR_SUGERIDO = "sugerido"   # faixa potencial curada (federal) — nunca é execução
+VALOR_CRM = "crm"             # valor negociado anotado no CRM estadual (texto livre)
+_VALOR_ROTULO = {
+    VALOR_EXECUCAO: "execução (aut/pago)",
+    VALOR_SUGERIDO: "valor sugerido (faixa)",
+    VALOR_CRM: "registrado no CRM",
+    "": "sem valor",
+}
+
+# Metadados de cada escopo — fonte única para os selos (Passo 2/3) e o rótulo de
+# fonte no contato oficial. Violeta é a cor-mãe do painel; o selo diferencia por
+# escopo. Senador já tem o lugar reservado.
+ESCOPO_META = {
+    "estadual": {"nome": "Estadual", "fonte": "ALESP", "sub": "Deputado estadual"},
+    "federal": {"nome": "Federal", "fonte": "Câmara", "sub": "Deputado federal"},
+    "senador": {"nome": "Senador", "fonte": "Senado", "sub": "Senador"},
+}
+ESCOPOS = ("estadual", "federal", "senador")
+
+
+def rotulo_valor(valor_tipo: str) -> str:
+    """Rótulo humano do tipo de valor — o único ponto que nomeia execução vs
+    sugerido. Use SEMPRE isto ao exibir um valor, para nunca co-rotular errado."""
+    return _VALOR_ROTULO.get(valor_tipo or "", "sem valor")
+
+
+def _dep_federal_do_row(row) -> dict:
+    """Dicionário completo de um deputado federal a partir da linha da aba.
+    Score/aderência/chance/valor/estratégia JÁ vêm curados — só normaliza tipos."""
+    def g(k):
+        return str(row.get(k, "")).strip()
+
+    def ni(k):
+        try:
+            return int(float(g(k).replace(",", ".") or 0))
+        except (TypeError, ValueError):
+            return 0
+    return {
+        "id": g("ID"), "nome": g("Deputado Federal"), "partido": g("Partido"),
+        "score": ni("Score Integrado"), "chance": ni("Chance Emenda (0-100)"),
+        "ader": ni("Aderência PFC (0-100)"), "base": g("Base Regional"),
+        "proximidade": g("Proximidade Territorial"), "gabinete_camara": g("Gabinete Câmara"),
+        "endereco_regional": g("Endereço/Escritório Regional"),
+        "dialogo": g("Diálogo"), "status": g("Status CRM"),
+        "temp_raw": g("Temperatura"), "temp": _temp_nome(g("Temperatura")),
+        "telefones": g("Telefones"), "whatsapp": g("WhatsApp"), "email": g("Email"),
+        "instagram": g("Instagram"), "emenda": g("Emenda/Ação"),
+        "valor_sugerido": g("Valor sugerido"), "estrategia": g("Estratégia PFC"),
+        "obs": g("Observações"), "fonte_camara": g("Fonte oficial Câmara"),
+        "follow_up": g("Follow-up sugerido"),
+    }
+
+
+def _deputados_federais_ordenados() -> list:
+    """Os deputados federais (aba 'Deputados Federais'), ordenados por score.
+    Score/estratégia/valor JÁ vêm curados da planilha — nada é recalculado."""
+    df = dados.carregar_deputados_federais()
+    if df.empty:
+        return []
+    out = [_dep_federal_do_row(r) for _, r in df.iterrows()]
+    out.sort(key=lambda d: d["score"], reverse=True)
+    return out
+
+
+def _parlamentar_estadual(d: dict) -> dict:
+    """Registro estadual do CRM (_deputados_ordenados) → formato unificado.
+    Chave de escrita = NOME (a porta atualizar_status_deputado casa por nome)."""
+    valor = str(d.get("valor", "")).strip()
+    temp = d.get("temp") or _temp_nome(d.get("temp"))
+    return {
+        "escopo": "estadual", "chave": d.get("nome", ""),
+        "nome": d.get("nome", ""), "partido": d.get("partido", "") or "—",
+        "score": _int0(d.get("score")), "ader": _int0(d.get("ader")),
+        "chance": _int0(d.get("chance")),
+        "status": d.get("status", "") or "—", "temp": temp,
+        "temp_cor": _TEMP_COR.get(temp, "#7C8698"),
+        "temp_emoji": _TEMP_EMOJI.get(temp, "⚫"),
+        "dialogo": d.get("dialogo", ""), "base": d.get("base", ""),
+        "valor_tipo": VALOR_CRM if valor else "", "valor_txt": valor,
+        "contato": {"fonte": ESCOPO_META["estadual"]["fonte"],
+                    "gabinete": d.get("gabinete", ""), "telefones": d.get("telefones", ""),
+                    "email": d.get("email", ""), "whatsapp": d.get("whatsapp", ""),
+                    "instagram": d.get("instagram", "")},
+        "estrategia": d.get("estrategia", ""), "emenda": d.get("emenda", ""),
+        "obs": d.get("obs", ""), "_raw": d,
+    }
+
+
+def _parlamentar_federal(d: dict) -> dict:
+    """Registro federal curado (_dep_federal_do_row) → formato unificado.
+    Chave de escrita = ID (a porta atualizar_deputado_federal casa por ID).
+    Valor é SEMPRE 'sugerido' (faixa) — nunca vira execução."""
+    valor = str(d.get("valor_sugerido", "")).strip()
+    temp = d.get("temp") or _temp_nome(d.get("temp_raw"))
+    return {
+        "escopo": "federal", "chave": d.get("id", ""),
+        "nome": d.get("nome", ""), "partido": d.get("partido", "") or "—",
+        "score": _int0(d.get("score")), "ader": _int0(d.get("ader")),
+        "chance": _int0(d.get("chance")),
+        "status": d.get("status", "") or "—", "temp": temp,
+        "temp_cor": _TEMP_COR.get(temp, "#7C8698"),
+        "temp_emoji": _TEMP_EMOJI.get(temp, "⚫"),
+        "dialogo": d.get("dialogo", ""), "base": d.get("base", ""),
+        "valor_tipo": VALOR_SUGERIDO if valor else "", "valor_txt": valor,
+        "contato": {"fonte": ESCOPO_META["federal"]["fonte"],
+                    "gabinete": d.get("gabinete_camara", ""), "telefones": d.get("telefones", ""),
+                    "email": d.get("email", ""), "whatsapp": d.get("whatsapp", ""),
+                    "instagram": d.get("instagram", "")},
+        "estrategia": d.get("estrategia", ""), "emenda": d.get("emenda", ""),
+        "obs": d.get("obs", ""), "_raw": d,
+    }
+
+
+def normalizar_parlamentares(estaduais: list | None, federais: list | None,
+                             senadores: list | None = None) -> list:
+    """Junta as listas dos três escopos num formato único (função PURA, testável
+    com dados falsos — não toca no Sheets). Ordena por score decrescente.
+    Cada registro carrega `escopo`, `chave` (p/ rotear a escrita) e `valor_tipo`
+    (execução vs sugerido nunca se confundem). `senadores` já normalizados; hoje
+    vazio, mas o parâmetro deixa o lugar pronto."""
+    out = [_parlamentar_estadual(d) for d in (estaduais or [])]
+    out += [_parlamentar_federal(d) for d in (federais or [])]
+    out += list(senadores or [])
+    out.sort(key=lambda r: r.get("score", 0), reverse=True)
+    return out
+
+
+def carregar_parlamentares(escopo: str = "Geral") -> list:
+    """Porta única de leitura unificada dos parlamentares (CRM dos três escopos).
+    `escopo`: 'Geral' (padrão, todos) ou 'Estadual'/'Federal'/'Senador' (filtra).
+    Lê ao vivo pelas portas de cada base e normaliza. Read-only."""
+    registros = normalizar_parlamentares(_deputados_ordenados(),
+                                         _deputados_federais_ordenados())
+    alvo = str(escopo or "Geral").strip().lower()
+    if alvo in ESCOPOS:
+        registros = [r for r in registros if r["escopo"] == alvo]
+    return registros
+
+
 def _sidebar_toggle_html() -> str:
     """Botão de recolher/expandir no TOPO da sidebar (em fluxo, dentro da barra).
     Clique tratado por delegação (_SIDEBAR_TOGGLE_JS); ícone/rótulo são dirigidos
