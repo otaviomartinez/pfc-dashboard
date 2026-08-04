@@ -273,6 +273,11 @@ _TEMP_COR = {"Muito Quente": "#EC6A8C", "Morno": "#E8B54A",
 _TEMP_EMOJI = {"Muito Quente": "🔵", "Morno": "🟡", "Frio": "🔴", "Fechado": "⚫"}
 
 
+# Ordem canônica de temperatura (mais quente → fechado). Usada pelo termômetro da
+# capa e pela ordenação de "negociação mais avançada".
+_TEMP_ORDEM = ["Muito Quente", "Morno", "Frio", "Fechado"]
+
+
 def _temp_nome(valor: str) -> str:
     """Normaliza a temperatura (a planilha traz '🟡 Morno') para o rótulo puro."""
     v = str(valor or "").lower()
@@ -452,7 +457,11 @@ def _parlamentar_estadual(d: dict) -> dict:
         "temp_cor": _TEMP_COR.get(temp, "#7C8698"),
         "temp_emoji": _TEMP_EMOJI.get(temp, "⚫"),
         "dialogo": d.get("dialogo", ""), "base": d.get("base", ""),
-        "valor_tipo": VALOR_CRM if valor else "", "valor_txt": valor,
+        "valor_tipo": VALOR_CRM if valor else "", "valor_txt": valor, "valor": valor,
+        "status_cor": _status_cor(d.get("status", "")),
+        "prioridade": str(d.get("prioridade", "")).strip(),
+        "escopo_nome": ESCOPO_META["estadual"]["nome"],
+        "telefones": d.get("telefones", ""),
         "contato": {"fonte": ESCOPO_META["estadual"]["fonte"],
                     "gabinete": d.get("gabinete", ""), "telefones": d.get("telefones", ""),
                     "email": d.get("email", ""), "whatsapp": d.get("whatsapp", ""),
@@ -478,6 +487,13 @@ def _parlamentar_federal(d: dict) -> dict:
         "temp_emoji": _TEMP_EMOJI.get(temp, "⚫"),
         "dialogo": d.get("dialogo", ""), "base": d.get("base", ""),
         "valor_tipo": VALOR_SUGERIDO if valor else "", "valor_txt": valor,
+        # alias `valor` p/ os cards dos diálogos: SEMPRE carimbado "· sugerido" —
+        # blindagem extra da regra de ouro (nunca aparece como execução aut/pago).
+        "valor": (valor + " · sugerido") if valor else "",
+        "status_cor": _status_cor(d.get("status", "")),
+        "prioridade": "",
+        "escopo_nome": ESCOPO_META["federal"]["nome"],
+        "telefones": d.get("telefones", ""),
         "contato": {"fonte": ESCOPO_META["federal"]["fonte"],
                     "gabinete": d.get("gabinete_camara", ""), "telefones": d.get("telefones", ""),
                     "email": d.get("email", ""), "whatsapp": d.get("whatsapp", ""),
@@ -511,6 +527,80 @@ def carregar_parlamentares(escopo: str = "Geral") -> list:
     if alvo in ESCOPOS:
         registros = [r for r in registros if r["escopo"] == alvo]
     return registros
+
+
+def capa_payload_parlamentares(regs: list, filtro: str | None = None,
+                               escopo_sel: str = "Geral") -> dict:
+    """Monta o payload da CAPA GERAL (Passo 3) a partir dos registros unificados —
+    o MESMO formato que a capa estadual sempre mandou ao componente _emendas_v2
+    (hero/kpis/temperatura/deps), agora sobre todos os escopos e com o selo em cada
+    card (campos `escopo`/`escopo_nome` que já vêm no registro).
+
+    PURA (sem st) e testável. `filtro` = temperatura selecionada (afeta só a tabela).
+    Devolve {payload, top, regs_view, em_articulacao, lista_reunioes, lista_aprovadas}
+    para a casca em app.py só renderizar e rotear os cliques.
+
+    Regra de ouro: a capa NÃO exibe nem soma valores nos cards (só chance/aderência/
+    status). Score federal é copiado do registro, nunca recalculado."""
+    total = len(regs)
+    if not total:
+        return {"payload": {"deps": [], "hero": {}, "temperatura": [], "kpis": [],
+                            "modo": "visao"},
+                "top": None, "regs_view": [], "em_articulacao": [],
+                "lista_reunioes": [], "lista_aprovadas": []}
+
+    def _st(r):
+        return str(r.get("status", "")).lower()
+    nao_abordados = sum(1 for r in regs if "não iniciado" in _st(r) or "nao iniciado" in _st(r))
+    articulacao = total - nao_abordados
+    reunioes = sum(1 for r in regs if _st(r).startswith(("reunião", "reuniao")))
+    aprovadas = sum(1 for r in regs if "aprovada" in _st(r))
+    chance_media = round(sum(r.get("chance", 0) for r in regs) / total) if total else 0
+
+    ordem_temp = {t: i for i, t in enumerate(_TEMP_ORDEM)}
+    top = min(regs, key=lambda r: (ordem_temp.get(r["temp"], 9), -r.get("score", 0)))
+
+    cont_temp = {t: 0 for t in _TEMP_ORDEM}
+    for r in regs:
+        cont_temp[r["temp"]] = cont_temp.get(r["temp"], 0) + 1
+    temperatura = [{"nome": t, "emoji": _TEMP_EMOJI[t], "cor": _TEMP_COR[t],
+                    "n": cont_temp.get(t, 0), "pct": round(cont_temp.get(t, 0) / total * 100)}
+                   for t in _TEMP_ORDEM]
+
+    em_articulacao = [r for r in regs if "iniciado" not in _st(r)]
+    lista_reunioes = [r for r in regs if _st(r).startswith(("reunião", "reuniao"))]
+    lista_aprovadas = [r for r in regs if "aprovada" in _st(r)]
+    regs_view = [r for r in regs if r["temp"] == filtro] if filtro else regs
+
+    fonte_foot = {"Geral": "nos três escopos", "Estadual": "na base ALESP",
+                  "Federal": "na Câmara"}.get(escopo_sel, "")
+    payload = {
+        "modo": "visao", "total": total, "filtro_temp": filtro,
+        "temp_ordem": [{"nome": t, "cor": _TEMP_COR[t], "emoji": _TEMP_EMOJI[t]}
+                       for t in _TEMP_ORDEM],
+        "hero": {"articulacao": articulacao, "total": total, "nao_abordados": nao_abordados,
+                 "top": {"nome": top["nome"], "partido": top["partido"],
+                         "status": top["status"], "score": top["score"],
+                         "temp": top["temp"], "cor": top["temp_cor"],
+                         "escopo": top["escopo"], "escopo_nome": top["escopo_nome"]}},
+        "temperatura": temperatura,
+        "kpis": [
+            {"c": "#8B7BF0", "icon": "users", "lab": "Parlamentares", "val": total,
+             "foot": fonte_foot},
+            {"k": "reunioes", "c": "#E8B54A", "icon": "cal", "lab": "Reuniões ativas",
+             "val": reunioes, "foot": "solicitadas ou agendadas · ver quais"},
+            {"k": "aprovadas", "c": "#4ADE80", "icon": "check", "lab": "Emendas aprovadas",
+             "val": aprovadas,
+             "foot": "✓ ver a conquista" if aprovadas else "nenhuma ainda",
+             "foot_cor": "#4ADE80" if aprovadas else None},
+            {"c": "#EC6A8C", "icon": "money", "lab": "Chance média", "val": chance_media,
+             "suffix": "%", "foot": "de emenda no grupo"},
+        ],
+        "deps": regs_view,
+    }
+    return {"payload": payload, "top": top, "regs_view": regs_view,
+            "em_articulacao": em_articulacao, "lista_reunioes": lista_reunioes,
+            "lista_aprovadas": lista_aprovadas}
 
 
 def _sidebar_toggle_html() -> str:

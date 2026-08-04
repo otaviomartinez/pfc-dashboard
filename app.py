@@ -74,9 +74,9 @@ from ui.estilos import (
 from ui.formato import (
     EMENDA_ETAPA_COR,
     EMENDA_FUNIL_ETAPAS,
-    ESCOPO_META,
     _TEMP_COR,
     _TEMP_EMOJI,
+    _TEMP_ORDEM,
     _temp_nome,
     _argumento_abordagem,
     _cap_mun,
@@ -104,12 +104,12 @@ from ui.formato import (
     _valor_rel,
     brl,
     brl_curto,
+    capa_payload_parlamentares,
     carregar_parlamentares,
     css_icones_botoes,
     esc,
     estilo_plotly,
     lista_orgs_html,
-    rotulo_valor,
     score_chip_cor,
     score_chip_hex,
     seg_html,
@@ -344,7 +344,6 @@ def render_hub():
 # é SENSÍVEL: só é renderizado para usuário logado (guard explícito), nunca
 # numa view pública.
 # =========================================================================== #
-_TEMP_ORDEM = ["Muito Quente", "Morno", "Frio", "Fechado"]
 
 
 @st.dialog("Dossiê do deputado", width="large")
@@ -1695,52 +1694,77 @@ def render_federal() -> None:
                "Clique num card para o dossiê completo (gancho, contato, CRM e PDF).")
 
 
-def _render_visao_unificada(escopo_sel: str) -> None:
-    """Visão geral no modo UNIFICADO (Passo 2 da reorganização "Escopo").
+def _abrir_dossie_parlamentar(r: dict) -> None:
+    """Abre o dossiê CERTO conforme o escopo do registro unificado (usa o _raw
+    original, então cada dossiê recebe exatamente o dicionário que já esperava)."""
+    if r.get("escopo") == "federal":
+        dlg_deputado_federal(dict(r["_raw"]))
+    else:
+        dlg_deputado(dict(r["_raw"]))
 
-    Lista os parlamentares do escopo escolhido pela porta única do Passo 1
-    (carregar_parlamentares). Aqui é só o FILTRO funcionando — trocar o escopo
-    muda o que aparece. Sem selos nem capa repaginada (isso é o Passo 3): cada
-    card só mostra nome/partido/escopo/score/valor e abre o dossiê CERTO conforme
-    o escopo. O valor é SEMPRE rotulado por rotulo_valor — execução (aut/pago
-    estadual) e sugerido (faixa federal) nunca se confundem."""
-    st.markdown(_DESCOBRIR_CSS, unsafe_allow_html=True)
-    if escopo_sel == "Senador":
-        st.markdown(
-            '<div class="dd-intro">Escopo <b>Senador</b> ainda sem cadastro. O lugar já '
-            'existe — quando a tabela do Fábio entrar, os senadores aparecem aqui com o '
-            'mesmo tratamento. Nada quebra por estar vazio.</div>', unsafe_allow_html=True)
-        return
+
+def _render_capa_geral(escopo_sel: str) -> None:
+    """CAPA GERAL da Visão geral (Passo 3): o MESMO layout rico da capa estadual
+    (herói, KPIs, termômetro, tabela por prioridade), agora alimentado pela
+    fundação unificada — todos os escopos juntos, cada linha com o SELO de escopo.
+
+    Só troca a fonte de dados (carregar_parlamentares) e adiciona os selos; a
+    lógica de herói/KPIs/termômetro (pura) vive em capa_payload_parlamentares.
+    Score federal nunca recalculado. A capa NÃO exibe nem soma valores
+    (chance/aderência/status só) — a regra de ouro fica naturalmente respeitada
+    aqui; onde há valor (dossiê e diálogos) ele já sai rotulado pelo seu tipo."""
     regs = carregar_parlamentares(escopo_sel)
-    legenda = {"Geral": "os três escopos juntos",
-               "Federal": "deputados federais · Câmara"}.get(escopo_sel, "")
     if not regs:
+        _emendas_v2(data={"deps": [], "hero": {}, "temperatura": [], "kpis": [], "modo": "visao"},
+                    key="emendas_v2", on_acao_change=lambda: None)
         st.info("Nenhum parlamentar neste escopo ainda.")
         return
-    st.markdown(
-        f'<div class="dd-intro"><b>{len(regs)}</b> parlamentar(es) · {esc(legenda)}. '
-        'Ordenados por score. Clique num card para o dossiê. '
-        '<span style="color:var(--dim)">(Selos de escopo e capa repaginada vêm no Passo 3.)</span></div>',
-        unsafe_allow_html=True)
-    for i, r in enumerate(regs):
-        c_info, _c = st.columns([9, 0.3])
-        rot = rotulo_valor(r["valor_tipo"])
-        val = r["valor_txt"] or "—"
-        c_info.markdown(
-            '<div class="dd-cell">'
-            f'<div class="dd-nomecol"><div class="dd-top"><span class="dd-nome">{esc(r["nome"])}</span></div>'
-            f'<div class="dd-sub">{esc(r["partido"])} · {esc(ESCOPO_META[r["escopo"]]["nome"])}</div></div>'
-            f'<div class="dd-scorecol"><div class="dd-score" style="color:{_cor_score(r["score"])}">'
-            f'{r["score"]}</div><div class="dd-sub">score</div></div>'
-            f'<div class="dd-valcol"><div class="dd-val">{esc(val)}</div>'
-            f'<div class="dd-sub">{esc(rot)}</div></div>'
-            '</div>', unsafe_allow_html=True)
-        if c_info.button(f"Abrir dossiê de {r['nome']}", key=f"vg_uni_{escopo_sel}_{i}",
-                         use_container_width=True):
-            if r["escopo"] == "federal":
-                dlg_deputado_federal(dict(r["_raw"]))
-            else:
-                dlg_deputado(dict(r["_raw"]))
+
+    filtro = st.session_state.get("emenda_filtro_temp")
+    ctx = capa_payload_parlamentares(regs, filtro, escopo_sel)
+    top = ctx["top"]
+    regs_view = ctx["regs_view"]
+
+    if filtro:
+        c1, c2 = st.columns([3, 1])
+        c1.markdown(
+            f'<div style="display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--ink)">'
+            f'<span style="font-family:var(--mono);font-size:10.5px;letter-spacing:.6px;'
+            f'text-transform:uppercase;color:var(--dim)">Filtrando por</span>'
+            f'<span style="background:{_TEMP_COR[filtro]}22;color:{_TEMP_COR[filtro]};font-weight:600;'
+            f'padding:4px 12px;border-radius:20px">{_TEMP_EMOJI[filtro]} {esc(filtro)} · '
+            f'{len(regs_view)} parlamentar(es)</span></div>',
+            unsafe_allow_html=True)
+        if c2.button("✕ Limpar filtro", key="em_limpar_filtro", use_container_width=True):
+            st.session_state.pop("emenda_filtro_temp", None)
+            st.rerun()
+
+    res = _emendas_v2(data=ctx["payload"], key="emendas_v2", on_acao_change=lambda: None)
+    ac = getattr(res, "acao", None)
+    if not isinstance(ac, dict):
+        return
+    if ac.get("n") == st.session_state.get("_emenda_nonce"):
+        return  # já processado neste ciclo
+    st.session_state["_emenda_nonce"] = ac.get("n")
+    t, i = ac.get("t"), ac.get("i")
+    if t == "dep" and isinstance(i, int) and 0 <= i < len(regs_view):
+        _abrir_dossie_parlamentar(regs_view[i])
+    elif t == "top":
+        _abrir_dossie_parlamentar(top)
+    elif t == "kpi" and ac.get("k") == "aprovadas":
+        dlg_emendas_aprovadas(ctx["lista_aprovadas"])
+    elif t == "kpi" and ac.get("k") == "reunioes":
+        dlg_reunioes_ativas(ctx["lista_reunioes"])
+    elif t == "articulacao":
+        dlg_em_articulacao(ctx["em_articulacao"])
+    elif t == "temp" and ac.get("temp") in _TEMP_ORDEM:
+        novo = ac["temp"]
+        # clicar na faixa já ativa desliga o filtro
+        if st.session_state.get("emenda_filtro_temp") == novo:
+            st.session_state.pop("emenda_filtro_temp", None)
+        else:
+            st.session_state["emenda_filtro_temp"] = novo
+        st.rerun()
 
 
 def render_emendas():
@@ -1796,23 +1820,30 @@ def render_emendas():
         render_relatorio_emendas()
         return
 
-    # ===== Passo 2 · controle de Escopo — SÓ na Visão geral por enquanto =====
-    # Segmentado no topo do CONTEÚDO (não na sidebar). Geral (padrão) junta os três
-    # escopos; Estadual mantém a capa rica atual INTACTA; Geral/Federal/Senador usam
-    # a lista unificada do Passo 1. Estado próprio (emenda_escopo_filtro), separado
-    # do emenda_escopo (navegação da sidebar) — os dois convivem até o Passo 8.
-    st.session_state.setdefault("emenda_escopo_filtro", "Geral")
-    escopo_sel = st.segmented_control(
-        "Escopo", options=["Geral", "Estadual", "Federal", "Senador"],
-        key="emenda_escopo_filtro", label_visibility="collapsed") or "Geral"
-    st.caption("Escopo · Geral junta os três · Estadual / Federal / Senador filtram. "
-               "(Por enquanto só na Visão geral; as outras telas vêm nos próximos passos.)")
-    if escopo_sel != "Estadual":
-        _render_visao_unificada(escopo_sel)
+    # ===== Passo 3 · Visão geral = CAPA GERAL (todos os escopos juntos) =====
+    # Controle de Escopo no topo do CONTEÚDO (não na sidebar), SÓ na Visão geral
+    # (modo 'visao'). Geral (padrão) mostra os três escopos na MESMA capa rica, com
+    # o selo de escopo em cada linha; Estadual/Federal filtram; Senador = vazio
+    # elegante. A página "Deputados" (modo 'deputados') segue com a tabela estadual,
+    # abaixo. Estado próprio (emenda_escopo_filtro), separado do emenda_escopo da
+    # navegação da sidebar — os dois convivem até o Passo 8.
+    if modo == "visao":
+        st.session_state.setdefault("emenda_escopo_filtro", "Geral")
+        escopo_sel = st.segmented_control(
+            "Escopo", options=["Geral", "Estadual", "Federal", "Senador"],
+            key="emenda_escopo_filtro", label_visibility="collapsed") or "Geral"
+        st.caption("Escopo · Geral junta os três · Estadual / Federal / Senador filtram.")
+        if escopo_sel == "Senador":
+            st.markdown(_DESCOBRIR_CSS, unsafe_allow_html=True)
+            st.markdown(
+                '<div class="dd-intro">Escopo <b>Senador</b> ainda sem cadastro. O lugar já '
+                'existe — quando a tabela do Fábio entrar, os senadores aparecem aqui na '
+                'mesma capa geral. Nada quebra por estar vazio.</div>', unsafe_allow_html=True)
+            return
+        _render_capa_geral(escopo_sel)
         return
-    # Estadual selecionado: segue a capa rica de sempre (herói, KPIs, termômetro),
-    # sem nenhuma mudança — todas as interações estaduais preservadas.
 
+    # modo == "deputados": tabela estadual (aba Deputados · ALESP) — inalterada.
     deps = _deputados_ordenados()
     total = len(deps)
     if not total:

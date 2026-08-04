@@ -845,6 +845,15 @@ _EMENDAS_V2_CSS = """
 .em .kcard .km{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--dim,#6B7688)}
 .em .kvazio{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dim,#6B7688);
   text-align:center;padding:10px;border:1px dashed var(--line2,rgba(255,255,255,.12));border-radius:9px}
+/* SELO DE ESCOPO (Passo 3) — violeta é a cor-mãe do painel; três sub-selos da
+   MESMA família, visualmente distintos: estadual (violeta), federal (azul-violeta),
+   senador (magenta-violeta). Diz de qual escopo é cada parlamentar na capa geral. */
+.em .selo{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;
+  letter-spacing:.5px;text-transform:uppercase;padding:1px 6px;border-radius:20px;margin-right:7px;
+  border:1px solid;vertical-align:middle;position:relative;top:-1px;white-space:nowrap}
+.em .selo-estadual{color:#8B7BF0;background:rgba(139,123,240,.14);border-color:rgba(139,123,240,.42)}
+.em .selo-federal{color:#5B9BD5;background:rgba(91,155,213,.14);border-color:rgba(91,155,213,.42)}
+.em .selo-senador{color:#C08BF0;background:rgba(192,139,240,.14);border-color:rgba(192,139,240,.42)}
 """
 
 
@@ -855,6 +864,11 @@ export default function(component){
   const d = data || {}, deps = d.deps || [], modo = d.modo || 'visao';
   const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  // selo de escopo (Passo 3): violeta cor-mãe, sub-selo por escopo. Vazio se o
+  // registro não trouxer escopo (mantém compatível com payloads antigos).
+  const seloHTML = p => (p && p.escopo)
+    ? '<span class="selo selo-' + esc(p.escopo) + '">' + esc(p.escopo_nome || p.escopo) + '</span>'
+    : '';
   const root = document.createElement('div'); root.className = 'em';
 
   const ICON = {
@@ -868,7 +882,7 @@ export default function(component){
     return '<div class="tr" data-i="' + i + '">' +
       '<div class="dep"><span class="tdot" style="background:' + p.temp_cor + ';box-shadow:0 0 8px ' + p.temp_cor +
       '"></span><div style="min-width:0"><div class="nm">' + esc(p.nome) + '</div>' +
-      '<div class="sub">' + esc(p.partido) + (p.prioridade ? ' · ' + esc(p.prioridade) : '') + '</div></div></div>' +
+      '<div class="sub">' + seloHTML(p) + esc(p.partido) + (p.prioridade ? ' · ' + esc(p.prioridade) : '') + '</div></div></div>' +
       '<div class="barcell"><span class="bk"><span class="bf" style="background:#8B7BF0;width:' +
       p.chance + '%"></span></span><span class="bv">' + p.chance + '</span></div>' +
       '<div class="barcell"><span class="bk"><span class="bf" style="background:#4ADE80;width:' +
@@ -916,7 +930,7 @@ export default function(component){
     if (top) {
       topHtml = '<div class="hh-row" data-act="top"><span class="hh-sc">' + esc(top.score) +
         '</span><div style="min-width:0"><div class="hh-t">' + esc(top.nome) + '</div>' +
-        '<div class="mono hh-m">' + esc(top.partido) + ' · ' + esc(top.status) + '</div></div>' +
+        '<div class="mono hh-m">' + seloHTML(top) + esc(top.partido) + ' · ' + esc(top.status) + '</div></div>' +
         '<span class="hh-dl" style="color:' + top.cor + ';background:' + top.cor + '1a;border:1px solid ' +
         top.cor + '4d">' + esc(top.temp).toUpperCase() + '</span></div>';
     }
