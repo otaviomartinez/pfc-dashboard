@@ -1196,6 +1196,14 @@ _DESCOBRIR_CSS = """
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dd-fabio{font-size:9.5px;font-weight:600;padding:2px 8px;border-radius:20px;vertical-align:middle;
   background:rgba(139,123,240,.16);color:#b7abff;margin-left:9px;letter-spacing:.3px}
+/* SELO DE ESCOPO na Descobrir (Passo 4) — mesmas cores da capa: violeta cor-mãe,
+   sub-selos distintos. Diz de qual escopo é o card (e, por tabela, que tipo de
+   valor ele mostra: estadual=execução aut/pago, federal=valor sugerido). */
+.dd-selo{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
+  padding:2px 7px;border-radius:20px;margin-right:8px;border:1px solid;white-space:nowrap;flex:none}
+.dd-selo-estadual{color:#8B7BF0;background:rgba(139,123,240,.14);border-color:rgba(139,123,240,.42)}
+.dd-selo-federal{color:#5B9BD5;background:rgba(91,155,213,.14);border-color:rgba(91,155,213,.42)}
+.dd-selo-senador{color:#C08BF0;background:rgba(192,139,240,.14);border-color:rgba(192,139,240,.42)}
 .dd-score{font-family:var(--disp);font-weight:700;font-size:22px;line-height:1.1}
 .dd-val{font-size:13px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dd-val b{font-family:var(--disp);color:var(--ink)}

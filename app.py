@@ -743,7 +743,8 @@ def _linha_descobrir(row: dict, secao: str, idx, no_crm: bool) -> None:
     c_info, c_acao = st.columns([7, 1.15])
     c_info.markdown(
         '<div class="dd-cell">'
-        f'<div class="dd-nomecol"><div class="dd-top"><span class="dd-nome">{esc(row["deputado"])}</span>'
+        f'<div class="dd-nomecol"><div class="dd-top">{_dd_selo("estadual", "Estadual")}'
+        f'<span class="dd-nome">{esc(row["deputado"])}</span>'
         + ('<span class="dd-fabio">NO CRM</span>' if no_crm else "")
         + f'</div><div class="dd-sub">{esc(row.get("partido", ""))} · fatia edu/social {esc(fatia)}%</div></div>'
         f'<div class="dd-scorecol"><div class="dd-score" style="color:{_cor_score(score)}">{round(score)}</div>'
@@ -770,6 +771,47 @@ def _linha_descobrir(row: dict, secao: str, idx, no_crm: bool) -> None:
         else:
             st.toast(f"Não deu para puxar: {res.get('mensagem') or res.get('motivo')}")
         st.rerun()
+
+
+def _dd_selo(escopo: str, nome: str) -> str:
+    """Selo de escopo para os cards da Descobrir (mesma família violeta da capa)."""
+    return f'<span class="dd-selo dd-selo-{esc(escopo)}">{esc(nome)}</span>'
+
+
+def _linha_descobrir_federal(dep: dict, idx) -> None:
+    """Card de deputado FEDERAL na Descobrir — mesmo estilo .dd-cell, com selo
+    Federal e valor SUGERIDO (faixa), NUNCA execução (regra de ouro). O card
+    inteiro abre o dossiê federal. Sem 'Puxar': o federal já é curado na sua
+    própria aba (Deputados Federais)."""
+    val = str(dep.get("valor_sugerido", "")).strip() or "—"
+    c_info, _c = st.columns([7, 1.15])
+    c_info.markdown(
+        '<div class="dd-cell">'
+        f'<div class="dd-nomecol"><div class="dd-top">{_dd_selo("federal", "Federal")}'
+        f'<span class="dd-nome">{esc(dep.get("nome", ""))}</span></div>'
+        f'<div class="dd-sub">{esc(dep.get("partido", ""))} · {esc(dep.get("base", "") or "base regional —")}</div></div>'
+        f'<div class="dd-scorecol"><div class="dd-score" style="color:{_cor_score(dep.get("score", 0))}">'
+        f'{dep.get("score", 0)}</div><div class="dd-sub">score</div></div>'
+        f'<div class="dd-valcol"><div class="dd-val">sugerido <b>{esc(val)}</b></div>'
+        f'<div class="dd-sub">valor sugerido · faixa</div></div>'
+        '</div>', unsafe_allow_html=True)
+    if c_info.button(f"Abrir dossiê de {dep.get('nome', '')}", key=f"dd_fed_{idx}",
+                     use_container_width=True):
+        dlg_deputado_federal(dict(dep))
+
+
+def _filtra_feds_descobrir(feds: list, busca: str, f_part: str) -> list:
+    """Aplica a busca (nome) e o filtro de partido aos federais. O filtro de
+    município é do levantamento estadual — não se aplica aos federais."""
+    b = str(busca or "").strip().lower()
+    out = []
+    for d in feds:
+        if b and b not in str(d.get("nome", "")).lower():
+            continue
+        if f_part and f_part != "Todos" and str(d.get("partido", "")).strip() != f_part:
+            continue
+        out.append(d)
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -938,57 +980,101 @@ def _municipios_pfc_lista() -> list:
 
 
 def render_descobrir() -> None:
+    """Descobrir GERAL (Passo 4): junta o levantamento estadual (execução real,
+    território/expansão) com os federais curados (valor sugerido), sob o mesmo
+    controle de Escopo da Visão geral. Cada card leva o selo do seu escopo; o
+    valor SEMPRE sai com o rótulo do seu tipo — execução (aut/pago estadual) e
+    sugerido (faixa federal) NUNCA se somam nem se confundem."""
     st.markdown(_DESCOBRIR_CSS, unsafe_allow_html=True)
-    terr = dados.carregar_ranking_territorio()
-    exp = dados.carregar_ranking_expansao()
-    if terr.empty and exp.empty:
+
+    # ---- Controle de Escopo (compartilha o estado com a Visão geral) ----
+    st.session_state.setdefault("emenda_escopo_filtro", "Geral")
+    escopo_sel = st.segmented_control(
+        "Escopo", options=["Geral", "Estadual", "Federal", "Senador"],
+        key="emenda_escopo_filtro", label_visibility="collapsed") or "Geral"
+    st.caption("Escopo · Geral junta os três · Estadual / Federal / Senador filtram.")
+    if escopo_sel == "Senador":
+        st.markdown(
+            '<div class="dd-intro">Escopo <b>Senador</b> ainda sem cadastro. O lugar já '
+            'existe — quando a tabela do Fábio entrar, os senadores aparecem aqui na mesma '
+            'descoberta. Nada quebra por estar vazio.</div>', unsafe_allow_html=True)
+        return
+
+    mostra_est = escopo_sel in ("Geral", "Estadual")
+    mostra_fed = escopo_sel in ("Geral", "Federal")
+
+    # ---- Fontes por escopo: estadual = levantamento (execução); federal = curado ----
+    terr = dados.carregar_ranking_territorio() if mostra_est else pd.DataFrame()
+    exp = dados.carregar_ranking_expansao() if mostra_est else pd.DataFrame()
+    feds = _deputados_federais_ordenados() if mostra_fed else []
+    if mostra_est and terr.empty and exp.empty and not mostra_fed:
         st.info("Levantamento ainda não gerado. Rode `python -m src.emendas` para "
                 "produzir os rankings em `data/`.")
         return
 
     st.markdown(
         '<div class="dd-intro">Quem abordar para emendas de educação e assistência social. '
-        'Baseado na execução real de 2023-2025 (Transparência SP). '
-        'Esta é a lista de prospecção — separada do CRM dos 16 deputados. '
-        'O botão <b>Puxar</b> grava o deputado no CRM na hora.</div>'
+        'Estaduais vêm da <b>execução real</b> 2023-2025 (Transparência SP · autorizado/pago); '
+        'federais são a <b>curadoria</b> do Fábio (valor <b>sugerido</b>, faixa). Cada card '
+        'marca o seu escopo. O botão <b>Puxar</b> grava o estadual no CRM na hora.</div>'
         '<div class="dd-legend">'
         '<span><span class="sw" style="background:var(--sem-high)"></span>score 60+ · forte</span>'
         '<span><span class="sw" style="background:var(--sem-mid)"></span>50–59 · médio</span>'
         '<span><span class="sw" style="background:var(--sem-low)"></span>&lt;50 · fraco</span>'
-        '</div>', unsafe_allow_html=True)
+        + ('<span><span class="sw" style="background:#8B7BF0"></span>Estadual · autorizado/pago</span>'
+           '<span><span class="sw" style="background:#5B9BD5"></span>Federal · valor sugerido</span>'
+           if escopo_sel == "Geral" else "")
+        + '</div>', unsafe_allow_html=True)
 
-    # ---- Busca e filtros (só leitura — achar um deputado na hora na reunião) ----
-    partidos = sorted(set(terr.get("partido", pd.Series(dtype=str)).dropna())
-                      | set(exp.get("partido", pd.Series(dtype=str)).dropna()))
-    fc1, fc2, fc3 = st.columns([2, 1.2, 1.5])
-    busca = fc1.text_input("Buscar deputado", key="dd_busca",
+    # ---- Busca e filtros (partidos de todos os escopos visíveis) ----
+    partidos = set()
+    if mostra_est:
+        partidos |= set(terr.get("partido", pd.Series(dtype=str)).dropna())
+        partidos |= set(exp.get("partido", pd.Series(dtype=str)).dropna())
+    if mostra_fed:
+        partidos |= {str(d.get("partido", "")).strip() for d in feds
+                     if str(d.get("partido", "")).strip()}
+    partidos = sorted(partidos)
+
+    if mostra_est:  # o filtro de município é do levantamento estadual
+        fc1, fc2, fc3 = st.columns([2, 1.2, 1.5])
+    else:
+        fc1, fc2 = st.columns([2, 1.5])
+        fc3 = None
+    busca = fc1.text_input("Buscar parlamentar", key="dd_busca",
                            placeholder="digite parte do nome…")
     f_part = fc2.selectbox("Partido", ["Todos"] + partidos, key="dd_partido")
-    f_mun = fc3.selectbox("Município do PFC onde atua",
-                          ["Todos"] + _municipios_pfc_lista(), key="dd_municipio")
+    f_mun = (fc3.selectbox("Município do PFC onde atua", ["Todos"] + _municipios_pfc_lista(),
+                           key="dd_municipio") if fc3 is not None else "Todos")
 
-    terr = _filtrar_descobrir(terr, busca, f_part, f_mun, ["municipios_pfc"])
-    exp = _filtrar_descobrir(exp, busca, f_part, f_mun, ["municipios_pfc_diretos"])
-    if (busca and busca.strip()) or f_part != "Todos" or f_mun != "Todos":
-        st.caption(f"Filtro ativo · {len(terr)} em Abordar já · {len(exp)} em Cortejar. "
-                   "Limpe os campos para ver todos.")
-        if terr.empty and exp.empty:
-            st.info("Nenhum deputado bate com esses filtros. Afrouxe a busca.")
+    if mostra_est:
+        terr = _filtrar_descobrir(terr, busca, f_part, f_mun, ["municipios_pfc"])
+        exp = _filtrar_descobrir(exp, busca, f_part, f_mun, ["municipios_pfc_diretos"])
+    if mostra_fed:
+        feds = _filtra_feds_descobrir(feds, busca, f_part)
+
+    if (busca and busca.strip()) or f_part != "Todos" or (f_mun and f_mun != "Todos"):
+        partes = []
+        if mostra_est:
+            partes.append(f"{len(terr)} em Abordar já · {len(exp)} em Cortejar")
+        if mostra_fed:
+            partes.append(f"{len(feds)} federais")
+        st.caption("Filtro ativo · " + " · ".join(partes) + ". Limpe os campos para ver todos.")
 
     # Checagem LIVE contra o CRM atual (não o flag estático do ranking, que fica
     # velho assim que se puxa alguém): decide o selo "NO CRM" e trava a duplicata.
     crm = dados.carregar_deputados()
     no_crm = lambda nome: dados.deputado_no_crm(nome, crm)  # noqa: E731
 
-    aba1, aba2 = st.tabs([f"Abordar já · {len(terr)}", f"Cortejar · {len(exp)}"])
-    with aba1:
+    def _aba_territorio():
         st.markdown('<div class="dd-intro">Já financiam educação/social <b>dentro</b> dos '
                     'municípios do PFC. Ação imediata.</div>', unsafe_allow_html=True)
         if terr.empty:
             st.caption("Ninguém no território ainda.")
         for i, row in terr.iterrows():
             _linha_descobrir(row, "territorio", i, no_crm(row["deputado"]))
-    with aba2:
+
+    def _aba_expansao():
         st.markdown('<div class="dd-intro">Alto alinhamento e volume no estado, ainda '
                     '<b>fora</b> dos nossos municípios (ou só de raspão). Alvo de cortejo — '
                     'emenda se redireciona a cada ciclo.</div>', unsafe_allow_html=True)
@@ -1002,6 +1088,35 @@ def render_descobrir() -> None:
                     f'<span class="ln"></span></div>', unsafe_allow_html=True)
         for i, row in dem.iterrows():
             _linha_descobrir(row, "expansao", i, no_crm(row["deputado"]))
+
+    def _aba_federal():
+        st.markdown('<div class="dd-intro">Deputados federais de SP, curados à mão. O valor é '
+                    'faixa <b>sugerida</b> (potencial de emenda), <b>não</b> execução. Já ficam '
+                    'no CRM Federal (aba própria) — por isso não têm "Puxar".</div>',
+                    unsafe_allow_html=True)
+        if not feds:
+            st.caption("Nenhum federal para este filtro.")
+        for i, dep in enumerate(feds):
+            _linha_descobrir_federal(dep, i)
+
+    # ---- Render por escopo ----
+    if escopo_sel == "Federal":
+        _aba_federal()
+    elif escopo_sel == "Estadual":
+        aba1, aba2 = st.tabs([f"Abordar já · {len(terr)}", f"Cortejar · {len(exp)}"])
+        with aba1:
+            _aba_territorio()
+        with aba2:
+            _aba_expansao()
+    else:  # Geral — os três num só lugar, cada aba com o seu escopo
+        aba1, aba2, aba3 = st.tabs([f"Abordar já · {len(terr)}",
+                                    f"Cortejar · {len(exp)}", f"Federais · {len(feds)}"])
+        with aba1:
+            _aba_territorio()
+        with aba2:
+            _aba_expansao()
+        with aba3:
+            _aba_federal()
 
 
 # =========================================================================== #
