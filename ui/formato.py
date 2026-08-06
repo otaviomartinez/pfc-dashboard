@@ -930,6 +930,50 @@ def _funil_emendas_colunas(deps: list) -> list:
     return colunas
 
 
+# Separador do id de card no funil GERAL (Passo 5). O kanban devolve um único
+# `org_id` opaco no drop, então embutimos o ESCOPO junto da CHAVE para rotear a
+# escrita sem ambiguidade (nome estadual × ID federal nunca colidem).  (SOH)
+# é um caractere de controle que não aparece em nome de deputado nem em ID.
+_SEP_ID_CARD = chr(1)  # SOH (U+0001): separa escopo/chave no id do card; nunca em nome/ID
+
+
+def _id_card_parlamentar(reg: dict) -> str:
+    """Codifica o id do card do funil geral como 'escopo\\x01chave'. A `chave` é o
+    NOME (estadual) ou o ID (federal) — a MESMA que roteia a escrita no drop."""
+    return f'{reg.get("escopo", "")}{_SEP_ID_CARD}{reg.get("chave", "")}'
+
+
+def _decodificar_id_card(org_id: str) -> tuple:
+    """Inverso de _id_card_parlamentar: 'escopo\\x01chave' → (escopo, chave).
+    Sem o separador (id legado/estranho), devolve ('', <id cru>) — aí o roteador
+    trata como escopo desconhecido e recusa a gravação, sem quebrar."""
+    org_id = str(org_id or "")
+    if _SEP_ID_CARD in org_id:
+        escopo, chave = org_id.split(_SEP_ID_CARD, 1)
+        return escopo.strip(), chave.strip()
+    return "", org_id.strip()
+
+
+def funil_parlamentares_colunas(regs: list) -> list:
+    """Colunas do kanban do FUNIL GERAL (Passo 5), a partir dos parlamentares já
+    unificados (carregar_parlamentares). Função PURA (sem st), testável.
+
+    Cada card leva `id = escopo\\x01chave` (roteia a escrita no drop) e mostra, no
+    meta, o PARTIDO · ESCOPO, o SCORE e a TEMPERATURA. REGRA DE OURO: o funil NÃO
+    exibe nem soma valor — execução estadual e faixa federal nunca se encontram
+    aqui; só status/score/temperatura, escopo a escopo."""
+    colunas = []
+    for etapa in EMENDA_FUNIL_ETAPAS:
+        cards = [{
+            "id": _id_card_parlamentar(r), "status": etapa, "nome": r["nome"],
+            "setor": f'{r.get("partido") or "—"} · {r.get("escopo_nome", "")}'.strip(" ·"),
+            "score": int(r.get("score") or 0),
+            "valor": f'{r.get("temp_emoji", "")} {r.get("temp", "")}'.strip(),
+        } for r in regs if _etapa_de_status(r.get("status", "")) == etapa]
+        colunas.append({"status": etapa, "cor": EMENDA_ETAPA_COR[etapa], "cards": cards})
+    return colunas
+
+
 def _dep_item_relatorio(row: dict, secao: str) -> dict:
     nome = str(row.get("deputado", "")).strip()
     if secao == "territorio":

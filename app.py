@@ -83,6 +83,7 @@ from ui.formato import (
     _cards_deputados,
     _contagens_emendas,
     _cor_score,
+    _decodificar_id_card,
     _deputados_federais_ordenados,
     _deputados_ordenados,
     _dias_texto,
@@ -109,6 +110,7 @@ from ui.formato import (
     css_icones_botoes,
     esc,
     estilo_plotly,
+    funil_parlamentares_colunas,
     lista_orgs_html,
     score_chip_cor,
     score_chip_hex,
@@ -1221,16 +1223,28 @@ def _mostrar_resultado(res):
 
 
 def render_funil_emendas() -> None:
-    """Funil de negociação dos deputados — MESMO kanban drag-and-drop da Captação.
-    Arrastar grava a nova etapa na coluna Status da aba Deputados (só essa célula)."""
-    deps = _deputados_ordenados()
+    """Funil de negociação GERAL (Passo 5) — todos os escopos no MESMO kanban
+    drag-and-drop (o mesmo componente da Captação). Arrastar ROTEIA a escrita pela
+    ORIGEM do card: estadual grava a coluna Status por NOME (aba Deputados);
+    federal grava Status CRM por ID (aba Deputados Federais). Nunca soma valores."""
     _mostrar_resultado(st.session_state.pop("kanban_emendas_msg", None))
-    if not deps:
-        st.warning("Base de deputados vazia.")
+
+    # Mesmo seletor de escopo da Visão geral (Passo 3), estado COMPARTILHADO
+    # (emenda_escopo_filtro): a escolha do usuário acompanha ele entre as telas.
+    st.session_state.setdefault("emenda_escopo_filtro", "Geral")
+    escopo_sel = st.segmented_control(
+        "Escopo", options=["Geral", "Estadual", "Federal", "Senador"],
+        key="emenda_escopo_filtro", label_visibility="collapsed") or "Geral"
+
+    regs = carregar_parlamentares(escopo_sel)
+    if not regs:
+        # Senador ainda não tem base (vazio elegante); idem qualquer filtro sem gente.
+        st.info("Escopo Senador ainda sem base — em breve." if escopo_sel == "Senador"
+                else "Nenhum parlamentar neste escopo.")
         return
 
     conectado = dados.deputados_conectado()
-    colunas = _funil_emendas_colunas(deps)
+    colunas = funil_parlamentares_colunas(regs)
     if not KANBAN_DND_OK or not conectado:
         # fallback estático (mesmo espírito do funil de Captação)
         cols_html = ""
@@ -1245,12 +1259,13 @@ def render_funil_emendas() -> None:
                           f'<div class="kbody">{cards}</div></div>')
         st.markdown(f'<div class="kan">{cols_html}</div>', unsafe_allow_html=True)
         st.caption("Arrastar-e-soltar disponível só com o Google Sheets conectado "
-                   "(a etapa grava direto na aba Deputados)." if not conectado
+                   "(a etapa grava direto na aba do parlamentar)." if not conectado
                    else "Arrastar-e-soltar indisponível neste ambiente.")
         return
 
-    # `clicavel` só quando logado: aí o clique num card abre a observação rápida
-    # (conteúdo sensível). Sem login, o card não emite clique — arrastar segue igual.
+    # `clicavel` só quando logado; a observação rápida (conteúdo sensível) só existe
+    # no ESTADUAL — o gate por escopo é no Python, porque o flag do componente vale
+    # para o quadro inteiro. Sem login, o card não emite clique — arrastar segue igual.
     pode_anotar = bool(st.session_state.get("user"))
     resultado = _kanban_component(colunas=colunas, editable=True, clicavel=pode_anotar,
                                   key="kanban_emendas", default=None)
@@ -1258,22 +1273,28 @@ def render_funil_emendas() -> None:
         nonce = resultado.get("nonce")
         if nonce and nonce != st.session_state.get("kanban_emendas_nonce"):
             st.session_state["kanban_emendas_nonce"] = nonce
-            # CLIQUE (sem arraste): abre o mini-editor de observação. Tratado ANTES
-            # do arraste porque não traz novo_status — não é um movimento de coluna.
+            # id do card = escopo + chave (nome estadual OU id federal). Decodifica
+            # ANTES de tudo, para rotear tanto o clique quanto o arraste.
+            escopo, chave = _decodificar_id_card(resultado.get("org_id", ""))
+            # CLIQUE (sem arraste): observação rápida — só estadual, só logado.
+            # Tratado ANTES do arraste porque não traz novo_status.
             if resultado.get("action") == "click":
-                nome = str(resultado.get("org_id", "")).strip()
-                if nome and pode_anotar:
-                    dlg_obs_rapida(nome)
+                if chave and pode_anotar and escopo == "estadual":
+                    dlg_obs_rapida(chave)
                 return
-            nome = str(resultado.get("org_id", "")).strip()   # id do card = nome do deputado
             novo = str(resultado.get("novo_status", "")).strip()
-            if nome and novo in EMENDA_FUNIL_ETAPAS:
-                res = dados.atualizar_status_deputado(nome, novo)
-                st.session_state["kanban_emendas_msg"] = res
-                st.toast(res.get("mensagem", ""))
-            else:
-                st.session_state["kanban_emendas_msg"] = {
-                    "sucesso": False, "mensagem": "Movimento inválido (etapa fora do funil)."}
+            # ===== ROTEAMENTO POR ORIGEM DO CARD (Passo 5) =====
+            if not chave or novo not in EMENDA_FUNIL_ETAPAS:
+                res = {"sucesso": False, "mensagem": "Movimento inválido (etapa fora do funil)."}
+            elif escopo == "estadual":               # chave = NOME  → aba Deputados
+                res = dados.atualizar_status_deputado(chave, novo)
+            elif escopo == "federal":                # chave = ID    → aba Deputados Federais
+                res = dados.atualizar_deputado_federal(chave, {"Status CRM": novo})
+            else:                                    # senador/futuro: ainda sem gravação
+                res = {"sucesso": False,
+                       "mensagem": "Escopo ainda sem gravação (ex.: Senador) — etapa não salva."}
+            st.session_state["kanban_emendas_msg"] = res
+            st.toast(res.get("mensagem", ""))
             st.rerun()  # sucesso confirma a coluna; falha faz o card voltar à origem
 
 
