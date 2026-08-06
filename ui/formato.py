@@ -1025,6 +1025,65 @@ def _tabela_emendas_html(itens: list) -> str:
             f'{linhas}</table>')
 
 
+# =========================================================================== #
+# RELATÓRIO GERAL de Emendas (Passo 6) — CRM unificado de todos os escopos.
+# Funções PURAS (sem st, sem reportlab), testáveis. A regra de ouro vive aqui:
+# cada linha carrega o valor JÁ ROTULADO pelo seu valor_tipo (rotulo_valor) e
+# NÃO existe campo de total — este relatório lista e CONTA, nunca soma valor.
+# --------------------------------------------------------------------------- #
+def itens_relatorio_parlamentares(regs: list) -> list:
+    """Linhas do relatório geral, uma por parlamentar, a partir dos registros
+    unificados (carregar_parlamentares). Cada linha traz `valor_rotulo` do tipo
+    correto (execução/sugerido/CRM) — nunca co-rotula errado — e nenhum total."""
+    return [{
+        "escopo": r.get("escopo", ""),
+        "escopo_nome": r.get("escopo_nome", ""),
+        "nome": r.get("nome", ""),
+        "partido": r.get("partido", "") or "—",
+        "score": str(_int0(r.get("score"))),
+        "ader": str(_int0(r.get("ader"))),
+        "chance": str(_int0(r.get("chance"))),
+        "temp": r.get("temp", "") or "—",
+        "status": r.get("status", "") or "—",
+        "valor_txt": str(r.get("valor_txt", "") or "").strip(),
+        "valor_rotulo": rotulo_valor(r.get("valor_tipo", "")),
+    } for r in regs]
+
+
+def resumo_relatorio_parlamentares(regs: list) -> dict:
+    """Contagens do relatório geral — SÓ números de pipeline, nunca dinheiro (a
+    regra de ouro proíbe agregar valor entre escopos). {total, em_articulacao,
+    reunioes, aprovadas}. Mesma leitura de status da capa (Passo 3)."""
+    def _s(r):
+        return str(r.get("status", "")).lower()
+    total = len(regs)
+    nao_iniciado = sum(1 for r in regs if "não iniciado" in _s(r) or "nao iniciado" in _s(r))
+    reunioes = sum(1 for r in regs if _s(r).startswith(("reunião", "reuniao")))
+    aprovadas = sum(1 for r in regs if "aprovada" in _s(r))
+    return {"total": total, "em_articulacao": total - nao_iniciado,
+            "reunioes": reunioes, "aprovadas": aprovadas}
+
+
+def _tabela_parlamentares_html(linhas: list) -> str:
+    """Tabela HTML da Seção 1 (on-screen), na mesma classe .rp da tela. Valor
+    rotulado por linha; sem total (regra de ouro)."""
+    corpo = ""
+    for i, d in enumerate(linhas, start=1):
+        valor = esc(d["valor_txt"]) if d["valor_txt"] else ""
+        rot = f'<div class="rp-sub">{esc(d["valor_rotulo"])}</div>'
+        corpo += (
+            f'<tr><td class="rp-n">{i}</td>'
+            f'<td><div class="rp-nome">{esc(d["nome"])}</div>'
+            f'<div class="rp-sub">{esc(d["partido"])} · {esc(d["escopo_nome"])}</div></td>'
+            f'<td style="font-weight:700;color:#8B7BF0">{esc(d["score"])}</td>'
+            f'<td>{esc(d["temp"])}</td>'
+            f'<td>{esc(d["status"])}</td>'
+            f'<td>{valor}{rot}</td></tr>')
+    return ('<table class="rp"><tr><th>#</th><th>Parlamentar</th><th>Score</th>'
+            '<th>Temperatura</th><th>Status</th><th>Valor (rotulado)</th></tr>'
+            f'{corpo}</table>')
+
+
 def _data_prazo(prazo):
     """Data do prazo: primeiro ISO (AAAA-MM-DD, como o radar grava), depois
     formatos livres via _parse_data. O ISO precisa vir ANTES porque a regex

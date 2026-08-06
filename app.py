@@ -102,6 +102,7 @@ from ui.formato import (
     _score_novidade,
     _sidebar_toggle_html,
     _tabela_emendas_html,
+    _tabela_parlamentares_html,
     _valor_rel,
     brl,
     brl_curto,
@@ -111,7 +112,9 @@ from ui.formato import (
     esc,
     estilo_plotly,
     funil_parlamentares_colunas,
+    itens_relatorio_parlamentares,
     lista_orgs_html,
+    resumo_relatorio_parlamentares,
     score_chip_cor,
     score_chip_hex,
     seg_html,
@@ -1490,21 +1493,41 @@ def render_relatorio_emendas():
     st.markdown(
         '<div class="phead" style="margin-bottom:6px"><h1 style="color:var(--ink)">'
         'Relatório de Prioridades</h1></div>', unsafe_allow_html=True)
-    territorio, expansao = _itens_relatorio_emendas()
-    if not territorio and not expansao:
-        st.info("Levantamento ainda não gerado. Rode `python -m src.emendas` para "
-                "produzir os rankings em `data/`.")
+
+    # Filtro de escopo compartilhado (Passos 3/5), default Geral: o relatório e o
+    # botão de imprimir passam a cobrir todos os escopos, respeitando a escolha.
+    st.session_state.setdefault("emenda_escopo_filtro", "Geral")
+    escopo_sel = st.segmented_control(
+        "Escopo", options=["Geral", "Estadual", "Federal", "Senador"],
+        key="emenda_escopo_filtro", label_visibility="collapsed") or "Geral"
+
+    # Seção 1 = CRM por escopo (unificado); Seção 2 = levantamento de execução,
+    # SÓ quando o escopo inclui estadual (Geral/Estadual).
+    regs = carregar_parlamentares(escopo_sel)
+    linhas = itens_relatorio_parlamentares(regs)
+    cont = resumo_relatorio_parlamentares(regs)
+    inclui_estadual = escopo_sel in ("Geral", "Estadual")
+    territorio, expansao = _itens_relatorio_emendas() if inclui_estadual else ([], [])
+
+    if not linhas and not territorio and not expansao:
+        st.info("Escopo Senador ainda sem base — em breve." if escopo_sel == "Senador"
+                else "Sem parlamentares no CRM deste escopo e levantamento ainda não "
+                     "gerado (rode `python -m src.emendas`).")
         return
 
     agora = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
-    resumo = (f"{len(territorio)} deputado(s) no território · "
-              f"{len(expansao)} alvo(s) prioritário(s) de expansão.")
+    resumo = (f"{cont['total']} parlamentar(es) · {cont['em_articulacao']} em articulação · "
+              f"{cont['reunioes']} reunião(ões) · {cont['aprovadas']} aprovada(s).")
     top = st.columns([3, 1])
     top[0].caption(f"🗓️ Gerado em {agora} · {resumo}")
-    pdf = relatorios.pdf_emendas(territorio, expansao, agora, resumo=resumo)
-    top[1].download_button("⬇ Baixar PDF", data=pdf,
-                           file_name=f"PFC_Prioridades_Emendas_{datetime.date.today():%Y-%m-%d}.pdf",
-                           mime="application/pdf", use_container_width=True)
+    # UM único botão de imprimir: um PDF com as duas seções, respeitando o filtro.
+    pdf = relatorios.pdf_parlamentares(
+        linhas, resumo, agora, escopo_sel=escopo_sel,
+        levantamento=(territorio, expansao) if inclui_estadual else None)
+    top[1].download_button(
+        "⬇ Baixar PDF", data=pdf,
+        file_name=f"PFC_Relatorio_Emendas_{slug(escopo_sel)}_{datetime.date.today():%Y-%m-%d}.pdf",
+        mime="application/pdf", use_container_width=True)
 
     st.markdown(
         '<style>'
@@ -1517,23 +1540,34 @@ def render_relatorio_emendas():
         '.rp .rp-sub{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:2px}'
         '</style>', unsafe_allow_html=True)
 
+    # ===== Seção 1 — CRM por escopo (todos os escopos do filtro) =====
     st.markdown('<div style="font-weight:700;font-size:15px;color:var(--ink);margin-top:8px">'
-                '1. Abordar já — atuam no território do PFC</div>'
-                '<div style="font-size:12.5px;color:var(--dim);margin:2px 0 4px">Já financiam '
-                'educação/social dentro dos municípios do PFC.</div>', unsafe_allow_html=True)
-    st.markdown(_tabela_emendas_html(territorio) if territorio
-                else '<div style="color:var(--dim);font-size:13px">Ninguém no território ainda.</div>',
+                '1. Parlamentares no CRM</div>'
+                '<div style="font-size:12.5px;color:var(--dim);margin:2px 0 4px">Cada valor é '
+                'rotulado pelo seu tipo (execução · sugerido · CRM) e nunca é somado entre '
+                'escopos.</div>', unsafe_allow_html=True)
+    st.markdown(_tabela_parlamentares_html(linhas) if linhas
+                else '<div style="color:var(--dim);font-size:13px">Nenhum parlamentar neste escopo.</div>',
                 unsafe_allow_html=True)
 
-    st.markdown('<div style="font-weight:700;font-size:15px;color:var(--ink);margin-top:20px">'
-                '2. Cortejar — alto volume, fora do território</div>'
-                '<div style="font-size:12.5px;color:var(--dim);margin:2px 0 4px">Alto alinhamento '
-                'e volume no estado, ainda fora dos nossos municípios.</div>', unsafe_allow_html=True)
-    st.markdown(_tabela_emendas_html(expansao) if expansao
-                else '<div style="color:var(--dim);font-size:13px">Sem alvos de expansão.</div>',
-                unsafe_allow_html=True)
-    st.caption("Valores da execução real 2023–2025 (Transparência SP). Autorizado e pago "
-               "separados, nunca somados. Contato oficial da ALESP (gabinete) — não o pessoal.")
+    # ===== Seção 2 — levantamento de execução (estadual), quando aplicável =====
+    if inclui_estadual and (territorio or expansao):
+        st.markdown('<div style="font-weight:700;font-size:15px;color:var(--ink);margin-top:22px">'
+                    '2. Levantamento de execução — quem abordar (estadual)</div>'
+                    '<div style="font-size:12.5px;color:var(--dim);margin:2px 0 4px">Execução real '
+                    '2023–2025 (Transparência SP). Autorizado e pago separados, nunca somados.</div>',
+                    unsafe_allow_html=True)
+        st.markdown('<div style="font-weight:600;font-size:13px;color:var(--ink);margin-top:10px">'
+                    '2.1 Abordar já — território do PFC</div>', unsafe_allow_html=True)
+        st.markdown(_tabela_emendas_html(territorio) if territorio
+                    else '<div style="color:var(--dim);font-size:13px">Ninguém no território ainda.</div>',
+                    unsafe_allow_html=True)
+        st.markdown('<div style="font-weight:600;font-size:13px;color:var(--ink);margin-top:14px">'
+                    '2.2 Cortejar — fora do território</div>', unsafe_allow_html=True)
+        st.markdown(_tabela_emendas_html(expansao) if expansao
+                    else '<div style="color:var(--dim);font-size:13px">Sem alvos de expansão.</div>',
+                    unsafe_allow_html=True)
+        st.caption("Contato oficial da ALESP (gabinete) — não o pessoal do relacionamento.")
 
 
 def _argumento_federal(dep: dict) -> str:

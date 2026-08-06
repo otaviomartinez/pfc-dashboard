@@ -14,6 +14,7 @@ o st.download_button.
 Funções públicas:
     pdf_captacao(itens, gerado_em, resumo=None) -> bytes
     pdf_emendas(territorio, expansao, gerado_em, resumo=None) -> bytes
+    pdf_parlamentares(linhas, resumo, gerado_em, escopo_sel="Geral", levantamento=None) -> bytes
 """
 from __future__ import annotations
 
@@ -435,6 +436,104 @@ def pdf_emendas(territorio: list[dict], expansao: list[dict], gerado_em: str,
                     "SP). Autorizado e pago são exibidos separados — nunca somados. Contato "
                     "oficial da ALESP (gabinete), não o contato pessoal do relacionamento.",
                     est["secao_cap"]))
+
+    doc.build(story, onFirstPage=rodape, onLaterPages=rodape)
+    return buffer.getvalue()
+
+
+# --------------------------------------------------------------------------- #
+# EMENDAS — Relatório GERAL (Passo 6): CRM por escopo + levantamento (opcional)
+# --------------------------------------------------------------------------- #
+def _tabela_parlamentares(linhas, est):
+    """Tabela do CRM por escopo. O valor de cada linha vem ROTULADO pelo seu tipo
+    (execução/sugerido/CRM) e NUNCA é somado — não há linha de total."""
+    cab = [_P("#", est["th"]), _P("PARLAMENTAR", est["th"]), _P("ESCOPO", est["th"]),
+           _P("SCORE", est["th"]), _P("TEMP.", est["th"]), _P("STATUS", est["th"]),
+           _P("VALOR (ROTULADO)", est["th"])]
+    linhas_tab = [cab]
+    estilo_linhas = []
+    for i, d in enumerate(linhas, start=1):
+        bloco = Table([[_P(d.get("nome") or "—", est["cel_b"])],
+                       [_P(d.get("partido") or "—", est["cel_dim"])]])
+        bloco.setStyle(TableStyle([
+            ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 1)]))
+        valor_txt = str(d.get("valor_txt") or "").strip()
+        rotulo = str(d.get("valor_rotulo") or "sem valor")
+        # valor E rótulo juntos, mas NUNCA somados com outra linha (regra de ouro)
+        valor = ("%s<br/><font size=7 color='#6B7688'>%s</font>" % (valor_txt, rotulo)
+                 if valor_txt else "<font size=7 color='#6B7688'>%s</font>" % rotulo)
+        linhas_tab.append([
+            _P(i, est["num"]), bloco,
+            _P(d.get("escopo_nome") or "—", est["cel_dim"]),
+            _P(d.get("score") or "—", est["cel_b"]),
+            _P(d.get("temp") or "—", est["cel_dim"]),
+            _P(d.get("status") or "—", est["cel"]),
+            _P(valor, est["cel"]),
+        ])
+        if i % 2 == 0:
+            estilo_linhas.append(("BACKGROUND", (0, i), (-1, i), _ZEBRA))
+
+    largura = A4[0] - 2 * _MARGEM
+    tabela = Table(linhas_tab,
+                   colWidths=[largura * x for x in (0.05, 0.24, 0.12, 0.08, 0.13, 0.18, 0.20)],
+                   repeatRows=1)
+    tabela.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), _TINTA),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.4, _LINHA),
+    ] + estilo_linhas))
+    return tabela
+
+
+def pdf_parlamentares(linhas: list[dict], resumo: str | None, gerado_em: str,
+                      escopo_sel: str = "Geral", levantamento=None) -> bytes:
+    """PDF do RELATÓRIO GERAL de Emendas (Passo 6). Um único documento:
+
+    Seção 1 — CRM por escopo (uma linha por parlamentar, valor ROTULADO pelo seu
+    tipo, NUNCA somado entre escopos).
+    Seção 2 — levantamento de execução (território/expansão), OPCIONAL: só quando
+    `levantamento=(territorio, expansao)` é passado (escopo inclui estadual).
+
+    `linhas`: itens_relatorio_parlamentares(regs) — cada um:
+        {escopo_nome, nome, partido, score, temp, status, valor_txt, valor_rotulo}
+    REGRA DE OURO: nenhum total agregando valores de tipos/escopos diferentes;
+    no levantamento, autorizado e pago seguem separados.
+    """
+    est = _estilos()
+    buffer = BytesIO()
+    sub = {"Geral": "Todos os escopos", "Estadual": "Deputados estaduais (ALESP)",
+           "Federal": "Deputados federais (Câmara)",
+           "Senador": "Senadores"}.get(escopo_sel, "Todos os escopos")
+    doc, rodape = _doc(buffer, _VIOLETA, "Relatório Geral · Emendas", gerado_em)
+    story = _cabecalho(_VIOLETA, "Relatório Geral — Emendas Parlamentares",
+                       "Articulação do CRM · %s" % sub, gerado_em, est)
+    if resumo:
+        story.append(_P(resumo, est["secao_cap"]))
+
+    story.append(_P("1. Parlamentares no CRM", est["secao"]))
+    story.append(_P("Cada valor é rotulado pelo seu tipo (execução · sugerido · CRM) "
+                    "e nunca é somado entre escopos.", est["secao_cap"]))
+    if linhas:
+        story.append(_tabela_parlamentares(linhas, est))
+    else:
+        story.append(_P("Nenhum parlamentar neste escopo.", est["vazio"]))
+
+    territorio, expansao = (levantamento or ([], []))
+    if territorio or expansao:
+        story.append(Spacer(1, 14))
+        story.append(_P("2. Levantamento de execução — quem abordar (estadual)", est["secao"]))
+        story.append(_P("Execução real de emendas estaduais 2023–2025 (Transparência SP). "
+                        "Autorizado e pago separados, nunca somados.", est["secao_cap"]))
+        if territorio:
+            story.append(_P("2.1 Abordar já — atuam no território do PFC", est["secao_cap"]))
+            story.append(_tabela_emendas(territorio, est, _VIOLETA))
+        if expansao:
+            story.append(Spacer(1, 8))
+            story.append(_P("2.2 Cortejar — alto volume, fora do território", est["secao_cap"]))
+            story.append(_tabela_emendas(expansao, est, _VIOLETA))
 
     doc.build(story, onFirstPage=rodape, onLaterPages=rodape)
     return buffer.getvalue()
