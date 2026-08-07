@@ -915,6 +915,23 @@ def _orfaos_com_candidatos(orfaos_df, base_df, ibge_df, terr_df, exp_df) -> list
     return resultado
 
 
+def aviso_contexto_territorios(escopo_sel: str) -> str:
+    """Aviso honesto de contexto da tela Territórios em Aberto (Passo 7). Função PURA.
+
+    Territórios é uma análise ESTADUAL por natureza — cruza execução estadual
+    georreferenciada (Transparência SP × Regiões Imediatas IBGE); não existe série
+    federal/senador equivalente. Então sob esses escopos o conteúdo NÃO muda (segue
+    estadual) — só declaramos isso honestamente. Retorna '' para Geral/Estadual (sem
+    aviso) e a frase para Federal/Senador. Nunca promete candidatos/série federal."""
+    alvo = str(escopo_sel or "Geral").strip().lower()
+    nome = {"federal": "Federal", "senador": "Senador"}.get(alvo)
+    if not nome:
+        return ""
+    return (f"Escopo {nome} selecionado: esta análise usa execução ESTADUAL "
+            f"georreferenciada (não há série {nome.lower()} equivalente). "
+            f"O conteúdo abaixo é sempre estadual.")
+
+
 def _funil_emendas_colunas(deps: list) -> list:
     """Monta as colunas do kanban a partir dos deputados, enquadrando cada um na
     sua etapa. card.id = nome (chave da aba); card.status = a etapa (coluna)."""

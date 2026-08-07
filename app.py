@@ -104,6 +104,7 @@ from ui.formato import (
     _tabela_emendas_html,
     _tabela_parlamentares_html,
     _valor_rel,
+    aviso_contexto_territorios,
     brl,
     brl_curto,
     capa_payload_parlamentares,
@@ -1143,6 +1144,17 @@ def render_orfaos() -> None:
         'deputados que já atuam na mesma região (Região Imediata · IBGE) — os candidatos a '
         'levar emenda para lá. Baseado na execução real de 2023–2025 (Transparência SP).</div>',
         unsafe_allow_html=True)
+
+    # Filtro de escopo compartilhado (Passos 3-6), default Geral. Territórios é uma
+    # análise ESTADUAL por natureza: o conteúdo abaixo NÃO muda por escopo — sob
+    # Federal/Senador só declaramos isso honestamente (aviso_contexto_territorios).
+    st.session_state.setdefault("emenda_escopo_filtro", "Geral")
+    escopo_sel = st.segmented_control(
+        "Escopo", options=["Geral", "Estadual", "Federal", "Senador"],
+        key="emenda_escopo_filtro", label_visibility="collapsed") or "Geral"
+    aviso = aviso_contexto_territorios(escopo_sel)
+    if aviso:
+        st.info(aviso)
 
     # Carga + cruzamento BLINDADOS: qualquer falha (CSV ausente no deploy, módulo
     # de dados defasado, erro de leitura) cai num estado vazio elegante — a tela
