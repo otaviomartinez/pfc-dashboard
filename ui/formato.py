@@ -932,6 +932,19 @@ def aviso_contexto_territorios(escopo_sel: str) -> str:
             f"O conteúdo abaixo é sempre estadual.")
 
 
+# Páginas da sidebar de Emendas → 'modo' de conteúdo. Fonte única (Passo 8), pura
+# e testável. Página desconhecida ou LEGADA (ex.: 'Lista' das antigas FEDERAL_PAGES,
+# aposentadas com a unificação de estado) cai em 'visao' — blinda a migração.
+_MODO_EMENDA = {"Visão geral": "visao", "Deputados": "deputados",
+                "Descobrir": "descobrir", "Territórios em Aberto": "orfaos",
+                "Funil de negociação": "funil", "Relatório": "relatorio"}
+
+
+def _modo_emenda(page: str) -> str:
+    """Modo de conteúdo da página de Emendas; 'visao' para página desconhecida/legada."""
+    return _MODO_EMENDA.get(page, "visao")
+
+
 def _funil_emendas_colunas(deps: list) -> list:
     """Monta as colunas do kanban a partir dos deputados, enquadrando cada um na
     sua etapa. card.id = nome (chave da aba); card.status = a etapa (coluna)."""

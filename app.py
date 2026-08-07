@@ -92,6 +92,7 @@ from ui.formato import (
     _fmt_prazo,
     _funil_emendas_colunas,
     _itens_relatorio_emendas,
+    _modo_emenda,
     _muns_pfc,
     _op_de_novidade,
     _orfaos_com_candidatos,
@@ -619,9 +620,10 @@ EMENDA_PAGES = ["Visão geral", "Deputados", "Descobrir", "Territórios em Abert
 # Páginas do escopo FEDERAL (Câmara): a sidebar troca EMENDA_PAGES por estas
 # quando emenda_escopo == "Federal". São as duas telas de render_federal, que
 # são dirigidas pelo estado `federal_vista` (mesmo valor do radio in-page).
-FEDERAL_PAGES = ["Lista", "Funil de negociação"]
+FEDERAL_PAGES = ["Lista", "Funil de negociação"]  # morto após Passo 8 — remover no Commit 2
 # Escopo do painel: Estadual (ALESP) e Federal (Câmara) navegáveis; Senadores em
 # breve. (nome, legenda, ativo). O clicável vira botão; "em breve" fica markdown.
+# morto após Passo 8 — remover no Commit 2 (o escopo virou o segmented control de conteúdo)
 EMENDA_ESCOPO = [("Estadual", "ALESP", True), ("Federal", "Câmara", True),
                  ("Senadores", "em breve", False)]
 EMENDA_ESCOPOS_ATIVOS = ["Estadual", "Federal"]
@@ -642,15 +644,17 @@ EMENDA_ROTULOS = {**{f"emnav_{slug(p)}": p for p in EMENDA_PAGES},
 
 
 def ir_para_emenda(pagina: str):
+    # Passo 8: só navega de página. O escopo virou eixo único (emenda_escopo_filtro,
+    # no conteúdo) — a sidebar não escreve mais emenda_escopo.
     st.session_state["emenda_page"] = pagina
-    # As páginas de Articulação são do Estadual; clicar numa delas volta ao Estadual.
-    st.session_state["emenda_escopo"] = "Estadual"
 
 
+# morto após Passo 8 — remover no Commit 2 (sem seção "Escopo" na sidebar)
 def ir_para_escopo(escopo: str):
     st.session_state["emenda_escopo"] = escopo
 
 
+# morto após Passo 8 — remover no Commit 2 (não há mais painel Federal separado)
 def ir_para_federal(vista: str):
     # Navegação das telas do escopo Federal: escreve o MESMO estado que o radio
     # in-page de render_federal (`federal_vista`). O callback roda antes de
@@ -671,51 +675,25 @@ def render_sidebar_emendas():
             '<div class="bt">Futuro Cientista<small>EMENDAS PARLAMENTARES</small></div></div>',
             unsafe_allow_html=True,
         )
-        escopo_atual = st.session_state.get("emenda_escopo", "Estadual")
-        # Articulação — páginas navegáveis, SENSÍVEIS AO ESCOPO ativo (mesma lógica
-        # que separa Estadual/Federal em render_emendas):
-        #   Estadual → páginas da ALESP (Visão/Descobrir/Territórios/Funil/Relatório),
-        #              dirigidas por `emenda_page` + ir_para_emenda.
-        #   Federal  → telas da Câmara (Lista / Funil), dirigidas por `federal_vista`
-        #              + ir_para_federal (o mesmo estado do radio de render_federal).
+        # Passo 8: a sidebar é SÓ navegação de página (EMENDA_PAGES, sempre as 6). O
+        # escopo (Geral/Estadual/Federal/Senador) é escolhido pelo segmented control
+        # DENTRO de cada tela (emenda_escopo_filtro) — não há mais seção "Escopo" aqui,
+        # nem ramo Federal. O conteúdo federal vem pelas telas unificadas.
         st.markdown('<div class="sb-sec">Articulação</div>', unsafe_allow_html=True)
-        if escopo_atual == "Federal":
-            fed_atual = st.session_state.get("federal_vista", "Lista")
-            n_deps = len(_deputados_federais_ordenados())
-            for p in FEDERAL_PAGES:
-                st.button(p, key=f"fednav_{slug(p)}", use_container_width=True,
-                          type="primary" if fed_atual == p else "secondary",
-                          on_click=ir_para_federal, args=(p,))
-        else:
-            n_deps = _contagens_emendas(_deputados_ordenados())["deputados"]
-            for p in EMENDA_PAGES:
-                rotulo = f"{p} · {n_deps}" if p == "Deputados" else p
-                st.button(rotulo, key=f"emnav_{slug(p)}", use_container_width=True,
-                          type="primary" if atual == p else "secondary",
-                          on_click=ir_para_emenda, args=(p,))
-        # Escopo — Estadual (ALESP) e Federal (Câmara) navegáveis; Senadores em
-        # breve (markdown). O botão do escopo ativo fica em destaque (primary).
-        st.markdown('<div class="sb-sec">Escopo</div>', unsafe_allow_html=True)
-        for nome, legenda, ativo in EMENDA_ESCOPO:
-            if ativo:
-                st.button(f"{nome} · {legenda}", key=f"emesc_{slug(nome)}",
-                          use_container_width=True,
-                          type="primary" if escopo_atual == nome else "secondary",
-                          on_click=ir_para_escopo, args=(nome,))
-            else:
-                st.markdown(f'<div class="esc-item esc-off" title="{esc(nome)}">'
-                            f'{svg_icone("bloqueado")}<span class="esc-nome">{esc(nome)}</span>'
-                            f'<span class="esc-leg">{esc(legenda)}</span></div>',
-                            unsafe_allow_html=True)
+        n_est = _contagens_emendas(_deputados_ordenados())["deputados"]
+        n_deps = n_est + len(_deputados_federais_ordenados())
+        for p in EMENDA_PAGES:
+            rotulo = f"{p} · {n_est}" if p == "Deputados" else p
+            st.button(rotulo, key=f"emnav_{slug(p)}", use_container_width=True,
+                      type="primary" if atual == p else "secondary",
+                      on_click=ir_para_emenda, args=(p,))
         # Status de conexão = cor de saúde (verde vivo / vermelho caiu), igual ao
-        # Captação. A contagem de deputados desce para a 2ª linha (ponto neutro).
+        # Captação. A contagem (estaduais + federais) desce para a 2ª linha.
         conn = ('<div class="sf"><span class="d g"></span>SHEETS CONECTADO</div>'
                 if modo_conectado else
                 '<div class="sf"><span class="d r"></span>MODO LOCAL · CSV</div>')
-        # Contagem e fonte do ESCOPO ativo: Federal = Câmara, Estadual = ALESP.
-        fonte = "CÂMARA" if escopo_atual == "Federal" else "ALESP"
         st.markdown(f'<div class="sb-foot">{conn}'
-                    f'<div class="sf"><span class="d n"></span>{n_deps} DEPUTADOS · {fonte}</div></div>',
+                    f'<div class="sf"><span class="d n"></span>{n_deps} PARLAMENTARES · ALESP + CÂMARA</div></div>',
                     unsafe_allow_html=True)
         if st.button("Trocar radar", key="emenda_trocar", use_container_width=True):
             st.session_state["radar_escolhido"] = None
@@ -1783,6 +1761,7 @@ def _funil_federal_colunas(deps: list) -> list:
     return colunas
 
 
+# morto após Passo 8 — remover no Commit 2 (funil federal migrou p/ o funil unificado)
 def _render_funil_federal(deps: list) -> None:
     """Funil de negociação dos federais — MESMO kanban do funil de deputados.
     Arrastar grava a etapa na coluna 'Status CRM' da aba Deputados Federais."""
@@ -1823,6 +1802,7 @@ def _render_funil_federal(deps: list) -> None:
             st.rerun()
 
 
+# morto após Passo 8 — remover no Commit 2 (conteúdo federal migrou p/ telas unificadas)
 def render_federal() -> None:
     """Escopo FEDERAL: listagem (cards clicáveis → dossiê) + funil de negociação,
     lendo da aba 'Deputados Federais'. Mesmo estilo visual do Estadual."""
@@ -1952,20 +1932,14 @@ def _render_capa_geral(escopo_sel: str) -> None:
 def render_emendas():
     """Painel do radar de Emendas Parlamentares (CRM de deputados)."""
     st.markdown(_EMENDAS_CHROME_CSS, unsafe_allow_html=True)
-    escopo = st.session_state.setdefault("emenda_escopo", "Estadual")
+    # Passo 8: eixo de estado ÚNICO. O escopo é escolhido pelo segmented control de
+    # CONTEÚDO (emenda_escopo_filtro) em cada tela — não mais pela sidebar. O antigo
+    # emenda_escopo e o early-return pro painel Federal foram aposentados; o conteúdo
+    # federal chega pelas telas unificadas (filtro=Federal/Geral).
     emenda_page = st.session_state.setdefault("emenda_page", "Visão geral")
-    modo = {"Visão geral": "visao", "Deputados": "deputados", "Descobrir": "descobrir",
-            "Territórios em Aberto": "orfaos", "Funil de negociação": "funil",
-            "Relatório": "relatorio"}.get(emenda_page, "visao")
-    render_topnav("emendas", "FEDERAL · CÂMARA" if escopo == "Federal" else emenda_page.upper())
+    modo = _modo_emenda(emenda_page)
+    render_topnav("emendas", emenda_page.upper())
     render_sidebar_emendas()
-
-    # Escopo FEDERAL: listagem própria (lê da aba 'Deputados Federais'). As páginas
-    # de Articulação (Visão/Descobrir/etc.) são do Estadual — o Federal ainda é só
-    # a listagem, então retorna aqui.
-    if escopo == "Federal":
-        render_federal()
-        return
 
     hora = datetime.datetime.now().hour
     saud = "Bom dia" if hora < 12 else "Boa tarde" if hora < 18 else "Boa noite"
@@ -1980,7 +1954,7 @@ def render_emendas():
         f'<div class="topbar"><div>'
         f'<div class="hi">{saud}, {esc(primeiro)}</div>'
         f'<div class="cr" style="margin-top:6px">{esc(subttl)}</div></div>'
-        f'<div class="tr-r"><div class="live">ALESP · ESTADUAL</div></div></div>'
+        f'<div class="tr-r"><div class="live">ALESP + CÂMARA</div></div></div>'
         '<div class="hr-line"></div>',
         unsafe_allow_html=True,
     )
