@@ -529,6 +529,15 @@ def carregar_parlamentares(escopo: str = "Geral") -> list:
     return registros
 
 
+def _e_nao_iniciado(status: str) -> bool:
+    """True se a ETAPA é 'Não iniciado' — incluindo status vazio/None (sem etapa =
+    não iniciado). Predicado ÚNICO de 'em articulação' (contagem E lista, em todos os
+    escopos): em articulação == not _e_nao_iniciado(status). Lê a ETAPA (status),
+    NUNCA o Diálogo (observação livre)."""
+    s = str(status or "").strip().lower()
+    return s == "" or "não iniciado" in s or "nao iniciado" in s
+
+
 def capa_payload_parlamentares(regs: list, filtro: str | None = None,
                                escopo_sel: str = "Geral") -> dict:
     """Monta o payload da CAPA GERAL (Passo 3) a partir dos registros unificados —
@@ -551,7 +560,7 @@ def capa_payload_parlamentares(regs: list, filtro: str | None = None,
 
     def _st(r):
         return str(r.get("status", "")).lower()
-    nao_abordados = sum(1 for r in regs if "não iniciado" in _st(r) or "nao iniciado" in _st(r))
+    nao_abordados = sum(1 for r in regs if _e_nao_iniciado(r.get("status")))
     articulacao = total - nao_abordados
     reunioes = sum(1 for r in regs if _st(r).startswith(("reunião", "reuniao")))
     aprovadas = sum(1 for r in regs if "aprovada" in _st(r))
@@ -567,7 +576,7 @@ def capa_payload_parlamentares(regs: list, filtro: str | None = None,
                     "n": cont_temp.get(t, 0), "pct": round(cont_temp.get(t, 0) / total * 100)}
                    for t in _TEMP_ORDEM]
 
-    em_articulacao = [r for r in regs if "iniciado" not in _st(r)]
+    em_articulacao = [r for r in regs if not _e_nao_iniciado(r.get("status"))]
     lista_reunioes = [r for r in regs if _st(r).startswith(("reunião", "reuniao"))]
     lista_aprovadas = [r for r in regs if "aprovada" in _st(r)]
     regs_view = [r for r in regs if r["temp"] == filtro] if filtro else regs

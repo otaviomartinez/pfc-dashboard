@@ -87,6 +87,7 @@ from ui.formato import (
     _deputados_federais_ordenados,
     _deputados_ordenados,
     _dias_texto,
+    _e_nao_iniciado,
     _etapa_de_status,
     _filtrar_descobrir,
     _fmt_prazo,
@@ -2008,8 +2009,7 @@ def render_emendas():
                     key="emendas_v2", on_acao_change=lambda: None)
         return
 
-    nao_abordados = sum(1 for d in deps if "não iniciado" in d["status"].lower()
-                        or "nao iniciado" in d["status"].lower())
+    nao_abordados = sum(1 for d in deps if _e_nao_iniciado(d["status"]))
     articulacao = total - nao_abordados
     cont = _contagens_emendas(deps)  # mesma contagem que alimenta o card do hub
     reunioes, aprovadas = cont["reunioes"], cont["aprovadas"]
@@ -2028,7 +2028,7 @@ def render_emendas():
                    for t in _TEMP_ORDEM]
 
     # subconjuntos reais por trás de cada interação
-    em_articulacao = [d for d in deps if "iniciado" not in d["status"].lower()]
+    em_articulacao = [d for d in deps if not _e_nao_iniciado(d["status"])]
     lista_reunioes = [d for d in deps if d["status"].lower().startswith(("reunião", "reuniao"))]
     lista_aprovadas = [d for d in deps if "aprovada" in d["status"].lower()]
 
