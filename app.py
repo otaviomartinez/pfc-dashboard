@@ -116,6 +116,7 @@ from ui.formato import (
     funil_parlamentares_colunas,
     itens_relatorio_parlamentares,
     lista_orgs_html,
+    plano_obs,
     resumo_relatorio_parlamentares,
     score_chip_cor,
     score_chip_hex,
@@ -522,15 +523,25 @@ def dlg_deputado(dep: dict):
 
 
 @st.dialog("Observação rápida", width="small")
-def dlg_obs_rapida(nome: str):
-    """Mini-editor aberto ao CLICAR num card do funil de Emendas. Anexa uma
-    observação ao MESMO campo Diálogo que o dossiê edita (sensível → só logado).
-    Não toca em status, temperatura nem contatos: grava só o Diálogo (append)."""
+def dlg_obs_rapida(escopo: str, chave: str):
+    """Mini-editor aberto ao CLICAR num card do funil de Emendas (estadual OU
+    federal). Anexa uma observação DATADA ao MESMO campo Diálogo que o dossiê edita
+    (sensível → só logado). NÃO toca em status/etapa, temperatura nem contatos:
+    grava só o Diálogo. Roteia a gravação por escopo (plano_obs)."""
     if not st.session_state.get("user"):
         st.warning("🔒 Conteúdo restrito à equipe logada.")
         return
-    # Diálogo atual como contexto (read-only), casando por nome no CRM.
-    dep = next((d for d in _deputados_ordenados() if d["nome"] == nome), None)
+    # Diálogo atual (contexto read-only) da base CERTA por escopo: estadual casa
+    # por nome (aba Deputados); federal por ID (aba Deputados Federais).
+    if escopo == "federal":
+        dep = next((d for d in _deputados_federais_ordenados()
+                    if str(d.get("id")) == str(chave)), None)
+        nome = (dep or {}).get("nome") or str(chave)
+        aba = "Deputados Federais"
+    else:
+        dep = next((d for d in _deputados_ordenados() if d["nome"] == chave), None)
+        nome = str(chave)
+        aba = "Deputados"
     atual = (dep or {}).get("dialogo", "")
     st.markdown(
         f'<div style="font-size:16px;font-weight:700;color:var(--ink)">{esc(nome)}</div>'
@@ -546,17 +557,23 @@ def dlg_obs_rapida(nome: str):
             f'max-height:150px;overflow-y:auto;white-space:pre-wrap">{esc(atual)}</div>',
             unsafe_allow_html=True)
 
-    nota = st.text_area("Nova observação", height=120, key=f"obsrap_txt_{nome}",
+    nota = st.text_area("Nova observação", height=120, key=f"obsrap_txt_{escopo}_{chave}",
                         placeholder="Ex.: Ligação com o assessor — pediu proposta por e-mail até sexta.")
     if st.button("Salvar observação", type="primary", use_container_width=True,
-                 key=f"obsrap_save_{nome}"):
+                 key=f"obsrap_save_{escopo}_{chave}"):
         if not nota.strip():
             st.info("Escreva uma observação antes de salvar.")
         else:
-            res = dados.anexar_dialogo_deputado(nome, nota.strip())
+            plano = plano_obs(escopo, chave, nota.strip(), atual)
+            if plano["porta"] == "estadual":
+                res = dados.anexar_dialogo_deputado(plano["nome"], plano["texto"])
+            elif plano["porta"] == "federal":
+                res = dados.atualizar_deputado_federal(plano["id"], plano["campos"])
+            else:
+                res = {"sucesso": False, "mensagem": "Escopo sem gravação de observação."}
             if res.get("sucesso"):
                 st.success("✓ Observação anexada ao diálogo — visível também no dossiê.")
-                st.toast("Salvo na aba Deputados.")
+                st.toast(f"Salvo na aba {aba}.")
                 st.caption("Feche para voltar ao funil.")
             else:
                 st.warning(res.get("mensagem", "Não foi possível gravar."))
@@ -1244,8 +1261,8 @@ def render_funil_emendas() -> None:
             # CLIQUE (sem arraste): observação rápida — só estadual, só logado.
             # Tratado ANTES do arraste porque não traz novo_status.
             if resultado.get("action") == "click":
-                if chave and pode_anotar and escopo == "estadual":
-                    dlg_obs_rapida(chave)
+                if chave and pode_anotar and escopo in ("estadual", "federal"):
+                    dlg_obs_rapida(escopo, chave)
                 return
             novo = str(resultado.get("novo_status", "")).strip()
             # ===== ROTEAMENTO POR ORIGEM DO CARD (Passo 5) =====

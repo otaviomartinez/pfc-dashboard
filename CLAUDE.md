@@ -52,7 +52,10 @@ contatos pessoais/de assessor. Sensível (regra 2). Porta única: leitura
 `dados.atualizar_status_deputado` (arrastar no funil), `dados.atualizar_deputado`
 (editar diálogo/temperatura/status/observações no **dossiê**, só as células que
 mudaram) e `dados.anexar_dialogo_deputado` (**observação rápida** clicando num
-card do funil — anexa datado ao mesmo campo Diálogo). Edição só para logado
+card do funil — anexa datado ao mesmo campo Diálogo). A obs rápida do funil vale
+para os DOIS escopos: no federal grava por ID via `dados.atualizar_deputado_federal`
+({"Diálogo": …}, append+carimbo composto em `ui.formato.compor_dialogo`), sem nunca
+mudar a etapa (Status CRM). Edição só para logado
 (regra 2); contatos OFICIAIS da ALESP são só-leitura. Detalhes na seção Armadilhas.
 
 **2. Levantamento público "quem abordar"** — descoberta automática, separada do

@@ -993,6 +993,43 @@ def _decodificar_id_card(org_id: str) -> tuple:
     return "", org_id.strip()
 
 
+def compor_dialogo(atual: str, texto: str, agora: str | None = None) -> str:
+    """Anexa uma observação DATADA ao Diálogo, preservando o histórico — MESMO
+    formato do estadual (dados.anexar_dialogo_deputado): '[dd/mm/aaaa HH:MM] texto'.
+    `agora` é injetável (teste). Usado no roteamento FEDERAL da obs rápida, cuja
+    porta (atualizar_deputado_federal) grava a célula RAW e NÃO anexa sozinha.
+    PURA e testável. Texto vazio devolve o atual intacto."""
+    texto = str(texto or "").strip()
+    atual = str(atual or "").strip()
+    if not texto:
+        return atual
+    if agora is None:
+        agora = pd.Timestamp.now().strftime("%d/%m/%Y %H:%M")
+    nova = f"[{agora}] {texto}"
+    return f"{atual}\n{nova}".strip() if atual else nova
+
+
+def plano_obs(escopo: str, chave: str, nota: str, atual: str = "") -> dict:
+    """Roteamento PURO da observação rápida do funil por escopo. Devolve o que a
+    casca (dlg_obs_rapida) deve executar — sem tocar em Streamlit nem no Sheets:
+
+      estadual → {'porta':'estadual','nome':chave,'texto':nota}   (a porta
+                 anexar_dialogo_deputado faz o append+carimbo por dentro)
+      federal  → {'porta':'federal','id':chave,
+                  'campos':{'Diálogo': compor_dialogo(atual,nota)}}  (append+carimbo
+                 aqui; grava por ID via atualizar_deputado_federal)
+      outro    → {'porta': None}   (ex.: senador — ainda sem gravação)
+
+    REGRA DE EIXO: a obs grava só o Diálogo (observação); NUNCA 'Status CRM' (etapa)."""
+    escopo = str(escopo or "").strip().lower()
+    if escopo == "estadual":
+        return {"porta": "estadual", "nome": chave, "texto": nota}
+    if escopo == "federal":
+        return {"porta": "federal", "id": chave,
+                "campos": {"Diálogo": compor_dialogo(atual, nota)}}
+    return {"porta": None}
+
+
 def funil_parlamentares_colunas(regs: list) -> list:
     """Colunas do kanban do FUNIL GERAL (Passo 5), a partir dos parlamentares já
     unificados (carregar_parlamentares). Função PURA (sem st), testável.
