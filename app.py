@@ -87,7 +87,6 @@ from ui.formato import (
     _deputados_federais_ordenados,
     _deputados_ordenados,
     _dias_texto,
-    _e_nao_iniciado,
     _etapa_de_status,
     _filtrar_descobrir,
     _fmt_prazo,
@@ -614,33 +613,20 @@ def dlg_em_articulacao(lista):
     st.markdown(_cards_deputados(lista, extras), unsafe_allow_html=True)
 
 
-# Navegação do painel de Emendas (páginas próprias + escopo).
-# "Descobrir" é a tela de PLANEJAMENTO (quem abordar), separada do CRM dos 16.
-EMENDA_PAGES = ["Visão geral", "Deputados", "Descobrir", "Territórios em Aberto",
+# Navegação do painel de Emendas — páginas próprias. O escopo (Geral/Estadual/
+# Federal/Senador) vive no segmented control de CONTEÚDO (emenda_escopo_filtro),
+# não na sidebar (Passo 8). "Descobrir" é planejamento, separado do CRM.
+EMENDA_PAGES = ["Visão geral", "Descobrir", "Territórios em Aberto",
                 "Funil de negociação", "Relatório"]
-# Páginas do escopo FEDERAL (Câmara): a sidebar troca EMENDA_PAGES por estas
-# quando emenda_escopo == "Federal". São as duas telas de render_federal, que
-# são dirigidas pelo estado `federal_vista` (mesmo valor do radio in-page).
-FEDERAL_PAGES = ["Lista", "Funil de negociação"]  # morto após Passo 8 — remover no Commit 2
-# Escopo do painel: Estadual (ALESP) e Federal (Câmara) navegáveis; Senadores em
-# breve. (nome, legenda, ativo). O clicável vira botão; "em breve" fica markdown.
-# morto após Passo 8 — remover no Commit 2 (o escopo virou o segmented control de conteúdo)
-EMENDA_ESCOPO = [("Estadual", "ALESP", True), ("Federal", "Câmara", True),
-                 ("Senadores", "em breve", False)]
-EMENDA_ESCOPOS_ATIVOS = ["Estadual", "Federal"]
 # chave do botão -> ícone (a chave vira a classe st-key-<chave> que o CSS usa)
-EMENDA_ICONES = {"emnav_visao-geral": "visao-geral", "emnav_deputados": "deputados",
+EMENDA_ICONES = {"emnav_visao-geral": "visao-geral",
                  "emnav_descobrir": "descobrir",
                  "emnav_territorios-em-aberto": "local",
                  "emnav_funil-de-negociacao": "funil-negociacao",
                  "emnav_relatorio": "relatorio",
-                 "emesc_estadual": "local", "emesc_federal": "deputados",
-                 "fednav_lista": "deputados", "fednav_funil-de-negociacao": "funil-negociacao",
                  "emenda_trocar": "trocar-radar", "emenda_logout": "sair"}
 # chave do botão -> nome no tooltip do modo ícone
 EMENDA_ROTULOS = {**{f"emnav_{slug(p)}": p for p in EMENDA_PAGES},
-                  **{f"fednav_{slug(p)}": p for p in FEDERAL_PAGES},
-                  "emesc_estadual": "Estadual · ALESP", "emesc_federal": "Federal · Câmara",
                   "emenda_trocar": "Trocar radar", "emenda_logout": "Sair"}
 
 
@@ -648,20 +634,6 @@ def ir_para_emenda(pagina: str):
     # Passo 8: só navega de página. O escopo virou eixo único (emenda_escopo_filtro,
     # no conteúdo) — a sidebar não escreve mais emenda_escopo.
     st.session_state["emenda_page"] = pagina
-
-
-# morto após Passo 8 — remover no Commit 2 (sem seção "Escopo" na sidebar)
-def ir_para_escopo(escopo: str):
-    st.session_state["emenda_escopo"] = escopo
-
-
-# morto após Passo 8 — remover no Commit 2 (não há mais painel Federal separado)
-def ir_para_federal(vista: str):
-    # Navegação das telas do escopo Federal: escreve o MESMO estado que o radio
-    # in-page de render_federal (`federal_vista`). O callback roda antes de
-    # qualquer widget, então setar a chave do radio aqui é seguro.
-    st.session_state["federal_vista"] = vista
-    st.session_state["emenda_escopo"] = "Federal"
 
 
 def render_sidebar_emendas():
@@ -684,8 +656,7 @@ def render_sidebar_emendas():
         n_est = _contagens_emendas(_deputados_ordenados())["deputados"]
         n_deps = n_est + len(_deputados_federais_ordenados())
         for p in EMENDA_PAGES:
-            rotulo = f"{p} · {n_est}" if p == "Deputados" else p
-            st.button(rotulo, key=f"emnav_{slug(p)}", use_container_width=True,
+            st.button(p, key=f"emnav_{slug(p)}", use_container_width=True,
                       type="primary" if atual == p else "secondary",
                       on_click=ir_para_emenda, args=(p,))
         # Status de conexão = cor de saúde (verde vivo / vermelho caiu), igual ao
@@ -1748,115 +1719,6 @@ def dlg_deputado_federal(dep: dict) -> None:
         st.caption("ℹ️ A edição do relacionamento é restrita à equipe logada.")
 
 
-def _funil_federal_colunas(deps: list) -> list:
-    """Colunas do kanban dos federais. card.id = ID; card.cor = cor da etapa
-    (o kanban esconde 'SCORE' quando há cor). Status vem de 'Status CRM'."""
-    colunas = []
-    for etapa in EMENDA_FUNIL_ETAPAS:
-        cards = [{"id": d["id"], "status": etapa, "nome": d["nome"],
-                  "setor": d.get("partido") or "—",
-                  "valor": f'{_TEMP_EMOJI.get(d.get("temp", ""), "")} {d.get("valor_sugerido", "")}'.strip(),
-                  "cor": EMENDA_ETAPA_COR[etapa]}
-                 for d in deps if _etapa_de_status(d.get("status", "")) == etapa]
-        colunas.append({"status": etapa, "cor": EMENDA_ETAPA_COR[etapa], "cards": cards})
-    return colunas
-
-
-# morto após Passo 8 — remover no Commit 2 (funil federal migrou p/ o funil unificado)
-def _render_funil_federal(deps: list) -> None:
-    """Funil de negociação dos federais — MESMO kanban do funil de deputados.
-    Arrastar grava a etapa na coluna 'Status CRM' da aba Deputados Federais."""
-    colunas = _funil_federal_colunas(deps)
-    st.markdown('<div style="font-family:var(--mono);font-size:11px;letter-spacing:1px;'
-                'text-transform:uppercase;color:var(--dim);margin:8px 0 10px">'
-                f'{len(deps)} deputados federais · arraste um card para mudar a etapa</div>',
-                unsafe_allow_html=True)
-    if not KANBAN_DND_OK or not modo_conectado:
-        cols_html = ""
-        for c in colunas:
-            cards = "".join(
-                f'<div class="kcard"><div class="kn">{esc(cd["nome"])}</div>'
-                f'<div class="ks">{esc(cd["setor"])} · {esc(cd["valor"])}</div></div>'
-                for cd in c["cards"][:12]) or '<div class="kmore">vazio</div>'
-            cols_html += (f'<div class="kcol"><div class="kcol-h"><span>'
-                          f'<span class="accent" style="background:{c["cor"]}"></span>{esc(c["status"])}</span>'
-                          f'<span class="ct">{len(c["cards"])}</span></div>'
-                          f'<div class="kbody">{cards}</div></div>')
-        st.markdown(f'<div class="kan">{cols_html}</div>', unsafe_allow_html=True)
-        st.caption("Arrastar-e-soltar disponível só com o Google Sheets conectado.")
-        return
-    resultado = _kanban_component(colunas=colunas, editable=True, clicavel=False,
-                                  key="kanban_federal", default=None)
-    if isinstance(resultado, dict):
-        nonce = resultado.get("nonce")
-        if nonce and nonce != st.session_state.get("kanban_federal_nonce"):
-            st.session_state["kanban_federal_nonce"] = nonce
-            id_ = str(resultado.get("org_id", "")).strip()   # id do card = ID do federal
-            novo = str(resultado.get("novo_status", "")).strip()
-            if id_ and novo in EMENDA_FUNIL_ETAPAS:
-                res = dados.atualizar_deputado_federal(id_, {"Status CRM": novo})
-                st.session_state["kanban_federal_msg"] = res
-                st.toast(res.get("mensagem", ""))
-            else:
-                st.session_state["kanban_federal_msg"] = {
-                    "sucesso": False, "mensagem": "Movimento inválido (etapa fora do funil)."}
-            st.rerun()
-
-
-# morto após Passo 8 — remover no Commit 2 (conteúdo federal migrou p/ telas unificadas)
-def render_federal() -> None:
-    """Escopo FEDERAL: listagem (cards clicáveis → dossiê) + funil de negociação,
-    lendo da aba 'Deputados Federais'. Mesmo estilo visual do Estadual."""
-    st.markdown(_DESCOBRIR_CSS, unsafe_allow_html=True)
-    _mostrar_resultado(st.session_state.pop("kanban_federal_msg", None))
-    primeiro = USER["nome"].split()[0]
-    hora = datetime.datetime.now().hour
-    saud = "Bom dia" if hora < 12 else "Boa tarde" if hora < 18 else "Boa noite"
-    st.markdown(
-        f'<div class="topbar"><div><div class="hi">{saud}, {esc(primeiro)}</div>'
-        f'<div class="cr" style="margin-top:6px">Deputados federais de SP · Câmara</div></div>'
-        f'<div class="tr-r"><div class="live">CÂMARA · FEDERAL</div></div></div>'
-        '<div class="hr-line"></div>', unsafe_allow_html=True)
-
-    deps = _deputados_federais_ordenados()
-    if not deps:
-        st.info("Aba 'Deputados Federais' vazia ou indisponível no Google Sheets.")
-        return
-
-    vista = st.radio("Ver como", ["Lista", "Funil de negociação"], horizontal=True,
-                     key="federal_vista", label_visibility="collapsed")
-    if vista == "Funil de negociação":
-        _render_funil_federal(deps)
-        return
-
-    st.markdown(
-        f'<div class="dd-intro">{len(deps)} deputados federais de SP, curados à mão. '
-        'Score, estratégia e valor <b>vêm da planilha</b> — não são recalculados. '
-        'Os valores são <b>faixas sugeridas</b> (potencial), não execução. '
-        'Clique num card para o dossiê. Ordenados por score.</div>'
-        '<div class="dd-legend">'
-        '<span><span class="sw" style="background:var(--sem-high)"></span>score 60+ · forte</span>'
-        '<span><span class="sw" style="background:var(--sem-mid)"></span>50–59 · médio</span>'
-        '<span><span class="sw" style="background:var(--sem-low)"></span>&lt;50 · fraco</span>'
-        '</div>', unsafe_allow_html=True)
-    for i, d in enumerate(deps):
-        c_info, _c = st.columns([9, 0.3])
-        c_info.markdown(
-            '<div class="dd-cell">'
-            f'<div class="dd-nomecol"><div class="dd-top"><span class="dd-nome">{esc(d["nome"])}</span></div>'
-            f'<div class="dd-sub">{esc(d["partido"])} · {esc(d["base"])}</div></div>'
-            f'<div class="dd-scorecol"><div class="dd-score" style="color:{_cor_score(d["score"])}">'
-            f'{d["score"]}</div><div class="dd-sub">score</div></div>'
-            f'<div class="dd-valcol"><div class="dd-val">sugerido <b>{esc(d["valor_sugerido"]) or "—"}</b></div>'
-            f'<div class="dd-sub">{esc(d["gabinete_camara"])}</div></div>'
-            '</div>', unsafe_allow_html=True)
-        if c_info.button(f"Abrir dossiê de {d['nome']}", key=f"dd_fed_{i}",
-                         use_container_width=True):
-            dlg_deputado_federal(dict(d))
-    st.caption("Valor sugerido = faixa de potencial de emenda (mín–máx), curada à mão. "
-               "Clique num card para o dossiê completo (gancho, contato, CRM e PDF).")
-
-
 def _abrir_dossie_parlamentar(r: dict) -> None:
     """Abre o dossiê CERTO conforme o escopo do registro unificado (usa o _raw
     original, então cada dossiê recebe exatamente o dicionário que já esperava)."""
@@ -1946,7 +1808,6 @@ def render_emendas():
     saud = "Bom dia" if hora < 12 else "Boa tarde" if hora < 18 else "Boa noite"
     primeiro = USER["nome"].split()[0]
     subttl = {"Visão geral": "Articulação política",
-              "Deputados": "Base de deputados · ALESP",
               "Descobrir": "Levantamento de emendas · quem abordar",
               "Territórios em Aberto": "Oportunidade de captação · sem emenda edu/social",
               "Funil de negociação": "Negociações por temperatura",
@@ -1977,13 +1838,10 @@ def render_emendas():
         render_relatorio_emendas()
         return
 
-    # ===== Passo 3 · Visão geral = CAPA GERAL (todos os escopos juntos) =====
-    # Controle de Escopo no topo do CONTEÚDO (não na sidebar), SÓ na Visão geral
-    # (modo 'visao'). Geral (padrão) mostra os três escopos na MESMA capa rica, com
-    # o selo de escopo em cada linha; Estadual/Federal filtram; Senador = vazio
-    # elegante. A página "Deputados" (modo 'deputados') segue com a tabela estadual,
-    # abaixo. Estado próprio (emenda_escopo_filtro), separado do emenda_escopo da
-    # navegação da sidebar — os dois convivem até o Passo 8.
+    # ===== Visão geral = CAPA GERAL (todos os escopos juntos) =====
+    # Controle de Escopo no topo do CONTEÚDO (não na sidebar). Geral (padrão) mostra
+    # os três escopos na MESMA capa rica, com o selo de escopo em cada linha;
+    # Estadual/Federal filtram; Senador = vazio elegante.
     if modo == "visao":
         st.session_state.setdefault("emenda_escopo_filtro", "Geral")
         escopo_sel = st.segmented_control(
@@ -1999,105 +1857,6 @@ def render_emendas():
             return
         _render_capa_geral(escopo_sel)
         return
-
-    # modo == "deputados": tabela estadual (aba Deputados · ALESP) — inalterada.
-    deps = _deputados_ordenados()
-    total = len(deps)
-    if not total:
-        st.warning("Base de deputados não encontrada. Confira `data/deputados_estaduais.csv`.")
-        _emendas_v2(data={"deps": [], "hero": {}, "temperatura": [], "kpis": []},
-                    key="emendas_v2", on_acao_change=lambda: None)
-        return
-
-    nao_abordados = sum(1 for d in deps if _e_nao_iniciado(d["status"]))
-    articulacao = total - nao_abordados
-    cont = _contagens_emendas(deps)  # mesma contagem que alimenta o card do hub
-    reunioes, aprovadas = cont["reunioes"], cont["aprovadas"]
-    chance_media = round(sum(d["chance"] for d in deps) / total) if total else 0
-
-    # temperatura mais quente + maior score = negociação mais avançada
-    ordem_temp = {t: i for i, t in enumerate(_TEMP_ORDEM)}
-    top = min(deps, key=lambda d: (ordem_temp.get(d["temp"], 9), -d["score"]))
-    top_i = deps.index(top)
-
-    cont_temp = {t: 0 for t in _TEMP_ORDEM}
-    for d in deps:
-        cont_temp[d["temp"]] += 1
-    temperatura = [{"nome": t, "emoji": _TEMP_EMOJI[t], "cor": _TEMP_COR[t],
-                    "n": cont_temp[t], "pct": round(cont_temp[t] / total * 100)}
-                   for t in _TEMP_ORDEM]
-
-    # subconjuntos reais por trás de cada interação
-    em_articulacao = [d for d in deps if not _e_nao_iniciado(d["status"])]
-    lista_reunioes = [d for d in deps if d["status"].lower().startswith(("reunião", "reuniao"))]
-    lista_aprovadas = [d for d in deps if "aprovada" in d["status"].lower()]
-
-    # filtro por temperatura (clique numa faixa do termômetro) — afeta só a tabela
-    filtro = st.session_state.get("emenda_filtro_temp")
-    deps_view = [d for d in deps if d["temp"] == filtro] if filtro else deps
-    if filtro:
-        c1, c2 = st.columns([3, 1])
-        c1.markdown(
-            f'<div style="display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--ink)">'
-            f'<span style="font-family:var(--mono);font-size:10.5px;letter-spacing:.6px;'
-            f'text-transform:uppercase;color:var(--dim)">Filtrando por</span>'
-            f'<span style="background:{_TEMP_COR[filtro]}22;color:{_TEMP_COR[filtro]};font-weight:600;'
-            f'padding:4px 12px;border-radius:20px">{_TEMP_EMOJI[filtro]} {esc(filtro)} · '
-            f'{len(deps_view)} deputado(s)</span></div>',
-            unsafe_allow_html=True)
-        if c2.button("✕ Limpar filtro", key="em_limpar_filtro", use_container_width=True):
-            st.session_state.pop("emenda_filtro_temp", None)
-            st.rerun()
-
-    payload = {
-        "modo": modo, "total": total, "filtro_temp": filtro,
-        "temp_ordem": [{"nome": t, "cor": _TEMP_COR[t], "emoji": _TEMP_EMOJI[t]}
-                       for t in _TEMP_ORDEM],
-        "hero": {"articulacao": articulacao, "total": total, "nao_abordados": nao_abordados,
-                 "top": {"nome": top["nome"], "partido": top["partido"],
-                         "status": top["status"], "score": top["score"],
-                         "temp": top["temp"], "cor": top["temp_cor"]}},
-        "temperatura": temperatura,
-        "kpis": [
-            {"c": "#8B7BF0", "icon": "users", "lab": "Deputados", "val": total,
-             "foot": "na base ALESP"},
-            {"k": "reunioes", "c": "#E8B54A", "icon": "cal", "lab": "Reuniões ativas",
-             "val": reunioes, "foot": "solicitadas ou agendadas · ver quais"},
-            {"k": "aprovadas", "c": "#4ADE80", "icon": "check", "lab": "Emendas aprovadas",
-             "val": aprovadas,
-             "foot": "✓ ver a conquista" if aprovadas else "nenhuma ainda",
-             "foot_cor": "#4ADE80" if aprovadas else None},
-            {"c": "#EC6A8C", "icon": "money", "lab": "Chance média", "val": chance_media,
-             "suffix": "%", "foot": "de emenda no grupo"},
-        ],
-        "deps": deps_view,
-    }
-    res = _emendas_v2(data=payload, key="emendas_v2", on_acao_change=lambda: None)
-    ac = getattr(res, "acao", None)
-    if not isinstance(ac, dict):
-        return
-    if ac.get("n") == st.session_state.get("_emenda_nonce"):
-        return  # já processado neste ciclo
-    st.session_state["_emenda_nonce"] = ac.get("n")
-    t, i = ac.get("t"), ac.get("i")
-    if t == "dep" and isinstance(i, int) and 0 <= i < len(deps_view):
-        dlg_deputado(deps_view[i])
-    elif t == "top":
-        dlg_deputado(top)
-    elif t == "kpi" and ac.get("k") == "aprovadas":
-        dlg_emendas_aprovadas(lista_aprovadas)
-    elif t == "kpi" and ac.get("k") == "reunioes":
-        dlg_reunioes_ativas(lista_reunioes)
-    elif t == "articulacao":
-        dlg_em_articulacao(em_articulacao)
-    elif t == "temp" and ac.get("temp") in _TEMP_ORDEM:
-        novo = ac["temp"]
-        # clicar na faixa já ativa desliga o filtro
-        if st.session_state.get("emenda_filtro_temp") == novo:
-            st.session_state.pop("emenda_filtro_temp", None)
-        else:
-            st.session_state["emenda_filtro_temp"] = novo
-        st.rerun()
 
 
 # =========================================================================== #

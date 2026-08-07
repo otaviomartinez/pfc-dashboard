@@ -17,7 +17,6 @@ from ui.formato import _modo_emenda  # noqa: E402
 # As 6 páginas atuais da sidebar (espelham EMENDA_PAGES em app.py).
 ESPERADO = {
     "Visão geral": "visao",
-    "Deputados": "deputados",
     "Descobrir": "descobrir",
     "Territórios em Aberto": "orfaos",
     "Funil de negociação": "funil",
@@ -31,8 +30,10 @@ def test_paginas_validas_mapeiam_certo():
 
 
 def test_legado_e_desconhecido_caem_em_visao():
-    # 'Lista' era página das FEDERAL_PAGES (aposentadas) — não pode quebrar a migração
+    # 'Lista' (painel Federal antigo) e 'Deputados' foram aposentadas — não podem
+    # quebrar a migração de estado legado
     assert _modo_emenda("Lista") == "visao"
+    assert _modo_emenda("Deputados") == "visao"
     # valores estranhos / vazio / None
     assert _modo_emenda("Qualquer coisa") == "visao"
     assert _modo_emenda("") == "visao"

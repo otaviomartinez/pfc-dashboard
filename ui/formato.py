@@ -942,9 +942,9 @@ def aviso_contexto_territorios(escopo_sel: str) -> str:
 
 
 # Páginas da sidebar de Emendas → 'modo' de conteúdo. Fonte única (Passo 8), pura
-# e testável. Página desconhecida ou LEGADA (ex.: 'Lista' das antigas FEDERAL_PAGES,
-# aposentadas com a unificação de estado) cai em 'visao' — blinda a migração.
-_MODO_EMENDA = {"Visão geral": "visao", "Deputados": "deputados",
+# e testável. Página desconhecida ou LEGADA (ex.: 'Lista' do painel Federal antigo,
+# ou 'Deputados', ambas aposentadas) cai em 'visao' — blinda a migração de estado.
+_MODO_EMENDA = {"Visão geral": "visao",
                 "Descobrir": "descobrir", "Territórios em Aberto": "orfaos",
                 "Funil de negociação": "funil", "Relatório": "relatorio"}
 
