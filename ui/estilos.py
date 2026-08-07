@@ -1038,6 +1038,32 @@ _EMENDAS_CHROME_CSS = """
    — aqui não dá para usar o balão em ::after, que já é a barrinha do item ativo. */
 .esc-item{justify-content:center;padding:10px 0;gap:0}
 .esc-item .esc-nome, .esc-item .esc-leg{display:none}
+/* ====== Control de ESCOPO — pill tabs escuras (Opção A, flat) ======
+   Escopado por .st-key-emenda_escopo_filtro: mira SÓ o segmented_control de escopo
+   das Emendas (os 5 usos compartilham a key e só um renderiza por vez). Puro estilo
+   — o widget st.segmented_control e a chave emenda_escopo_filtro seguem intactos.
+   Validado no DOM do Streamlit 1.58 (ativo=kind segmented_controlActive; opções em
+   button:nth-of-type 1..4 = Geral/Estadual/Federal/Senador). */
+.st-key-emenda_escopo_filtro [data-testid="stButtonGroup"]>div{
+  display:inline-flex;gap:2px;background:#1a1a24;border:none;border-radius:12px;padding:4px}
+.st-key-emenda_escopo_filtro [data-testid="stButtonGroup"] button{
+  border:none!important;box-shadow:none!important;background:transparent!important;
+  color:#9a97b5!important;font-weight:400!important;border-radius:9px!important;
+  padding:6px 13px!important;min-height:0!important}
+.st-key-emenda_escopo_filtro [data-testid="stButtonGroup"] button:hover{
+  background:#ffffff10!important;color:#c9c6e0!important}
+.st-key-emenda_escopo_filtro [data-testid="stButtonGroup"] button[kind="segmented_controlActive"]{
+  background:#8B7BF0!important;color:#17123a!important;font-weight:500!important}
+.st-key-emenda_escopo_filtro [data-testid="stButtonGroup"] button[kind="segmented_controlActive"]:hover{
+  background:#8B7BF0!important;color:#17123a!important}
+/* ponto colorido (8px) antes do label — só nas pills INATIVAS; "Geral" (1ª) não tem */
+.st-key-emenda_escopo_filtro [data-testid="stButtonGroup"] button[kind="segmented_control"]:nth-of-type(2)::before,
+.st-key-emenda_escopo_filtro [data-testid="stButtonGroup"] button[kind="segmented_control"]:nth-of-type(3)::before,
+.st-key-emenda_escopo_filtro [data-testid="stButtonGroup"] button[kind="segmented_control"]:nth-of-type(4)::before{
+  content:"";flex:0 0 auto;width:8px;height:8px;border-radius:50%;margin-right:7px}
+.st-key-emenda_escopo_filtro [data-testid="stButtonGroup"] button[kind="segmented_control"]:nth-of-type(2)::before{background:#8B7BF0}
+.st-key-emenda_escopo_filtro [data-testid="stButtonGroup"] button[kind="segmented_control"]:nth-of-type(3)::before{background:#5B9BD5}
+.st-key-emenda_escopo_filtro [data-testid="stButtonGroup"] button[kind="segmented_control"]:nth-of-type(4)::before{background:#C08BF0}
 </style>
 """
 
