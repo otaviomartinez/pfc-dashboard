@@ -2015,6 +2015,33 @@ NAV_ICONES = {**{f"nav_{slug(p)}": slug(p) for p in PAGES},
 # chave do botão -> nome no tooltip do modo ícone
 NAV_ROTULOS = {**{f"nav_{slug(p)}": p for p in PAGES},
                "trocar_radar": "Trocar radar", "logout": "Sair"}
+# chave -> cor da pastilha, POR SEÇÃO (deriva de NAV_SECOES, fonte única): Operação
+# no âmbar de marca (#E8873A, identidade da Captação), Dados no azul-aço (#5B9BD5).
+# Footer (trocar_radar/logout) fica neutro. Mesmo mecanismo por chave do Commit 1.
+_NAV_COR_SECAO = {"Operação": "#E8873A", "Dados": "#5B9BD5"}
+NAV_CORES = {f"nav_{slug(p)}": _NAV_COR_SECAO[secao]
+             for secao, paginas in NAV_SECOES for p in paginas}
+# Realce da Visão geral (ponto de entrada) + acento âmbar/azul nos cabeçalhos das
+# seções. Espelho do _EMENDA_REALCE_CSS, em âmbar. Tudo escopado a
+# [data-testid=stSidebar] + chaves nav_* / classes .sb-sec-<x> que só existem na
+# Captação — não casa emnav_*, então não vaza pra Emendas nem pro conteúdo. O
+# realce fica ABAIXO do ativo (primary .15) pra não competir com o "você está aqui".
+_NAV_REALCE_CSS = (
+    "[data-testid='stSidebar'] .st-key-nav_visao-geral .stButton>button[kind='secondary']"
+    "{background:rgba(232,135,58,.07)}"
+    "[data-testid='stSidebar'] .st-key-nav_visao-geral .stButton>button[kind='secondary']:hover"
+    "{background:rgba(232,135,58,.12)}"
+    # cabeçalho por seção (2 classes vencem a base .sb-sec por especificidade):
+    # modo ícone = divisor tingido; expandido = rótulo na cor.
+    "[data-testid='stSidebar'] .sb-sec.sb-sec-operacao"
+    "{background:linear-gradient(90deg,rgba(232,135,58,.5),var(--line) 65%)}"
+    "[data-testid='stSidebar'] .sb-sec.sb-sec-dados"
+    "{background:linear-gradient(90deg,rgba(91,155,213,.5),var(--line) 65%)}"
+    "html.pfc-sb-open [data-testid='stSidebar'] .sb-sec.sb-sec-operacao"
+    "{background:none;color:#f0a460}"
+    "html.pfc-sb-open [data-testid='stSidebar'] .sb-sec.sb-sec-dados"
+    "{background:none;color:#8fbde6}"
+)
 
 
 def _rotulo_nav(p: str) -> str:
@@ -2029,8 +2056,9 @@ def _rotulo_nav(p: str) -> str:
 def render_sidebar():
     _preparar_sidebar()
     with st.sidebar:
-        st.markdown(f"<style>{css_icones_botoes(NAV_ICONES, NAV_ROTULOS)}</style>",
-                    unsafe_allow_html=True)
+        st.markdown(
+            f"<style>{css_icones_botoes(NAV_ICONES, NAV_ROTULOS, NAV_CORES)}"
+            f"{_NAV_REALCE_CSS}</style>", unsafe_allow_html=True)
         st.markdown(_sidebar_toggle_html(), unsafe_allow_html=True)  # recolher/expandir no topo
         st.markdown(
             '<div class="sb-brand"><div class="rings"><span></span><span></span><span></span></div>'
@@ -2038,7 +2066,8 @@ def render_sidebar():
             unsafe_allow_html=True,
         )
         for secao, paginas in NAV_SECOES:
-            st.markdown(f'<div class="sb-sec">{secao}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="sb-sec sb-sec-{slug(secao)}">{secao}</div>',
+                        unsafe_allow_html=True)
             for p in paginas:
                 st.button(_rotulo_nav(p), key=f"nav_{slug(p)}", use_container_width=True,
                           type="primary" if st.session_state["page"] == p else "secondary",
