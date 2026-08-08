@@ -316,6 +316,8 @@ def pdf_resumo_deputado(dep: dict, gerado_em: str) -> bytes:
         linhas_ct.append("Telefone: %s" % dep["telefone"])
     if dep.get("pagina"):
         linhas_ct.append("Página: %s" % dep["pagina"])
+    if dep.get("sala"):  # sala/gabinete na ALESP (do CRM) — só quando houver
+        linhas_ct.append("Sala ALESP: %s" % dep["sala"])
     story.append(_P("<br/>".join(linhas_ct) if linhas_ct
                     else "Não encontrado na lista de titulares da ALESP.", est["cel"]))
     story.append(Spacer(1, 10))

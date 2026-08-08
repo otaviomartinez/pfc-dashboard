@@ -839,6 +839,24 @@ def _status_no_crm(nome: str, crm_df) -> str:
     return "No CRM do Fábio"
 
 
+def _sala_no_crm(nome: str, crm_df) -> str:
+    """Sala/gabinete do deputado na ALESP, do CRM (coluna 'Gabinete ALESP'), ou
+    '' se ausente/vazio. Casa por slug (tolerante a acento/caixa e nome contido),
+    igual a _status_no_crm. Diferente do status: quando não há, devolve '' — a
+    linha da sala é então OMITIDA graciosamente (dossiê e PDF), nunca 'Sala: —'."""
+    if crm_df is None or crm_df.empty or "Deputado" not in crm_df:
+        return ""
+    alvo = slug(str(nome))
+    if not alvo:
+        return ""
+    for _, r in crm_df.iterrows():
+        outro = slug(str(r.get("Deputado", "")))
+        if outro and (outro == alvo or alvo in outro or outro in alvo):
+            sala = str(r.get("Gabinete ALESP", "")).strip()
+            return "" if sala.lower() in ("nan", "none") else sala
+    return ""
+
+
 def _resumo_dep_dados(row: dict, secao: str, no_crm: bool, crm_df) -> dict:
     """Monta o dicionário do resumo pré-reunião (só dado real do levantamento+CRM)."""
     score = float(row.get("score_pfc") or row.get("score_expansao") or 0)
@@ -866,6 +884,8 @@ def _resumo_dep_dados(row: dict, secao: str, no_crm: bool, crm_df) -> dict:
         "municipios_vizinhos": vizinhos or "nenhum",
         "email": ct.get("email", ""), "telefone": ct.get("telefone", ""),
         "pagina": ct.get("pagina", ""),
+        # Sala/gabinete na ALESP — vem do CRM (curada pelo Fábio). '' -> omitida.
+        "sala": _sala_no_crm(str(row.get("deputado", "")), crm_df),
     }
 
 

@@ -101,6 +101,7 @@ from ui.formato import (
     _prazo_confiavel,
     _puxar_para_crm,
     _resumo_dep_dados,
+    _sala_no_crm,
     _score_novidade,
     _sidebar_toggle_html,
     _tabela_emendas_html,
@@ -928,12 +929,15 @@ def dlg_descobrir_deputado(row: dict, secao: str) -> None:
                     f'text-transform:uppercase;color:var(--dim);min-width:78px;padding-top:2px">'
                     f'{rot}</span><span style="color:var(--ink)">{corpo}</span></div>')
         email = ct.get("email", "")
+        # Sala/gabinete na ALESP — do CRM (curada). Só entra quando houver (omite).
+        sala = _sala_no_crm(str(row.get("deputado", "")), dados.carregar_deputados())
         st.markdown(
             '<div style="background:var(--surface2);border:1px solid var(--line);'
             'border-left:3px solid #8B7BF0;border-radius:0 10px 10px 0;padding:12px 15px">'
             + _campo("Email", email, link=(f"mailto:{email}" if email and email != "não encontrado" else None))
             + _campo("Telefone", ct.get("telefone", ""))
             + _campo("Página", "abrir no site da ALESP" if ct.get("pagina") else "", link=ct.get("pagina"))
+            + (_campo("Sala ALESP", sala) if sala else "")
             + '</div>'
             '<div style="font-size:11px;color:var(--dim);margin-top:6px">Contato público de '
             'gabinete. Os contatos pessoais/de assessor ficam no CRM (tela Deputados).</div>',
