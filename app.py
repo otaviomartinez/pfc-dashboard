@@ -118,7 +118,9 @@ from ui.formato import (
     itens_relatorio_parlamentares,
     lista_orgs_html,
     plano_obs,
+    PROSPECCAO_TIPOS,
     resumo_relatorio_parlamentares,
+    rotulo_tipo_prospeccao,
     score_chip_cor,
     score_chip_hex,
     seg_html,
@@ -1300,7 +1302,6 @@ def render_funil_emendas() -> None:
 PROSPECCAO_ETAPAS = ["Indicada", "Aprovada", "Assinada", "Paga"]
 PROSPECCAO_ETAPA_COR = {"Indicada": "#7C8698", "Aprovada": "#5B9BD5",
                         "Assinada": "#E8B54A", "Paga": "#4ADE80"}
-PROSPECCAO_TIPOS = ["Emenda", "Prêmio", "Patrocínio", "Outro"]
 
 # Placar de verba conquistada (verde = etapa final, mesma cor do "Paga").
 _PROSPECCAO_PLACAR_CSS = """
@@ -1342,7 +1343,7 @@ def _funil_prospeccao_colunas(itens: list) -> list:
                                             str(it.get("Previsão", "")).strip()) if x)
             cards.append({"id": str(it.get("ID", "")).strip(), "status": etapa,
                           "nome": str(it.get("Nome", "")).strip() or "(sem nome)",
-                          "setor": str(it.get("Tipo", "")).strip() or "—",
+                          "setor": rotulo_tipo_prospeccao(it.get("Tipo")),
                           "valor": resumo or "—", "cor": PROSPECCAO_ETAPA_COR[etapa]})
         colunas.append({"status": etapa, "cor": PROSPECCAO_ETAPA_COR[etapa], "cards": cards})
     return colunas

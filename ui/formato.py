@@ -964,6 +964,19 @@ def _destino_radar(radar_escolhido) -> str:
     return "hub"
 
 
+# Tipos de verba da Prospecção — lista FIXA (4, sem "Outro"). Alimenta SÓ o selectbox
+# de entrada; a EXIBIÇÃO tolera tipos legados fora da lista (rotulo_tipo_prospeccao),
+# então remover um tipo daqui nunca esconde um registro já gravado (ex.: 'OUTRO').
+PROSPECCAO_TIPOS = ["Emenda", "Patrocínio", "Prefeitura", "Prêmio"]
+
+
+def rotulo_tipo_prospeccao(t) -> str:
+    """Rótulo de exibição do tipo de verba, TOLERANTE a tipo legado: devolve o tipo
+    cru (mesmo fora de PROSPECCAO_TIPOS, ex.: 'OUTRO' de um registro antigo) e '—'
+    quando vazio. Não valida nem esconde — a lista canônica é só para a entrada."""
+    return str(t or "").strip() or "—"
+
+
 def _funil_emendas_colunas(deps: list) -> list:
     """Monta as colunas do kanban a partir dos deputados, enquadrando cada um na
     sua etapa. card.id = nome (chave da aba); card.status = a etapa (coluna)."""
