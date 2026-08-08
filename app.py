@@ -86,6 +86,7 @@ from ui.formato import (
     _decodificar_id_card,
     _deputados_federais_ordenados,
     _deputados_ordenados,
+    _destino_radar,
     _dias_texto,
     _etapa_de_status,
     _filtrar_descobrir,
@@ -331,11 +332,20 @@ def render_hub():
         em = _contagens_emendas(_deputados_ordenados())
     except Exception:
         em = {"deputados": 0, "reunioes": 0, "aprovadas": 0}
+    # Prospecção: contagens read-only (não toca tipos/seed) para o card do hub.
+    try:
+        _dfp = dados.carregar_prospeccao()
+        _itens_p = _dfp.to_dict("records") if not _dfp.empty else []
+        _tot_p, _ganhos_p = _prospeccao_conquistado(_itens_p)
+        pros = {"total": len(_itens_p), "conquistadas": len(_ganhos_p)}
+    except Exception:
+        pros = {"total": 0, "conquistadas": 0}
     payload = {
         "status": "SHEETS AO VIVO · 06:00" if modo_conectado else "MODO LOCAL · CSV",
         "captacao": {"orgs": TOTAL, "novas": novas, "fontes": n_fontes,
                      "tag": "Setor 01 · Recursos privados"},
         "emendas": {**em, "tag": "Setor 02 · Recursos públicos"},
+        "prospeccao": {**pros, "tag": "Setor 03 · Verba em captação"},
     }
     res = _hub_component(data=payload, key="hub", on_escolha_change=lambda: None)
     esc = getattr(res, "escolha", None)
@@ -1352,14 +1362,12 @@ def render_prospeccao():
     """Painel próprio de Prospecção: formulário de registro + funil por etapa
     (MESMO kanban drag-and-drop do funil de deputados). Arrastar grava só o
     Status na aba Prospecção, sem tocar nos outros campos."""
-    top = st.columns([4, 1])
-    top[0].markdown(
+    # Barra do topo padrão (3 destinos); "Voltar à Central" é nativo do menu do topnav.
+    render_topnav("prospeccao")
+    st.markdown(
         '<div class="phead"><h1 style="color:var(--ink)">Prospecção</h1>'
         '<p>Toda verba que o PFC está buscando — emendas, prêmios, patrocínios — '
         'registrada à mão e acompanhada por etapa.</p></div>', unsafe_allow_html=True)
-    if top[1].button("← Central", use_container_width=True, key="prosp_voltar"):
-        st.session_state["radar_escolhido"] = None
-        st.rerun()
     if not modo_conectado:
         st.caption(HINT_ESCRITA + " — registrar e arrastar gravam na aba Prospecção.")
 
@@ -1905,7 +1913,7 @@ def render_topnav(radar_atual: str, crumb: str = ""):
         return  # já processado (evita reprocessar no rerun seguinte)
     st.session_state["_topnav_nonce"] = ac.get("n")
     t = ac.get("t")
-    if t == "radar" and ac.get("v") in ("captacao", "emendas") and ac["v"] != radar_atual:
+    if t == "radar" and ac.get("v") in ("captacao", "emendas", "prospeccao") and ac["v"] != radar_atual:
         st.session_state["radar_escolhido"] = ac["v"]
         st.rerun()
     elif t == "hub":
@@ -1937,15 +1945,17 @@ HINT_ESCRITA = "🔒 Conecte ao Google Sheets para habilitar escrita."
 # radar_escolhido: None -> hub · "emendas" -> placeholder · "captacao" -> painel
 # --------------------------------------------------------------------------- #
 st.session_state.setdefault("radar_escolhido", None)
-if st.session_state["radar_escolhido"] is None:
+_destino = _destino_radar(st.session_state["radar_escolhido"])
+if _destino == "hub":
     render_hub()
     st.stop()
-if st.session_state["radar_escolhido"] == "emendas":
+if _destino == "emendas":
     render_emendas()
     st.stop()
-if st.session_state["radar_escolhido"] == "prospeccao":
+if _destino == "prospeccao":
     render_prospeccao()
     st.stop()
+# _destino == "captacao": cai no painel de Captação abaixo (fall-through).
 
 
 # --------------------------------------------------------------------------- #

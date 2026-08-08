@@ -607,8 +607,26 @@ _HUB_CSS = """
 .hub-card.c2:hover .hub-enter{background:#8B7BF5;color:#fff;border-color:#8B7BF5}
 .hub-enter svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.3;transition:.35s}
 .hub-card:hover .hub-enter svg{transform:translateX(5px)}
+/* Card Prospecção (c3): menor, canto inferior direito, ESTÁTICO — sem animação de
+   entrada (a base .hub-card é opacity:0, então c3 força opacity:1) e fora do tilt.
+   Acento teal #2DD4BF. */
+.hub-card.c3{position:absolute;right:30px;bottom:30px;width:290px;opacity:1;z-index:12;
+  box-shadow:0 30px 60px -30px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.08)}
+.hub-card.c3:hover{border-color:transparent;
+  box-shadow:0 40px 80px -30px rgba(45,212,191,.4),0 0 0 1px rgba(45,212,191,.5),inset 0 1px 0 rgba(255,255,255,.12)}
+.hub-card.c3 .hub-radarbox{padding:22px 0 16px}
+.hub-card.c3 .hub-radO{width:148px;height:148px}
+.hub-card.c3 .hub-sweep{stroke:#2DD4BF}
+.hub-card.c3 .hub-htag{color:#5eead4}
+.hub-card.c3 .hub-plate{padding:16px 22px 20px}
+.hub-card.c3 .hub-plate h2{font-size:21px;margin-bottom:12px}
+.hub-card.c3 .hub-stats{gap:18px;margin-bottom:14px}
+.hub-card.c3 .hub-stats .n{color:#2DD4BF;font-size:21px}
+.hub-card.c3 .hub-enter{color:#5eead4;padding:11px;font-size:14px}
+.hub-card.c3:hover .hub-enter{background:#2DD4BF;color:#04120F;border-color:#2DD4BF}
 @media(max-width:980px){.hub-arena{flex-direction:column;gap:20px;overflow:auto;max-height:80vh}
-  .hub-card{width:340px}.hub-title h1{font-size:32px}}
+  .hub-card{width:340px}.hub-title h1{font-size:32px}
+  .hub-card.c3{position:static;width:340px}}
 """
 
 
@@ -616,7 +634,7 @@ _HUB_JS = r"""
 export default function(component){
   const {data, parentElement, setTriggerValue} = component;
   const old = parentElement.querySelector('.hub'); if (old) old.remove();
-  const d = data || {}, cap = d.captacao || {}, emd = d.emendas || {};
+  const d = data || {}, cap = d.captacao || {}, emd = d.emendas || {}, pro = d.prospeccao || {};
   const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const plural = (n, um, varios) => (Number(n) === 1 ? um : varios);
   const arrow = '<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
@@ -624,8 +642,10 @@ export default function(component){
   function radarSVG(cls){
     const blips = cls === 'c1'
       ? [[172,78,0],[80,168,1.3],[176,158,2.5]]
+      : cls === 'c3'
+      ? [[120,70,0],[168,150,1.5],[86,160,2.7]]
       : [[92,78,0],[170,138,1.6],[98,170,2.8]];
-    const cor = cls === 'c1' ? '#F2911E' : '#b7abff';
+    const cor = cls === 'c1' ? '#F2911E' : cls === 'c3' ? '#2DD4BF' : '#b7abff';
     let b = '';
     blips.forEach(function(p){ b += '<circle class="hub-blip" cx="'+p[0]+'" cy="'+p[1]+
       '" r="4" fill="'+cor+'" style="animation-delay:'+p[2]+'s"/>'; });
@@ -663,8 +683,6 @@ export default function(component){
     '<span>Captação Privada</span></div>' +
     '<div class="hub-ritem" data-radar="emendas"><svg viewBox="0 0 24 24"><path d="M6 3h12l3 6-9 12L3 9z"/></svg>' +
     '<span>Emendas</span></div>' +
-    '<div class="hub-ritem" data-radar="prospeccao"><svg viewBox="0 0 24 24"><path d="M3 4h18l-7 8v6l-4 2v-8z"/></svg>' +
-    '<span>Prospecção</span></div>' +
     '<div class="hub-rfoot"><div class="hub-rstat"><span class="d"></span>' + esc(d.status || '') + '</div></div></aside>' +
     '<div class="hub-stage"><div class="hub-title"><div class="eye">Central de Captação</div>' +
     '<h1>Escolha seu radar</h1></div><div class="hub-arena">' +
@@ -674,7 +692,9 @@ export default function(component){
          [[emd.deputados, plural(emd.deputados, 'deputado', 'deputados')],
           [emd.reunioes, plural(emd.reunioes, 'reunião', 'reuniões')],
           [emd.aprovadas, plural(emd.aprovadas, 'aprovada', 'aprovadas')]]) +
-    '</div></div>';
+    '</div></div>' +
+    card('c3', 'prospeccao', pro.tag || 'Setor 03 · Verba em captação', 'Prospecção',
+         [[pro.total, plural(pro.total, 'verba', 'verbas')], [pro.conquistadas, 'conquistadas']]);
   parentElement.appendChild(root);
 
   // cliques -> Python (card inteiro ou item da rail)
@@ -686,7 +706,7 @@ export default function(component){
     setTriggerValue('escolha', {radar: el.dataset.radar, n: Date.now()});
   });
   // tilt 3D nos cards
-  root.querySelectorAll('.hub-card').forEach(function(c){
+  root.querySelectorAll('.hub-arena .hub-card').forEach(function(c){
     c.addEventListener('mousemove', function(e){
       const r = c.getBoundingClientRect();
       const px = (e.clientX - r.left) / r.width - .5, py = (e.clientY - r.top) / r.height - .5;
@@ -1322,6 +1342,7 @@ _TOPNAV_CSS = """
 .tn-item .rdot{width:8px;height:8px;border-radius:50%;flex:none}
 .tn-item .rdot.amber{background:#E8873A;box-shadow:0 0 7px rgba(232,135,58,.7)}
 .tn-item .rdot.violet{background:#8B7BF0;box-shadow:0 0 7px rgba(139,123,240,.7)}
+.tn-item .rdot.teal{background:#2DD4BF;box-shadow:0 0 7px rgba(45,212,191,.7)}
 .tn-item .nm{flex:1}
 .tn-item .ck{width:15px;height:15px;flex:none;fill:none;stroke:var(--acc);stroke-width:2.4}
 .tn-item svg.ic{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8}
@@ -1342,9 +1363,13 @@ export default function(component){
   const d = data || {}, radar = d.radar || 'captacao';
   const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  const acc = radar === 'emendas' ? '#8B7BF0' : '#E8873A';
-  const accSoft = radar === 'emendas' ? 'rgba(139,123,240,.14)' : 'rgba(232,135,58,.14)';
-  const nomeAtual = radar === 'emendas' ? 'Emendas Parlamentares' : 'Captação Privada';
+  const RMETA = {
+    captacao:  {acc:'#E8873A', soft:'rgba(232,135,58,.14)', nome:'Captação Privada'},
+    emendas:   {acc:'#8B7BF0', soft:'rgba(139,123,240,.14)', nome:'Emendas Parlamentares'},
+    prospeccao:{acc:'#2DD4BF', soft:'rgba(45,212,191,.14)',  nome:'Prospecção'}
+  };
+  const rm = RMETA[radar] || RMETA.captacao;
+  const acc = rm.acc, accSoft = rm.soft, nomeAtual = rm.nome;
   const ck = '<svg class="ck" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>';
   const chev = '<svg class="tn-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>';
   const iHub = '<svg class="ic" viewBox="0 0 24 24"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>';
@@ -1375,6 +1400,7 @@ export default function(component){
     '<div class="tn-lbl">Radar</div>' +
     item('captacao', 'Captação Privada', 'amber') +
     item('emendas', 'Emendas Parlamentares', 'violet') +
+    item('prospeccao', 'Prospecção', 'teal') +
     '<div class="tn-sep"></div>' +
     '<button class="tn-item" data-act="hub">' + iHub + '<span class="nm">Voltar à Central</span></button>' +
     '<button class="tn-item danger" data-act="sair">' + iOut + '<span class="nm">Sair</span></button>' +

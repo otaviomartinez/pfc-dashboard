@@ -954,6 +954,16 @@ def _modo_emenda(page: str) -> str:
     return _MODO_EMENDA.get(page, "visao")
 
 
+def _destino_radar(radar_escolhido) -> str:
+    """Mapa raiz do painel a renderizar a partir de session_state['radar_escolhido'].
+    Função PURA, testável. None → 'hub' (Central); 'captacao'/'emendas'/'prospeccao'
+    → si mesmos; qualquer outro valor (legado/corrompido) → 'hub' (fallback são: o
+    usuário re-escolhe na Central, em vez de cair numa tela errada)."""
+    if radar_escolhido in ("captacao", "emendas", "prospeccao"):
+        return radar_escolhido
+    return "hub"
+
+
 def _funil_emendas_colunas(deps: list) -> list:
     """Monta as colunas do kanban a partir dos deputados, enquadrando cada um na
     sua etapa. card.id = nome (chave da aba); card.status = a etapa (coluna)."""
