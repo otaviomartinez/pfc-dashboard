@@ -38,7 +38,15 @@ def _mask_url(nome: str) -> str:
     return f"url(\"data:image/svg+xml,{quote(_SVG_TRACO.format(ICONES[nome]), safe='')}\")"
 
 
-def css_icones_botoes(mapa: dict, rotulos: dict | None = None) -> str:
+def _icone_url_cor(nome: str, cor: str) -> str:
+    """Como _mask_url, mas o SVG sai COLORIDO (stroke na cor) — para o ícone
+    aparecer na cor dentro da pastilha via background-image (não mask)."""
+    svg = _SVG_TRACO.replace("stroke='black'", f"stroke='{cor}'").format(ICONES[nome])
+    return f"url(\"data:image/svg+xml,{quote(svg, safe='')}\")"
+
+
+def css_icones_botoes(mapa: dict, rotulos: dict | None = None,
+                      cores: dict | None = None) -> str:
     """CSS dos botões da sidebar. mapa: {chave do botão: ícone}.
 
     Faz três coisas, todas escopadas às chaves do mapa:
@@ -46,6 +54,10 @@ def css_icones_botoes(mapa: dict, rotulos: dict | None = None) -> str:
       2. no modo ícone, esconde o texto do rótulo;
       3. mostra o nome como tooltip no hover (::after do botão), a partir de
          `rotulos` = {chave: nome}.
+
+    `cores` (opcional) = {chave: cor hex}: transforma o ::before dessas chaves
+    numa PASTILHA — caixa arredondada com fundo tênue da cor + ícone na cor. É
+    ADITIVO: sem `cores`, a saída é byte-idêntica à de antes (Captação intacta).
 
     Tudo sai enumerado por seletor, e não numa regra genérica para todo botão
     da sidebar, de propósito: sem mask-image o background:currentColor viraria
@@ -72,6 +84,24 @@ def css_icones_botoes(mapa: dict, rotulos: dict | None = None) -> str:
         u = _mask_url(icone)
         linhas.append(f".st-key-{chave} .stButton>button {alvo}::before"
                       f"{{-webkit-mask-image:{u};mask-image:{u}}}")
+    # PASTILHA colorida por página (aditivo): vira o ::before numa caixa
+    # arredondada com fundo tênue da cor + ícone na cor (background-image
+    # colorido, mask cancelado). Vem DEPOIS da regra de mask acima, então
+    # sobrescreve (mesma especificidade, vence por ordem). Só sai com `cores`.
+    if cores:
+        for chave in mapa:
+            if chave not in cores:
+                continue
+            cor = cores[chave]
+            u = _icone_url_cor(mapa[chave], cor)
+            linhas.append(
+                f".st-key-{chave} .stButton>button {alvo}::before"
+                f"{{width:26px;height:26px;border-radius:8px;flex:none;"
+                f"background-color:{cor}26;"
+                f"background-image:{u};background-repeat:no-repeat;"
+                f"background-position:center;background-size:16px 16px;"
+                f"-webkit-mask:none;mask:none;opacity:1;"
+                f"box-shadow:inset 0 0 0 1px {cor}2b}}")
     if rotulos:
         # tooltip: balão em ::after, posicionado ao lado do botão. Depende do
         # overflow:visible declarado no bloco SIDEBAR do CSS global — sem ele

@@ -658,6 +658,27 @@ EMENDA_ICONES = {"emnav_visao-geral": "visao-geral",
 # chave do botão -> nome no tooltip do modo ícone
 EMENDA_ROTULOS = {**{f"emnav_{slug(p)}": p for p in EMENDA_PAGES},
                   "emenda_trocar": "Trocar radar", "emenda_logout": "Sair"}
+# chave do botão -> cor da pastilha (só as 5 páginas; o rodapé fica neutro).
+# Paleta reusando as cores do app, uma por página. A Visão Geral (violeta) é o
+# ponto de entrada e ganha um realce permanente (ver _EMENDA_REALCE_CSS).
+EMENDA_CORES = {"emnav_visao-geral": "#8B7BF0", "emnav_descobrir": "#5B9BD5",
+                "emnav_territorios-em-aberto": "#4ADE80",
+                "emnav_funil-de-negociacao": "#E8B54A", "emnav_relatorio": "#EC6A8C"}
+# Realce da Visão Geral (ponto de entrada) + acento violeta na seção Articulação.
+# Tudo escopado à sidebar de EMENDAS: a chave emnav_visao-geral só existe aqui, e
+# o :has(...) garante que o acento em .sb-sec NÃO vaze pra sidebar de Captação
+# (nav_*) nem pro conteúdo. O realce fica ABAIXO do estado ativo (primary .15),
+# pra não competir com o "você está aqui".
+_EMENDA_REALCE_CSS = (
+    "[data-testid='stSidebar'] .st-key-emnav_visao-geral .stButton>button[kind='secondary']"
+    "{background:rgba(139,123,240,.07)}"
+    "[data-testid='stSidebar'] .st-key-emnav_visao-geral .stButton>button[kind='secondary']:hover"
+    "{background:rgba(139,123,240,.12)}"
+    "[data-testid='stSidebar']:has(.st-key-emnav_visao-geral) .sb-sec"
+    "{background:linear-gradient(90deg,rgba(139,123,240,.5),var(--line) 65%)}"
+    "html.pfc-sb-open [data-testid='stSidebar']:has(.st-key-emnav_visao-geral) .sb-sec"
+    "{background:none;color:#a99cf5}"
+)
 
 
 def ir_para_emenda(pagina: str):
@@ -670,8 +691,9 @@ def render_sidebar_emendas():
     _preparar_sidebar()
     atual = st.session_state.get("emenda_page", "Visão geral")
     with st.sidebar:
-        st.markdown(f"<style>{css_icones_botoes(EMENDA_ICONES, EMENDA_ROTULOS)}</style>",
-                    unsafe_allow_html=True)
+        st.markdown(
+            f"<style>{css_icones_botoes(EMENDA_ICONES, EMENDA_ROTULOS, EMENDA_CORES)}"
+            f"{_EMENDA_REALCE_CSS}</style>", unsafe_allow_html=True)
         st.markdown(_sidebar_toggle_html(), unsafe_allow_html=True)  # recolher/expandir no topo
         st.markdown(
             '<div class="sb-brand em-brand"><div class="rings em-rings"><span></span><span></span><span></span></div>'
