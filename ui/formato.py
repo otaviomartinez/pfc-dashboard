@@ -977,6 +977,24 @@ def rotulo_tipo_prospeccao(t) -> str:
     return str(t or "").strip() or "—"
 
 
+def linhas_placar_prospeccao(ganhos: list) -> list:
+    """Modelo das linhas do placar 'Verba já conquistada' (Prospecção) — uma por
+    item na etapa final. PURA (sem st/HTML): monta {nome, sub, valor} a partir dos
+    registros; a casca (app.py) escapa e vira HTML. Lista vazia → []. O `sub`
+    junta Tipo · Financiador · Previsão (só os não-vazios)."""
+    linhas = []
+    for it in (ganhos or []):
+        sub = " · ".join(x for x in (str(it.get("Tipo", "")).strip(),
+                                     str(it.get("Financiador", "")).strip(),
+                                     str(it.get("Previsão", "")).strip()) if x)
+        linhas.append({
+            "nome": str(it.get("Nome", "")).strip() or "(sem nome)",
+            "sub": sub,
+            "valor": str(it.get("Valor", "")).strip() or "—",
+        })
+    return linhas
+
+
 def _funil_emendas_colunas(deps: list) -> list:
     """Monta as colunas do kanban a partir dos deputados, enquadrando cada um na
     sua etapa. card.id = nome (chave da aba); card.status = a etapa (coluna)."""

@@ -116,6 +116,7 @@ from ui.formato import (
     estilo_plotly,
     funil_parlamentares_colunas,
     itens_relatorio_parlamentares,
+    linhas_placar_prospeccao,
     lista_orgs_html,
     plano_obs,
     PROSPECCAO_TIPOS,
@@ -1303,23 +1304,46 @@ PROSPECCAO_ETAPAS = ["Indicada", "Aprovada", "Assinada", "Paga"]
 PROSPECCAO_ETAPA_COR = {"Indicada": "#7C8698", "Aprovada": "#5B9BD5",
                         "Assinada": "#E8B54A", "Paga": "#4ADE80"}
 
-# Placar de verba conquistada (verde = etapa final, mesma cor do "Paga").
-_PROSPECCAO_PLACAR_CSS = """
+# Estilo da tela Prospecção (Frente 3): placar em glowcard TEAL (#2DD4BF, identidade
+# da Prospecção), valores em verde (dinheiro = verde) dentro da moldura teal; form
+# escopado por .st-key-prosp_form (NÃO vaza p/ outros forms); acentos teal discretos.
+_PROSPECCAO_CSS = """
 <style>
-.plc{background:linear-gradient(135deg,rgba(74,222,128,.13),rgba(74,222,128,.02));
-  border:1px solid rgba(74,222,128,.32);border-left:3px solid #4ADE80;border-radius:16px;
-  padding:20px 22px;margin:6px 0 4px}
-.plc-lbl{font-family:var(--mono);font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:#4ADE80}
-.plc-total{font-size:38px;font-weight:800;color:var(--ink);line-height:1.05;margin-top:5px;
-  font-variant-numeric:tabular-nums}
+/* ---- Placar "Verba já conquistada": glowcard teal ---- */
+.plc{position:relative;overflow:hidden;border-radius:18px;padding:22px 24px;margin:6px 0 8px;
+  background:linear-gradient(150deg,rgba(45,212,191,.12),rgba(45,212,191,.02) 60%),rgba(20,26,33,.72);
+  border:1px solid rgba(45,212,191,.28);
+  box-shadow:0 24px 60px -34px rgba(45,212,191,.5),inset 0 1px 0 rgba(255,255,255,.05)}
+.plc::before{content:"";position:absolute;top:-42%;right:-8%;width:260px;height:260px;pointer-events:none;
+  background:radial-gradient(circle,rgba(45,212,191,.22),transparent 68%)}
+.plc-head{position:relative;z-index:1;display:flex;align-items:flex-start;gap:14px}
+.plc-ico{width:42px;height:42px;flex:none;display:grid;place-items:center;border-radius:12px;font-size:21px;
+  background:rgba(45,212,191,.16);box-shadow:inset 0 0 0 1px rgba(45,212,191,.32)}
+.plc-headtxt{min-width:0}
+.plc-lbl{font-family:var(--mono);font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:#2DD4BF}
+.plc-total{font-size:40px;font-weight:800;color:#2DD4BF;line-height:1.02;margin-top:4px;
+  letter-spacing:-.6px;font-variant-numeric:tabular-nums}
 .plc-cap{font-size:12.5px;color:var(--muted);margin-top:5px}
-.plc-list{margin-top:14px;display:flex;flex-direction:column}
+.plc-list{position:relative;z-index:1;margin-top:16px}
 .plc-row{display:flex;align-items:center;justify-content:space-between;gap:14px;
-  padding:10px 0;border-top:1px solid var(--line)}
+  padding:11px 0;border-top:1px solid rgba(255,255,255,.07)}
+.plc-rinfo{flex:1;min-width:0}
 .plc-nome{font-weight:600;color:var(--ink);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .plc-sub{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:2px}
 .plc-val{font-weight:700;color:#4ADE80;font-size:15px;white-space:nowrap;font-variant-numeric:tabular-nums}
-.plc-vazio{margin-top:12px;font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px}
+.plc-vazio{position:relative;z-index:1;margin-top:14px;font-size:13px;color:var(--muted);
+  border-top:1px solid rgba(255,255,255,.07);padding-top:14px}
+/* ---- Header + caption do funil: acento teal discreto ---- */
+.phead-prosp{border-left:3px solid #2DD4BF;padding-left:14px}
+.prosp-cap{font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;
+  color:var(--dim);border-left:2px solid rgba(45,212,191,.55);padding-left:10px;margin:8px 0 10px}
+/* ---- Form "Registrar nova verba": ESCOPADO por .st-key-prosp_form (não vaza) ---- */
+.st-key-prosp_form [data-testid="stExpander"] summary:hover{color:#2DD4BF}
+.st-key-prosp_form [data-testid="stBaseButton-primaryFormSubmit"]{
+  background:#2DD4BF !important;border-color:#2DD4BF !important;color:#04120F !important}
+.st-key-prosp_form [data-testid="stBaseButton-primaryFormSubmit"]:hover{
+  background:#2DD4BF !important;border-color:#2DD4BF !important;color:#04120F !important;filter:brightness(1.08)}
+.st-key-prosp_form [data-testid="stBaseButton-primaryFormSubmit"]:disabled{opacity:.5}
 </style>
 """
 
@@ -1366,7 +1390,7 @@ def render_prospeccao():
     # Barra do topo padrão (3 destinos); "Voltar à Central" é nativo do menu do topnav.
     render_topnav("prospeccao")
     st.markdown(
-        '<div class="phead"><h1 style="color:var(--ink)">Prospecção</h1>'
+        '<div class="phead phead-prosp"><h1 style="color:var(--ink)">Prospecção</h1>'
         '<p>Toda verba que o PFC está buscando — emendas, prêmios, patrocínios — '
         'registrada à mão e acompanhada por etapa.</p></div>', unsafe_allow_html=True)
     if not modo_conectado:
@@ -1379,57 +1403,55 @@ def render_prospeccao():
     # ---- PARTE 2 · PLACAR: verba JÁ CONQUISTADA (itens na etapa final) ----
     total_ganho, ganhos = _prospeccao_conquistado(itens)
     etapa_final = PROSPECCAO_ETAPAS[-1]
-    if ganhos:
-        linhas = ""
-        for it in ganhos:
-            sub = " · ".join(x for x in (str(it.get("Tipo", "")).strip(),
-                             str(it.get("Financiador", "")).strip(),
-                             str(it.get("Previsão", "")).strip()) if x)
-            linhas += (f'<div class="plc-row"><div style="flex:1;min-width:0">'
-                       f'<div class="plc-nome">{esc(str(it.get("Nome", "")))}</div>'
-                       f'<div class="plc-sub">{esc(sub)}</div></div>'
-                       f'<div class="plc-val">{esc(str(it.get("Valor", "")).strip() or "—")}</div></div>')
+    dados_linhas = linhas_placar_prospeccao(ganhos)
+    if dados_linhas:
+        linhas = "".join(
+            f'<div class="plc-row"><div class="plc-rinfo">'
+            f'<div class="plc-nome">{esc(ln["nome"])}</div>'
+            f'<div class="plc-sub">{esc(ln["sub"])}</div></div>'
+            f'<div class="plc-val">{esc(ln["valor"])}</div></div>'
+            for ln in dados_linhas)
     else:
         linhas = (f'<div class="plc-vazio">Nenhuma verba na etapa "{esc(etapa_final)}" ainda. '
                   f'Arraste um item até lá quando o dinheiro entrar — ele vira vitória aqui.</div>')
     st.markdown(
-        _PROSPECCAO_PLACAR_CSS +
-        '<div class="plc"><div class="plc-head"><div>'
-        '<div class="plc-lbl">🏆 Verba já conquistada</div>'
+        _PROSPECCAO_CSS +
+        '<div class="plc"><div class="plc-head">'
+        '<div class="plc-ico">🏆</div><div class="plc-headtxt">'
+        '<div class="plc-lbl">Verba já conquistada</div>'
         f'<div class="plc-total">{brl(total_ganho) if total_ganho else "R$ 0"}</div>'
         f'<div class="plc-cap">{len(ganhos)} item(ns) na etapa final · "{esc(etapa_final)}"</div>'
         f'</div></div><div class="plc-list">{linhas}</div></div>', unsafe_allow_html=True)
 
     # ---- formulário de inserção manual ----
-    with st.expander("➕ Registrar nova verba", expanded=False):
-        with st.form("form_prospeccao", clear_on_submit=True):
-            c1, c2 = st.columns([2, 1])
-            nome = c1.text_input("Nome / origem", placeholder="Emenda Vitor Lippi · Prêmio X…")
-            tipo = c2.selectbox("Tipo", PROSPECCAO_TIPOS)
-            c3, c4 = st.columns(2)
-            valor = c3.text_input("Valor", placeholder="R$ 50 mil")
-            financiador = c4.text_input("Deputado / financiador", placeholder="quando aplicável")
-            c5, c6 = st.columns(2)
-            previsao = c5.text_input("Previsão / data esperada",
-                                     placeholder="setembro · após a eleição · pode deixar vazio")
-            status = c6.selectbox("Status", PROSPECCAO_ETAPAS)
-            obs = st.text_area("Observações", height=70)
-            enviar = st.form_submit_button("Adicionar à prospecção", type="primary",
-                                           use_container_width=True, disabled=not modo_conectado)
-        if enviar:
-            res = dados.adicionar_prospeccao({
-                "Nome": nome, "Tipo": tipo, "Valor": valor, "Financiador": financiador,
-                "Previsão": previsao, "Status": status, "Observações": obs})
-            (st.success if res["sucesso"] else st.error)(res["mensagem"])
-            if res["sucesso"]:
-                st.rerun()
+    with st.container(key="prosp_form"):  # chave p/ escopar o CSS do form (não vaza)
+        with st.expander("➕ Registrar nova verba", expanded=False):
+            with st.form("form_prospeccao", clear_on_submit=True):
+                c1, c2 = st.columns([2, 1])
+                nome = c1.text_input("Nome / origem", placeholder="Emenda Vitor Lippi · Prêmio X…")
+                tipo = c2.selectbox("Tipo", PROSPECCAO_TIPOS)
+                c3, c4 = st.columns(2)
+                valor = c3.text_input("Valor", placeholder="R$ 50 mil")
+                financiador = c4.text_input("Deputado / financiador", placeholder="quando aplicável")
+                c5, c6 = st.columns(2)
+                previsao = c5.text_input("Previsão / data esperada",
+                                         placeholder="setembro · após a eleição · pode deixar vazio")
+                status = c6.selectbox("Status", PROSPECCAO_ETAPAS)
+                obs = st.text_area("Observações", height=70)
+                enviar = st.form_submit_button("Adicionar à prospecção", type="primary",
+                                               use_container_width=True, disabled=not modo_conectado)
+            if enviar:
+                res = dados.adicionar_prospeccao({
+                    "Nome": nome, "Tipo": tipo, "Valor": valor, "Financiador": financiador,
+                    "Previsão": previsao, "Status": status, "Observações": obs})
+                (st.success if res["sucesso"] else st.error)(res["mensagem"])
+                if res["sucesso"]:
+                    st.rerun()
 
     # ---- PARTE 1 · funil por etapa (reusa o kanban do funil de deputados) ----
     _mostrar_resultado(st.session_state.pop("kanban_prosp_msg", None))
-    st.markdown('<div style="font-family:var(--mono);font-size:11px;letter-spacing:1px;'
-                'text-transform:uppercase;color:var(--dim);margin:8px 0 10px">'
-                f'{len(itens)} verba(s) em prospecção · arraste um card para mudar a etapa</div>',
-                unsafe_allow_html=True)
+    st.markdown(f'<div class="prosp-cap">{len(itens)} verba(s) em prospecção · '
+                'arraste um card para mudar a etapa</div>', unsafe_allow_html=True)
     colunas = _funil_prospeccao_colunas(itens)
 
     if not KANBAN_DND_OK or not modo_conectado:
