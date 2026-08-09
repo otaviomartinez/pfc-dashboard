@@ -397,6 +397,73 @@ def pdf_resumo_federal(dep: dict, gerado_em: str) -> bytes:
     return buffer.getvalue()
 
 
+def pdf_resumo_senador(dep: dict, gerado_em: str) -> bytes:
+    """Resumo pré-reunião de UM SENADOR — para imprimir e levar. Espelha o federal:
+    valor é FAIXA SUGERIDA (potencial), não execução; estratégia curada e o
+    gabinete/sala do Senado. Omissão graciosa dos campos vazios. dep (montado pelo app):
+        {senador, partido, base, score, aderencia, status_crm, argumento,
+         valor_sugerido, estrategia, gabinete_senado, telefone, email,
+         fonte_senado, whatsapp, instagram}
+    """
+    est = _estilos()
+    buffer = BytesIO()
+    nome = dep.get("senador") or "Senador"
+    partido = dep.get("partido") or "—"
+    doc, rodape = _doc(buffer, _VIOLETA, "Resumo para reunião · %s (senador)" % nome, gerado_em)
+
+    story = _cabecalho(_VIOLETA, nome,
+                       "Resumo para reunião · %s · Senado Federal" % partido, gerado_em, est)
+    story.append(_P("Score PFC: <b>%s</b>  ·  Aderência: <b>%s</b>  ·  "
+                    "Situação no CRM: <b>%s</b>  ·  Base: <b>%s</b>"
+                    % (dep.get("score") or "—", dep.get("aderencia") or "—",
+                       dep.get("status_crm") or "—", dep.get("base") or "—"), est["sub"]))
+    story.append(Spacer(1, 12))
+
+    story.append(_P("Melhor gancho de abordagem", est["secao"]))
+    story.append(_P(dep.get("argumento") or "—", est["cel"]))
+    story.append(Spacer(1, 12))
+
+    # Valor SUGERIDO (faixa/potencial) — nunca "pago/autorizado".
+    story.append(_P("Valor sugerido (potencial de emenda)", est["secao"]))
+    box = Table([[_P("<b>Faixa sugerida</b><br/>%s" % (dep.get("valor_sugerido") or "—"),
+                     est["cel"])]], colWidths=[A4[0] - 2 * _MARGEM])
+    box.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.5, _LINHA), ("LINEBEFORE", (0, 0), (0, -1), 2, _VIOLETA),
+        ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10)]))
+    story.append(box)
+    story.append(_P("Faixa de <b>potencial</b> de emenda (mín–máx), curada à mão — "
+                    "não é execução histórica.", est["secao_cap"]))
+    story.append(Spacer(1, 12))
+
+    if dep.get("estrategia"):
+        story.append(_P("Estratégia PFC", est["secao"]))
+        story.append(_P(dep["estrategia"], est["cel"]))
+        story.append(Spacer(1, 12))
+
+    story.append(_P("Contato oficial · Senado", est["secao"]))
+    linhas_ct = []
+    if dep.get("gabinete_senado"):
+        linhas_ct.append("Gabinete/sala: %s" % dep["gabinete_senado"])
+    if dep.get("telefone"):
+        linhas_ct.append("Telefone: %s" % dep["telefone"])
+    if dep.get("email"):
+        linhas_ct.append("Email: %s" % dep["email"])
+    if dep.get("fonte_senado"):
+        linhas_ct.append("Página oficial: %s" % dep["fonte_senado"])
+    story.append(_P("<br/>".join(linhas_ct) or "—", est["cel"]))
+    ressalva = [x for x in (("WhatsApp", dep.get("whatsapp")), ("Instagram", dep.get("instagram")))
+                if str(x[1]).strip()]
+    if ressalva:
+        story.append(_P(" · ".join("%s: %s" % (r, v) for r, v in ressalva), est["secao_cap"]))
+    story.append(Spacer(1, 8))
+    story.append(_P("Contato público de gabinete (Senado Federal). Score, estratégia e "
+                    "valor sugerido são curados à mão — não recalculados.", est["secao_cap"]))
+
+    doc.build(story, onFirstPage=rodape, onLaterPages=rodape)
+    return buffer.getvalue()
+
+
 def pdf_emendas(territorio: list[dict], expansao: list[dict], gerado_em: str,
                 resumo: str | None = None) -> bytes:
     """PDF dos deputados prioritários a abordar (território primeiro, depois expansão).

@@ -1797,11 +1797,179 @@ def dlg_deputado_federal(dep: dict) -> None:
         st.caption("ℹ️ A edição do relacionamento é restrita à equipe logada.")
 
 
+def _resumo_senador_dados(dep: dict) -> dict:
+    """Dicionário para o PDF senador (relatorios.pdf_resumo_senador). Espelha
+    _resumo_federal_dados, com gabinete/fonte do Senado."""
+    return {
+        "senador": dep["nome"], "partido": dep["partido"], "base": dep["base"],
+        "score": str(dep["score"]), "aderencia": str(dep["ader"]),
+        "status_crm": dep.get("status") or "—", "argumento": _argumento_federal(dep),
+        "valor_sugerido": dep["valor_sugerido"], "estrategia": dep["estrategia"],
+        "gabinete_senado": dep["gabinete_senado"], "telefone": dep["telefones"],
+        "email": dep["email"], "fonte_senado": dep["fonte_senado"],
+        "whatsapp": dep["whatsapp"], "instagram": dep["instagram"],
+    }
+
+
+@st.dialog("Dossiê do senador", width="large")
+def dlg_senador(dep: dict) -> None:
+    """Espelha dlg_deputado_federal: mesmas linhas de info, casa por ID, mostra o
+    Gabinete Senado, valor sugerido em faixa e a edição do CRM (grava por ID via
+    atualizar_senador). O gancho reusa _argumento_federal (base/proximidade/aderência)."""
+    breadcrumb("Senador", dep["nome"])
+    st.markdown(
+        f'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+        f'<span style="font-size:20px;font-weight:700;color:var(--ink)">{esc(dep["nome"])}</span>'
+        f'<span style="font-family:var(--mono);font-size:12px;color:var(--dim)">'
+        f'{esc(dep["partido"])} · Senado · {esc(dep["base"]) or "base —"}</span></div>'
+        f'<div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:8px">'
+        f'score <b style="color:{_cor_score(dep["score"])}">{dep["score"]}</b> · '
+        f'aderência {dep["ader"]}/100 · chance de emenda {dep["chance"]}%</div>',
+        unsafe_allow_html=True)
+
+    # PDF resumo (senador) — reusa o ReportLab dos relatórios.
+    try:
+        _pdf = relatorios.pdf_resumo_senador(_resumo_senador_dados(dep),
+                                             datetime.date.today().strftime("%d/%m/%Y"))
+        st.download_button("Resumo para reunião (PDF)", data=_pdf,
+                           file_name=f"resumo-senador-{slug(dep['nome'])}.pdf",
+                           mime="application/pdf", use_container_width=True,
+                           key=f"pdf_sen_{slug(dep['nome'])}",
+                           help="Página limpa com tudo do senador, para levar à reunião.")
+    except Exception as e:  # PDF nunca derruba o dossiê
+        st.caption(f"Não consegui gerar o PDF agora: {e}")
+
+    # Melhor gancho de abordagem.
+    st.markdown(
+        '<div style="background:linear-gradient(135deg,rgba(139,123,240,.16),rgba(139,123,240,.03));'
+        'border:1px solid rgba(139,123,240,.34);border-left:3px solid #8B7BF0;border-radius:12px;'
+        'padding:14px 16px;margin:18px 0 4px">'
+        '<div style="font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;'
+        'color:#b7abff;margin-bottom:7px">Melhor gancho de abordagem</div>'
+        f'<div style="font-size:15.5px;line-height:1.5;color:var(--ink);font-weight:500">'
+        f'{esc(_argumento_federal(dep))}</div></div>', unsafe_allow_html=True)
+
+    # Valor SUGERIDO (faixa/potencial) — nunca pago/autorizado.
+    st.markdown(
+        '<div class="dd-box aut" style="margin-top:14px"><div class="k">Valor sugerido · potencial</div>'
+        f'<div class="v" style="color:#b7abff">{esc(dep["valor_sugerido"]) or "—"}</div>'
+        '<div class="n">faixa de potencial de emenda (mín–máx), curada à mão — não é execução</div></div>',
+        unsafe_allow_html=True)
+
+    # Estratégia + emenda/ação + gabinete.
+    linhas = [("Estratégia PFC", esc(dep["estrategia"]) or "—"),
+              ("Emenda / ação sugerida", esc(dep["emenda"]) or "—"),
+              ("Gabinete / sala · Senado", esc(dep["gabinete_senado"]) or "—"),
+              ("Base regional", esc(dep["base"]) or "—")]
+    st.markdown("".join(
+        f'<div style="margin-top:16px"><div style="font-family:var(--mono);font-size:11px;'
+        f'letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:6px">{lab}</div>'
+        f'<div style="font-size:14px;color:var(--ink);line-height:1.6">{val}</div></div>'
+        for lab, val in linhas), unsafe_allow_html=True)
+
+    # Diálogo (sensível) — só logado.
+    st.markdown('<div style="font-family:var(--mono);font-size:11px;letter-spacing:1px;'
+                'text-transform:uppercase;color:var(--dim);margin:18px 0 8px">'
+                'Diálogo · andamento da negociação</div>', unsafe_allow_html=True)
+    if st.session_state.get("user"):
+        dlg = dep["dialogo"] or "Sem anotações de diálogo ainda."
+        st.markdown(f'<div style="background:var(--surface2);border:1px solid var(--line);'
+                    f'border-left:3px solid #8B7BF0;border-radius:0 10px 10px 0;padding:14px 16px;'
+                    f'font-size:14px;line-height:1.6;color:var(--muted);font-style:italic">'
+                    f'{esc(dlg)}</div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div style="font-size:13px;color:var(--dim)">🔒 Conteúdo restrito.</div>',
+                    unsafe_allow_html=True)
+
+    # Contato oficial · Senado (público). WhatsApp/Instagram com ressalva "a validar".
+    st.markdown('<div style="margin-top:18px;font-family:var(--mono);font-size:11px;'
+                'letter-spacing:1px;text-transform:uppercase;color:var(--dim);margin-bottom:7px">'
+                'Contato oficial · Senado</div>', unsafe_allow_html=True)
+
+    def _cf(rot, val, link=None, ressalva=False):
+        if not str(val).strip():
+            v = '<span style="color:var(--dim)">—</span>'
+        elif link:
+            v = f'<a href="{esc(link)}" target="_blank" style="color:#b7abff">{esc(val)}</a>'
+        else:
+            v = esc(val)
+        if ressalva:
+            v += ' <span style="color:var(--sem-mid);font-size:11px">(a validar)</span>'
+        return (f'<div style="display:flex;gap:8px;font-size:13px;margin-bottom:5px">'
+                f'<span style="font-family:var(--mono);font-size:10px;letter-spacing:.5px;'
+                f'text-transform:uppercase;color:var(--dim);min-width:88px;padding-top:2px">{rot}</span>'
+                f'<span style="color:var(--ink)">{v}</span></div>')
+    email = dep["email"]
+    _wa = dep["whatsapp"]
+    _ig = dep["instagram"]
+    _val = lambda x: str(x).strip().lower() in ("a validar", "avalidar", "validar")  # noqa: E731
+    st.markdown(
+        '<div style="background:var(--surface2);border:1px solid var(--line);'
+        'border-left:3px solid #8B7BF0;border-radius:0 10px 10px 0;padding:12px 15px">'
+        + _cf("Gabinete/sala", dep["gabinete_senado"])
+        + _cf("Telefone", dep["telefones"])
+        + _cf("Email", email, link=(f"mailto:{email}" if email else None))
+        + _cf("Página", "abrir no site do Senado" if dep["fonte_senado"] else "", link=dep["fonte_senado"])
+        + (_cf("WhatsApp", _wa, ressalva=_val(_wa)) if _wa else "")
+        + (_cf("Instagram", _ig, ressalva=_val(_ig)) if _ig else "")
+        + '</div>'
+        '<div style="font-size:11px;color:var(--dim);margin-top:6px">Contato público de gabinete '
+        '(Senado). WhatsApp/Instagram marcados <b>a validar</b> não são confirmados.</div>',
+        unsafe_allow_html=True)
+
+    # ---- EDIÇÃO do CRM (sensível) — grava por ID na aba Senadores ----
+    if st.session_state.get("user"):
+        etapa_atual = _etapa_de_status(dep["status"])
+        idx_status = (EMENDA_FUNIL_ETAPAS.index(etapa_atual)
+                      if etapa_atual in EMENDA_FUNIL_ETAPAS else 0)
+        idx_temp = _TEMP_ORDEM.index(dep["temp"]) if dep["temp"] in _TEMP_ORDEM else 0
+        k = slug(dep["nome"])
+        st.markdown('<div style="margin-top:22px;padding-top:18px;border-top:1px solid var(--line);'
+                    'font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;'
+                    'color:#8B7BF0">✎ Atualizar relacionamento</div>', unsafe_allow_html=True)
+        ce1, ce2 = st.columns(2)
+        novo_status = ce1.selectbox("Status · etapa do funil", EMENDA_FUNIL_ETAPAS,
+                                    index=idx_status, key=f"eds_status_{k}")
+        nova_temp = ce2.selectbox("Temperatura", _TEMP_ORDEM, index=idx_temp, key=f"eds_temp_{k}")
+        novo_dialogo = st.text_area("Diálogo · anotações de negociação", value=dep["dialogo"],
+                                    height=120, key=f"eds_dialogo_{k}")
+        nova_obs = st.text_area("Registro de reunião / próximos passos", value=dep["obs"],
+                                height=80, key=f"eds_obs_{k}")
+        if st.button("Salvar alterações", type="primary", use_container_width=True,
+                     key=f"eds_salvar_{k}"):
+            campos = {}
+            if novo_status != etapa_atual:
+                campos["Status CRM"] = novo_status
+            if nova_temp != dep["temp"]:
+                campos["Temperatura"] = f"{_TEMP_EMOJI[nova_temp]} {nova_temp}"
+            if novo_dialogo.strip() != dep["dialogo"]:
+                campos["Diálogo"] = novo_dialogo.strip()
+            if nova_obs.strip() != dep["obs"]:
+                campos["Observações"] = nova_obs.strip()
+            if not campos:
+                st.info("Nenhuma alteração para salvar.")
+            else:
+                res = dados.atualizar_senador(dep["id"], campos)
+                if res.get("sucesso"):
+                    st.success(f"✓ {res['mensagem']} Os demais campos foram preservados.")
+                    st.toast("Senador atualizado no Google Sheets.")
+                    st.caption("Feche o dossiê para ver a lista e o funil já atualizados.")
+                else:
+                    st.warning(res.get("mensagem", "Não foi possível gravar."))
+        st.caption("🔒 Edição restrita à equipe logada · grava na aba Senadores. "
+                   "Score/estratégia/contato oficial não se editam aqui.")
+    else:
+        st.caption("ℹ️ A edição do relacionamento é restrita à equipe logada.")
+
+
 def _abrir_dossie_parlamentar(r: dict) -> None:
     """Abre o dossiê CERTO conforme o escopo do registro unificado (usa o _raw
     original, então cada dossiê recebe exatamente o dicionário que já esperava)."""
-    if r.get("escopo") == "federal":
+    escopo = r.get("escopo")
+    if escopo == "federal":
         dlg_deputado_federal(dict(r["_raw"]))
+    elif escopo == "senador":
+        dlg_senador(dict(r["_raw"]))
     else:
         dlg_deputado(dict(r["_raw"]))
 

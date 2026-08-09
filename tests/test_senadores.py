@@ -104,10 +104,31 @@ def test_roteamento_escrita_tres_escopos_nao_cruza():
     assert list(sen["campos"].keys()) == ["Diálogo"] and "Status CRM" not in sen["campos"]
 
 
+def test_pdf_resumo_senador_smoke():
+    """PDF do senador: com campos preenchidos E quase vazio, gera %PDF válido — a
+    omissão graciosa dos contatos vazios não quebra o PDF (espelha o smoke da Sala)."""
+    from src import relatorios
+    cheio = {
+        "senador": "Ciclano da Silva", "partido": "XPTO", "base": "São Paulo",
+        "score": "88", "aderencia": "92", "status_crm": "Reunião",
+        "argumento": "Encaixe forte pela pauta de educação.",
+        "valor_sugerido": "R$ 200 mil a R$ 400 mil", "estrategia": "abrir pela educação",
+        "gabinete_senado": "Ala 5, Gab 12", "telefone": "61 3303-0000",
+        "email": "cic@senado.leg.br", "fonte_senado": "senado.leg.br",
+        "whatsapp": "", "instagram": "",
+    }
+    vazio = {"senador": "Fulano de Tal"}   # quase tudo ausente → tudo omitido
+    b_cheio = relatorios.pdf_resumo_senador(cheio, "08/08/2026")
+    b_vazio = relatorios.pdf_resumo_senador(vazio, "08/08/2026")
+    assert b_cheio[:4] == b"%PDF" and b_vazio[:4] == b"%PDF"   # ambos válidos
+    assert len(b_cheio) > 1200 and len(b_vazio) > 1000         # vazio não quebra
+
+
 if __name__ == "__main__":
     test_sen_do_row_le_colunas_renomeadas()
     test_parlamentar_senador_forma_certa()
     test_normalizar_inclui_e_ordena_com_os_outros()
     test_aba_vazia_senador_fica_vazio()
     test_roteamento_escrita_tres_escopos_nao_cruza()
-    print("OK — testes da fundação + roteamento de escrita dos senadores passaram.")
+    test_pdf_resumo_senador_smoke()
+    print("OK — fundação + roteamento + dossiê/PDF dos senadores passaram.")
