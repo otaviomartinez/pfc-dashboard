@@ -50,6 +50,19 @@ ABA_DEPUTADOS = "Deputados"
 # importada uma vez). Painel Federal lê daqui ao vivo, igual ao Estadual lê de
 # 'Deputados'. Score/estratégia/valor JÁ vêm curados — não se recalcula nada.
 ABA_DEPUTADOS_FEDERAIS = "Deputados Federais"
+# Aba dos SENADORES de SP (curados à mão na planilha, molde do federal). O escopo
+# Senador do painel de Emendas lê daqui ao vivo. Score/valor JÁ vêm curados — não
+# se recalcula nada. Nasce vazia (só header) por criar_aba_senadores(); as linhas
+# entram à mão depois. Leitura POR NOME de coluna (coluna nova flui sozinha).
+ABA_SENADORES = "Senadores"
+HEADERS_SENADORES = [
+    "ID", "Senador", "Partido", "Score Integrado", "Chance Emenda (0-100)",
+    "Aderência PFC (0-100)", "Base Regional", "Proximidade Territorial",
+    "Gabinete Senado", "Endereço/Escritório Regional", "Diálogo", "Status CRM",
+    "Temperatura", "Telefones", "WhatsApp", "Email", "Instagram", "Emenda/Ação",
+    "Valor sugerido", "Estratégia PFC", "Observações", "Fonte oficial Senado",
+    "Follow-up sugerido",
+]
 # Aba de inscritos no alerta de editais por e-mail (cadastro pelo próprio app).
 # Só e-mail + data + flag Ativo — nada sensível. O radar lê daqui para enviar.
 ABA_INSCRITOS = "Inscritos Alerta"
@@ -624,6 +637,41 @@ def carregar_prospeccao() -> pd.DataFrame:
         registros = sh.worksheet(ABA_PROSPECCAO).get_all_records()
         return pd.DataFrame(registros).astype(str).replace({"None": "", "nan": ""}) if registros \
             else pd.DataFrame(columns=HEADERS_PROSPECCAO)
+    except Exception:
+        return pd.DataFrame()
+
+
+def criar_aba_senadores() -> bool:
+    """Garante a aba 'Senadores' com o cabeçalho padrão. True se criada agora.
+    Roda UMA VEZ, FORA do runtime (não é chamada por botão/carga) — depois as
+    linhas entram à mão no Sheet, como os estaduais/federais são mantidos."""
+    sh = _conectar()
+    if sh is None:
+        return False
+    try:
+        if ABA_SENADORES in [w.title for w in sh.worksheets()]:
+            return False
+        ws = sh.add_worksheet(title=ABA_SENADORES, rows=200, cols=len(HEADERS_SENADORES))
+        ws.append_row(HEADERS_SENADORES)
+        return True
+    except Exception:
+        return False
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def carregar_senadores() -> pd.DataFrame:
+    """Base dos SENADORES (aba 'Senadores'). Vazio se não existir/sem conexão — o
+    escopo Senador mostra estado vazio-elegante, não quebra. NÃO auto-cria (a
+    criação é a função separada criar_aba_senadores). Leitura POR NOME de coluna."""
+    sh = _conectar()
+    if sh is None:
+        return pd.DataFrame()
+    try:
+        if ABA_SENADORES not in [w.title for w in sh.worksheets()]:
+            return pd.DataFrame()
+        registros = sh.worksheet(ABA_SENADORES).get_all_records()
+        return pd.DataFrame(registros).astype(str).replace({"None": "", "nan": ""}) if registros \
+            else pd.DataFrame(columns=HEADERS_SENADORES)
     except Exception:
         return pd.DataFrame()
 

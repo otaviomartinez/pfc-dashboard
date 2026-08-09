@@ -533,6 +533,75 @@ def _parlamentar_federal(d: dict) -> dict:
     }
 
 
+def _sen_do_row(row) -> dict:
+    """Dicionário completo de um SENADOR a partir da linha da aba 'Senadores'.
+    Cópia de _dep_federal_do_row com 3 colunas renomeadas (Senado no lugar de
+    Câmara). Score/aderência/chance/valor/estratégia JÁ vêm curados — nada recalcula."""
+    def g(k):
+        return str(row.get(k, "")).strip()
+
+    def ni(k):
+        try:
+            return int(float(g(k).replace(",", ".") or 0))
+        except (TypeError, ValueError):
+            return 0
+    return {
+        "id": g("ID"), "nome": g("Senador"), "partido": g("Partido"),
+        "score": ni("Score Integrado"), "chance": ni("Chance Emenda (0-100)"),
+        "ader": ni("Aderência PFC (0-100)"), "base": g("Base Regional"),
+        "proximidade": g("Proximidade Territorial"), "gabinete_senado": g("Gabinete Senado"),
+        "endereco_regional": g("Endereço/Escritório Regional"),
+        "dialogo": g("Diálogo"), "status": g("Status CRM"),
+        "temp_raw": g("Temperatura"), "temp": _temp_nome(g("Temperatura")),
+        "telefones": g("Telefones"), "whatsapp": g("WhatsApp"), "email": g("Email"),
+        "instagram": g("Instagram"), "emenda": g("Emenda/Ação"),
+        "valor_sugerido": g("Valor sugerido"), "estrategia": g("Estratégia PFC"),
+        "obs": g("Observações"), "fonte_senado": g("Fonte oficial Senado"),
+        "follow_up": g("Follow-up sugerido"),
+    }
+
+
+def _senadores_ordenados() -> list:
+    """Os senadores (aba 'Senadores'), ordenados por score. Curados — nada é
+    recalculado. Aba vazia/inexistente → lista vazia (escopo Senador vazio-elegante)."""
+    df = dados.carregar_senadores()
+    if df.empty:
+        return []
+    out = [_sen_do_row(r) for _, r in df.iterrows()]
+    out.sort(key=lambda d: d["score"], reverse=True)
+    return out
+
+
+def _parlamentar_senador(d: dict) -> dict:
+    """Registro senador curado (_sen_do_row) → formato unificado. Espelha o federal:
+    chave = ID (CodigoParlamentar), valor SEMPRE 'sugerido' (faixa, nunca execução),
+    score PRESERVADO (não recalcula). escopo/fonte próprios do Senado."""
+    valor = str(d.get("valor_sugerido", "")).strip()
+    temp = d.get("temp") or _temp_nome(d.get("temp_raw"))
+    return {
+        "escopo": "senador", "chave": d.get("id", ""),
+        "nome": d.get("nome", ""), "partido": d.get("partido", "") or "—",
+        "score": _int0(d.get("score")), "ader": _int0(d.get("ader")),
+        "chance": _int0(d.get("chance")),
+        "status": d.get("status", "") or "—", "temp": temp,
+        "temp_cor": _TEMP_COR.get(temp, "#7C8698"),
+        "temp_emoji": _TEMP_EMOJI.get(temp, "⚫"),
+        "dialogo": d.get("dialogo", ""), "base": d.get("base", ""),
+        "valor_tipo": VALOR_SUGERIDO if valor else "", "valor_txt": valor,
+        "valor": (valor + " · sugerido") if valor else "",
+        "status_cor": _status_cor(d.get("status", "")),
+        "prioridade": "",
+        "escopo_nome": ESCOPO_META["senador"]["nome"],
+        "telefones": d.get("telefones", ""),
+        "contato": {"fonte": ESCOPO_META["senador"]["fonte"],
+                    "gabinete": d.get("gabinete_senado", ""), "telefones": d.get("telefones", ""),
+                    "email": d.get("email", ""), "whatsapp": d.get("whatsapp", ""),
+                    "instagram": d.get("instagram", "")},
+        "estrategia": d.get("estrategia", ""), "emenda": d.get("emenda", ""),
+        "obs": d.get("obs", ""), "_raw": d,
+    }
+
+
 def normalizar_parlamentares(estaduais: list | None, federais: list | None,
                              senadores: list | None = None) -> list:
     """Junta as listas dos três escopos num formato único (função PURA, testável
@@ -551,8 +620,9 @@ def carregar_parlamentares(escopo: str = "Geral") -> list:
     """Porta única de leitura unificada dos parlamentares (CRM dos três escopos).
     `escopo`: 'Geral' (padrão, todos) ou 'Estadual'/'Federal'/'Senador' (filtra).
     Lê ao vivo pelas portas de cada base e normaliza. Read-only."""
-    registros = normalizar_parlamentares(_deputados_ordenados(),
-                                         _deputados_federais_ordenados())
+    registros = normalizar_parlamentares(
+        _deputados_ordenados(), _deputados_federais_ordenados(),
+        [_parlamentar_senador(d) for d in _senadores_ordenados()])
     alvo = str(escopo or "Geral").strip().lower()
     if alvo in ESCOPOS:
         registros = [r for r in registros if r["escopo"] == alvo]
