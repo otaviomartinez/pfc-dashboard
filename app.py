@@ -583,6 +583,8 @@ def dlg_obs_rapida(escopo: str, chave: str):
                 res = dados.anexar_dialogo_deputado(plano["nome"], plano["texto"])
             elif plano["porta"] == "federal":
                 res = dados.atualizar_deputado_federal(plano["id"], plano["campos"])
+            elif plano["porta"] == "senador":
+                res = dados.atualizar_senador(plano["id"], plano["campos"])
             else:
                 res = {"sucesso": False, "mensagem": "Escopo sem gravação de observação."}
             if res.get("sucesso"):
@@ -1300,7 +1302,7 @@ def render_funil_emendas() -> None:
             # CLIQUE (sem arraste): observação rápida — só estadual, só logado.
             # Tratado ANTES do arraste porque não traz novo_status.
             if resultado.get("action") == "click":
-                if chave and pode_anotar and escopo in ("estadual", "federal"):
+                if chave and pode_anotar and escopo in ("estadual", "federal", "senador"):
                     dlg_obs_rapida(escopo, chave)
                 return
             novo = str(resultado.get("novo_status", "")).strip()
@@ -1311,9 +1313,11 @@ def render_funil_emendas() -> None:
                 res = dados.atualizar_status_deputado(chave, novo)
             elif escopo == "federal":                # chave = ID    → aba Deputados Federais
                 res = dados.atualizar_deputado_federal(chave, {"Status CRM": novo})
-            else:                                    # senador/futuro: ainda sem gravação
+            elif escopo == "senador":                # chave = ID    → aba Senadores
+                res = dados.atualizar_senador(chave, {"Status CRM": novo})
+            else:                                    # escopo desconhecido: sem gravação
                 res = {"sucesso": False,
-                       "mensagem": "Escopo ainda sem gravação (ex.: Senador) — etapa não salva."}
+                       "mensagem": "Escopo desconhecido — etapa não salva."}
             st.session_state["kanban_emendas_msg"] = res
             st.toast(res.get("mensagem", ""))
             st.rerun()  # sucesso confirma a coluna; falha faz o card voltar à origem

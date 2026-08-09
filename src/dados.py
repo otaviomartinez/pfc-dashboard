@@ -407,6 +407,44 @@ def atualizar_deputado_federal(id_item, campos: dict) -> dict:
         return {"sucesso": False, "mensagem": f"Erro ao gravar no Google Sheets: {e}"}
 
 
+def atualizar_senador(id_item, campos: dict) -> dict:
+    """Grava SÓ as células dos campos informados (casa por ID = CodigoParlamentar)
+    na aba 'Senadores'. Preserva TODO o resto — RAW, célula a célula. Espelha
+    atualizar_deputado_federal. Usado pelo funil (Status CRM) e pela obs rápida
+    (Diálogo). Coluna nova é criada no fim do cabeçalho. Só grava conectado ao
+    Sheets. Retorna {sucesso, mensagem}."""
+    id_item = str(id_item or "").strip()
+    campos = {str(k).strip(): ("" if v is None else str(v))
+              for k, v in (campos or {}).items() if str(k).strip()}
+    if not id_item or not campos:
+        return {"sucesso": False, "mensagem": "Item ou campos em branco."}
+    sh = _conectar()
+    if sh is None:
+        return {"sucesso": False, "mensagem": "Sem conexão com o Google Sheets — as "
+                "alterações não foram gravadas (modo local)."}
+    try:
+        import gspread
+        ws = sh.worksheet(ABA_SENADORES)
+        cab = [str(c).strip() for c in ws.row_values(1)]
+        if "ID" not in cab:
+            return {"sucesso": False, "mensagem": "Aba Senadores sem coluna ID."}
+        ids = ws.col_values(cab.index("ID") + 1)  # ids[0] é o cabeçalho
+        linha = next((i for i, v in enumerate(ids[1:], start=2)
+                      if str(v).strip() == id_item), None)
+        if linha is None:
+            return {"sucesso": False, "mensagem": f"Senador ID {id_item} não encontrado."}
+        for col in campos:  # cria coluna nova no cabeçalho, se preciso
+            if col not in cab:
+                cab.append(col)
+                ws.update_cell(1, len(cab), col)
+        celulas = [gspread.Cell(linha, cab.index(col) + 1, val) for col, val in campos.items()]
+        ws.update_cells(celulas, value_input_option="RAW")
+        carregar_senadores.clear()
+        return {"sucesso": True, "mensagem": f"{len(celulas)} campo(s) atualizado(s)."}
+    except Exception as e:  # noqa: BLE001
+        return {"sucesso": False, "mensagem": f"Erro ao gravar no Google Sheets: {e}"}
+
+
 # Levantamento de emendas (tela "Descobrir"): rankings gerados por src/emendas.py.
 # São dados PÚBLICOS (transparência), versionados — não confundir com o CSV
 # sensível dos 16 deputados acima. Sem o arquivo, degrada para vazio.

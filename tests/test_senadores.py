@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pandas as pd  # noqa: E402
 
 from ui import formato as F  # noqa: E402
+from ui.formato import plano_obs  # noqa: E402
 
 
 def _row_falsa(**over):
@@ -86,9 +87,27 @@ def test_aba_vazia_senador_fica_vazio():
          F.dados.carregar_deputados_federais) = orig
 
 
+def test_roteamento_escrita_tres_escopos_nao_cruza():
+    """Roteamento da obs rápida (plano_obs) nos 3 escopos, sem cruzar: estadual
+    casa por NOME; federal e senador casam por ID (senador espelha o federal, NÃO
+    o estadual). É a garantia de que o senador grava na porta certa (atualizar_senador
+    por ID no dispatch), sem tocar as portas estadual/federal."""
+    est = plano_obs("estadual", "Ana Lima", "n")
+    fed = plano_obs("federal", "204534", "n")
+    sen = plano_obs("senador", "5322", "n")
+    assert est["porta"] == "estadual" and est["nome"] == "Ana Lima" and "id" not in est
+    assert fed["porta"] == "federal" and fed["id"] == "204534" and "nome" not in fed
+    assert sen["porta"] == "senador" and sen["id"] == "5322" and "nome" not in sen
+    # senador tem a MESMA forma do federal (porta+id+campos Diálogo), não a do
+    # estadual (porta+nome+texto) — casa por ID, não por nome; e portas distintas.
+    assert set(sen) == set(fed) and sen["porta"] != fed["porta"]
+    assert list(sen["campos"].keys()) == ["Diálogo"] and "Status CRM" not in sen["campos"]
+
+
 if __name__ == "__main__":
     test_sen_do_row_le_colunas_renomeadas()
     test_parlamentar_senador_forma_certa()
     test_normalizar_inclui_e_ordena_com_os_outros()
     test_aba_vazia_senador_fica_vazio()
-    print("OK — testes da fundação de dados dos senadores (Commit 1) passaram.")
+    test_roteamento_escrita_tres_escopos_nao_cruza()
+    print("OK — testes da fundação + roteamento de escrita dos senadores passaram.")

@@ -29,8 +29,19 @@ def test_plano_estadual_usa_porta_por_nome_sem_cruzar():
     assert "campos" not in p and "id" not in p         # não usa a porta federal
 
 
-def test_plano_escopo_sem_gravacao():
-    assert plano_obs("senador", "SEN-1", "x")["porta"] is None
+def test_plano_senador_grava_so_dialogo_por_id():
+    # senador AGORA tem porta própria (espelha o federal): grava só o Diálogo, por ID.
+    p = plano_obs("senador", "5322", "Falei com o gabinete", atual="")
+    assert p["porta"] == "senador"
+    assert p["id"] == "5322"                           # casa por ID (CodigoParlamentar)
+    assert list(p["campos"].keys()) == ["Diálogo"]     # só o Diálogo...
+    assert "Status CRM" not in p["campos"]             # ...NUNCA a etapa
+    assert "Falei com o gabinete" in p["campos"]["Diálogo"]
+
+
+def test_plano_escopo_desconhecido_sem_gravacao():
+    # escopo de fato DESCONHECIDO → sem porta (senador deixou de ser exemplo disto)
+    assert plano_obs("prefeito", "X", "x")["porta"] is None
     assert plano_obs("", "", "x")["porta"] is None
 
 
@@ -53,7 +64,8 @@ def test_federal_preserva_historico_no_plano():
 if __name__ == "__main__":
     test_plano_federal_grava_so_dialogo_por_id()
     test_plano_estadual_usa_porta_por_nome_sem_cruzar()
-    test_plano_escopo_sem_gravacao()
+    test_plano_senador_grava_so_dialogo_por_id()
+    test_plano_escopo_desconhecido_sem_gravacao()
     test_compor_dialogo_carimba_e_preserva_historico()
     test_federal_preserva_historico_no_plano()
-    print("OK — testes da obs rápida federal passaram.")
+    print("OK — testes da obs rápida federal/senador passaram.")

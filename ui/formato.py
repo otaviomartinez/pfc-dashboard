@@ -1179,7 +1179,10 @@ def plano_obs(escopo: str, chave: str, nota: str, atual: str = "") -> dict:
       federal  → {'porta':'federal','id':chave,
                   'campos':{'Diálogo': compor_dialogo(atual,nota)}}  (append+carimbo
                  aqui; grava por ID via atualizar_deputado_federal)
-      outro    → {'porta': None}   (ex.: senador — ainda sem gravação)
+      senador  → {'porta':'senador','id':chave,
+                  'campos':{'Diálogo': compor_dialogo(atual,nota)}}  (espelha o
+                 federal; grava por ID via atualizar_senador)
+      outro    → {'porta': None}   (escopo desconhecido — sem gravação)
 
     REGRA DE EIXO: a obs grava só o Diálogo (observação); NUNCA 'Status CRM' (etapa)."""
     escopo = str(escopo or "").strip().lower()
@@ -1187,6 +1190,9 @@ def plano_obs(escopo: str, chave: str, nota: str, atual: str = "") -> dict:
         return {"porta": "estadual", "nome": chave, "texto": nota}
     if escopo == "federal":
         return {"porta": "federal", "id": chave,
+                "campos": {"Diálogo": compor_dialogo(atual, nota)}}
+    if escopo == "senador":
+        return {"porta": "senador", "id": chave,
                 "campos": {"Diálogo": compor_dialogo(atual, nota)}}
     return {"porta": None}
 

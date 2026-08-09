@@ -78,20 +78,34 @@ def test_funil_colunas_bucketiza_rotula_e_respeita_regra_de_ouro():
 
 
 def test_escopo_desconhecido_nao_e_roteavel():
-    """Card de escopo sem gravação (ex.: futuro senador) decodifica, mas o escopo
-    não casa com estadual/federal — o roteador (em app.py) cai no else e recusa."""
-    reg_s = {"escopo": "senador", "chave": "SEN-1", "nome": "Zeca",
-             "partido": "—", "escopo_nome": "Senador", "score": 0,
-             "temp_emoji": "⚫", "temp": "Fechado", "status": "Não iniciado"}
-    colunas = funil_parlamentares_colunas([reg_s])
+    """Card de escopo DESCONHECIDO (ex.: 'prefeito') decodifica, mas não casa com
+    estadual/federal/senador — o roteador (app.py) cai no else e recusa a gravação."""
+    reg = {"escopo": "prefeito", "chave": "P-1", "nome": "Zeca",
+           "partido": "—", "escopo_nome": "Prefeito", "score": 0,
+           "temp_emoji": "⚫", "temp": "Fechado", "status": "Não iniciado"}
+    colunas = funil_parlamentares_colunas([reg])
     card = colunas[0]["cards"][0]  # "Não iniciado"
     escopo, chave = _decodificar_id_card(card["id"])
-    assert (escopo, chave) == ("senador", "SEN-1")
-    assert escopo not in ("estadual", "federal")  # → else do roteador: não grava
+    assert (escopo, chave) == ("prefeito", "P-1")
+    assert escopo not in ("estadual", "federal", "senador")  # → else do roteador: não grava
+
+
+def test_senador_e_roteavel_por_id():
+    """Card senador decodifica para ('senador', ID) — roteável pela porta senador
+    (o dispatch em app.py grava via atualizar_senador por ID, como o federal)."""
+    reg = {"escopo": "senador", "chave": "5322", "nome": "Ciclano",
+           "partido": "—", "escopo_nome": "Senador", "score": 88,
+           "temp_emoji": "🟡", "temp": "Morno", "status": "Reunião"}
+    colunas = funil_parlamentares_colunas([reg])
+    card = next(c for col in colunas for c in col["cards"])  # o único card
+    escopo, chave = _decodificar_id_card(card["id"])
+    assert (escopo, chave) == ("senador", "5322")   # chave = ID (CodigoParlamentar)
+    assert "\x01" not in chave                       # ID numérico não colide com o SEP
 
 
 if __name__ == "__main__":
     test_roundtrip_id_card()
     test_funil_colunas_bucketiza_rotula_e_respeita_regra_de_ouro()
     test_escopo_desconhecido_nao_e_roteavel()
+    test_senador_e_roteavel_por_id()
     print("OK — todos os testes do Funil Geral (Passo 5) passaram.")
