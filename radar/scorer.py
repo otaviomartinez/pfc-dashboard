@@ -108,6 +108,35 @@ REGIOES_PFC = [
 ]
 REGIOES_AMPLAS = ["sao paulo", "nacional", "todo o brasil", "todo brasil", "em todo o pais"]
 
+# --- Restrição geográfica (fora de SP/Sudeste) -------------------------------
+# O PFC é do estado de SP (Sudeste). Barra editais RESTRITOS a outra macro-região
+# ou estado fora do Sudeste. RECALL > PRECISÃO: só barra quando um MARCADOR de
+# restrição ('exclusivo/somente/apenas/restrito/municípios do…') aparece PERTO de
+# uma âncora regional fora do Sudeste — NUNCA na palavra 'sul' solta ('zona sul',
+# 'sul de Minas' = Sudeste). Na dúvida, MANTÉM. Tudo normalizado (_norm, sem acento).
+INCLUI_SUDESTE_NACIONAL = REGIOES_PFC + REGIOES_AMPLAS + [
+    "sudeste", "paulista", "ambito nacional", "territorio nacional",
+    "todas as regioes", "todos os estados", "qualquer estado", "qualquer regiao",
+    "todo o territorio",
+]
+ANCORAS_FORA_SUDESTE = [
+    # macro-regiões (NÃO 'sul'/'norte' soltos — falso positivo)
+    "nordeste", "centro-oeste", "centro oeste", "amazonia legal", "regiao amazonica",
+    "semiarido", "sertao", "regiao norte", "regiao sul",
+    "estados do norte", "estados do nordeste", "estados do sul",
+    # estados fora do Sudeste (evita 'para'=preposição e 'acre'=subst. de 'massacre')
+    "bahia", "ceara", "pernambuco", "maranhao", "piaui", "rio grande do norte",
+    "paraiba", "alagoas", "sergipe", "amazonas", "rondonia", "roraima",
+    "amapa", "tocantins", "goias", "mato grosso", "mato grosso do sul",
+    "distrito federal", "parana", "santa catarina", "rio grande do sul",
+]
+RESTRICAO_MARCADORES = [
+    "exclusiv", "somente", "apenas", "restrit", "limitad", "voltad", "destinad",
+    "municipios do", "municipios da", "municipios de", "municipios das",
+    "municipios dos", "estado do", "estado da", "estados do", "sediad",
+    "com sede", "residentes", "domiciliad",
+]
+
 
 # --- Pré-filtro de sinal (roda ANTES da pontuação) ---------------------------
 # Dois níveis: sinais FORTES qualificam sozinhos; sinais FRACOS só qualificam
@@ -198,6 +227,26 @@ def e_nao_elegivel(titulo: str, descricao: str) -> bool:
     return any(k in texto for k in NAO_ELEGIVEL)
 
 
+def e_restrito_fora_sudeste(titulo: str, descricao: str) -> bool:
+    """True se o edital é RESTRITO a região/estado FORA de SP/Sudeste (o PFC é de
+    SP). NÃO barra: nacional/sem recorte, ou que cite SP/Sudeste/Sorocaba/município
+    do PFC, ou que liste várias regiões incluindo o Sudeste. RECALL > PRECISÃO: só
+    barra quando um MARCADOR de restrição aparece PERTO (mesma frase) de uma âncora
+    fora do Sudeste — nunca 'sul' solto ('zona sul', 'sul de Minas' = Sudeste). Na
+    dúvida, MANTÉM (melhor mostrar um nacional a mais do que esconder)."""
+    texto = _norm(f"{titulo or ''} {descricao or ''}")
+    if any(k in texto for k in INCLUI_SUDESTE_NACIONAL):
+        return False
+    for m in RESTRICAO_MARCADORES:
+        i = texto.find(m)
+        while i != -1:
+            janela = texto[max(0, i - 25): i + len(m) + 45]   # restrição colada à região
+            if any(a in janela for a in ANCORAS_FORA_SUDESTE):
+                return True
+            i = texto.find(m, i + 1)
+    return False
+
+
 def avaliar_sinal(op: dict) -> tuple[bool, str]:
     """Decisão do pré-filtro. Retorna (passa, motivo_descarte).
 
@@ -219,6 +268,8 @@ def avaliar_sinal(op: dict) -> tuple[bool, str]:
         return False, "prêmio para pessoa física (professor/indivíduo), não captação institucional"
     if e_nao_elegivel(titulo, descricao):
         return False, "inaplicável ao PFC (bem-estar animal/saúde hospitalar/aldeia indígena)"
+    if e_restrito_fora_sudeste(titulo, descricao):
+        return False, "restrito a região fora de SP/Sudeste (o PFC é de São Paulo)"
     if tem_sinal_de_oportunidade(titulo, descricao):
         return True, ""
     return False, "sem sinal de oportunidade"
