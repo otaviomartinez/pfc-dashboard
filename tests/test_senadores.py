@@ -124,6 +124,23 @@ def test_pdf_resumo_senador_smoke():
     assert len(b_cheio) > 1200 and len(b_vazio) > 1000         # vazio não quebra
 
 
+def test_capa_filtro_senador_renderiza_em_vez_do_placeholder():
+    """Fix do placeholder da capa: com escopo='Senador' e senadores presentes, o
+    payload da capa traz os senadores (é o que _render_capa_geral renderiza) — não
+    mais o placeholder antigo. Com lista vazia, cai no vazio-elegante padrão do
+    _render_capa_geral (deps [] / top None), nunca no 'ainda sem cadastro'."""
+    s1 = F._parlamentar_senador(F._sen_do_row(_row_falsa(ID="1", **{"Score Integrado": "90"})))
+    s2 = F._parlamentar_senador(F._sen_do_row(_row_falsa(ID="2", **{"Score Integrado": "70"})))
+    ctx = F.capa_payload_parlamentares([s1, s2], None, "Senador")
+    deps = ctx["payload"]["deps"]
+    assert len(deps) == 2 and all(d["escopo"] == "senador" for d in deps)
+    assert ctx["top"]["escopo"] == "senador"                 # herói é senador
+    assert deps[0]["score"] >= deps[1]["score"]              # ordenado por score
+    # vazio → vazio-elegante do _render_capa_geral (não o placeholder incondicional)
+    vazio = F.capa_payload_parlamentares([], None, "Senador")
+    assert vazio["payload"]["deps"] == [] and vazio["top"] is None
+
+
 if __name__ == "__main__":
     test_sen_do_row_le_colunas_renomeadas()
     test_parlamentar_senador_forma_certa()
@@ -131,4 +148,5 @@ if __name__ == "__main__":
     test_aba_vazia_senador_fica_vazio()
     test_roteamento_escrita_tres_escopos_nao_cruza()
     test_pdf_resumo_senador_smoke()
-    print("OK — fundação + roteamento + dossiê/PDF dos senadores passaram.")
+    test_capa_filtro_senador_renderiza_em_vez_do_placeholder()
+    print("OK — fundação + roteamento + dossiê/PDF + fix da capa (senadores) passaram.")

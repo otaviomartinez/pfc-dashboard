@@ -2094,13 +2094,10 @@ def render_emendas():
             "Escopo", options=["Geral", "Estadual", "Federal", "Senador"],
             key="emenda_escopo_filtro", label_visibility="collapsed") or "Geral"
         st.caption("Escopo · Geral junta os três · Estadual / Federal / Senador filtram.")
-        if escopo_sel == "Senador":
-            st.markdown(_DESCOBRIR_CSS, unsafe_allow_html=True)
-            st.markdown(
-                '<div class="dd-intro">Escopo <b>Senador</b> ainda sem cadastro. O lugar já '
-                'existe — quando a tabela do Fábio entrar, os senadores aparecem aqui na '
-                'mesma capa geral. Nada quebra por estar vazio.</div>', unsafe_allow_html=True)
-            return
+        # Senador flui igual aos outros escopos: _render_capa_geral já trata vazio
+        # graciosamente ("nenhum parlamentar neste escopo ainda"). O placeholder
+        # incondicional de "ainda sem cadastro" foi removido (bloqueava os senadores
+        # reais depois que a aba passou a ter linhas).
         _render_capa_geral(escopo_sel)
         return
 
