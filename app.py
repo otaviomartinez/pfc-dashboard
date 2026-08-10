@@ -789,16 +789,17 @@ def _dd_selo(escopo: str, nome: str) -> str:
     return f'<span class="dd-selo dd-selo-{esc(escopo)}">{esc(nome)}</span>'
 
 
-def _linha_descobrir_federal(dep: dict, idx) -> None:
-    """Card de deputado FEDERAL na Descobrir — mesmo estilo .dd-cell, com selo
-    Federal e valor SUGERIDO (faixa), NUNCA execução (regra de ouro). O card
-    inteiro abre o dossiê federal. Sem 'Puxar': o federal já é curado na sua
-    própria aba (Deputados Federais)."""
+def _linha_descobrir_curado(dep: dict, idx, escopo: str, escopo_nome: str,
+                            abrir, chave_ui: str) -> None:
+    """Card de parlamentar CURADO (federal ou senador) na Descobrir — mesmo estilo
+    .dd-cell, selo do escopo e valor SUGERIDO (faixa), NUNCA execução (regra de
+    ouro). O card inteiro abre o dossiê do escopo (`abrir`). Sem 'Puxar': já é
+    curado na sua própria aba. `dep` é o dict cru do escopo (o que o dossiê espera)."""
     val = str(dep.get("valor_sugerido", "")).strip() or "—"
     c_info, _c = st.columns([7, 1.15])
     c_info.markdown(
         '<div class="dd-cell">'
-        f'<div class="dd-nomecol"><div class="dd-top">{_dd_selo("federal", "Federal")}'
+        f'<div class="dd-nomecol"><div class="dd-top">{_dd_selo(escopo, escopo_nome)}'
         f'<span class="dd-nome">{esc(dep.get("nome", ""))}</span></div>'
         f'<div class="dd-sub">{esc(dep.get("partido", ""))} · {esc(dep.get("base", "") or "base regional —")}</div></div>'
         f'<div class="dd-scorecol"><div class="dd-score" style="color:{_cor_score(dep.get("score", 0))}">'
@@ -806,9 +807,19 @@ def _linha_descobrir_federal(dep: dict, idx) -> None:
         f'<div class="dd-valcol"><div class="dd-val">sugerido <b>{esc(val)}</b></div>'
         f'<div class="dd-sub">valor sugerido · faixa</div></div>'
         '</div>', unsafe_allow_html=True)
-    if c_info.button(f"Abrir dossiê de {dep.get('nome', '')}", key=f"dd_fed_{idx}",
+    if c_info.button(f"Abrir dossiê de {dep.get('nome', '')}", key=f"{chave_ui}_{idx}",
                      use_container_width=True):
-        dlg_deputado_federal(dict(dep))
+        abrir(dict(dep))
+
+
+def _linha_descobrir_federal(dep: dict, idx) -> None:
+    """Card FEDERAL na Descobrir — clique abre dlg_deputado_federal (aba própria)."""
+    _linha_descobrir_curado(dep, idx, "federal", "Federal", dlg_deputado_federal, "dd_fed")
+
+
+def _linha_descobrir_senador(dep: dict, idx) -> None:
+    """Card SENADOR na Descobrir — clique abre dlg_senador (NÃO o dossiê estadual)."""
+    _linha_descobrir_curado(dep, idx, "senador", "Senador", dlg_senador, "dd_sen")
 
 
 def _filtra_feds_descobrir(feds: list, busca: str, f_part: str) -> list:
@@ -1007,20 +1018,17 @@ def render_descobrir() -> None:
         "Escopo", options=["Geral", "Estadual", "Federal", "Senador"],
         key="emenda_escopo_filtro", label_visibility="collapsed") or "Geral"
     st.caption("Escopo · Geral junta os três · Estadual / Federal / Senador filtram.")
-    if escopo_sel == "Senador":
-        st.markdown(
-            '<div class="dd-intro">Escopo <b>Senador</b> ainda sem cadastro. O lugar já '
-            'existe — quando a tabela do Fábio entrar, os senadores aparecem aqui na mesma '
-            'descoberta. Nada quebra por estar vazio.</div>', unsafe_allow_html=True)
-        return
 
     mostra_est = escopo_sel in ("Geral", "Estadual")
     mostra_fed = escopo_sel in ("Geral", "Federal")
+    mostra_sen = escopo_sel in ("Geral", "Senador")
 
-    # ---- Fontes por escopo: estadual = levantamento (execução); federal = curado ----
+    # ---- Fontes por escopo: estadual = levantamento (execução); federal/senador = curados ----
     terr = dados.carregar_ranking_territorio() if mostra_est else pd.DataFrame()
     exp = dados.carregar_ranking_expansao() if mostra_est else pd.DataFrame()
     feds = _deputados_federais_ordenados() if mostra_fed else []
+    # senador espelha o federal: dict cru (o que dlg_senador espera) = registro _raw.
+    sens = [r["_raw"] for r in carregar_parlamentares("Senador")] if mostra_sen else []
     if mostra_est and terr.empty and exp.empty and not mostra_fed:
         st.info("Levantamento ainda não gerado. Rode `python -m src.emendas` para "
                 "produzir os rankings em `data/`.")
@@ -1037,6 +1045,7 @@ def render_descobrir() -> None:
         '<span><span class="sw" style="background:var(--sem-low)"></span>&lt;50 · fraco</span>'
         + ('<span><span class="sw" style="background:#8B7BF0"></span>Estadual · autorizado/pago</span>'
            '<span><span class="sw" style="background:#5B9BD5"></span>Federal · valor sugerido</span>'
+           '<span><span class="sw" style="background:#C08BF0"></span>Senador · valor sugerido</span>'
            if escopo_sel == "Geral" else "")
         + '</div>', unsafe_allow_html=True)
 
@@ -1047,6 +1056,9 @@ def render_descobrir() -> None:
         partidos |= set(exp.get("partido", pd.Series(dtype=str)).dropna())
     if mostra_fed:
         partidos |= {str(d.get("partido", "")).strip() for d in feds
+                     if str(d.get("partido", "")).strip()}
+    if mostra_sen:
+        partidos |= {str(d.get("partido", "")).strip() for d in sens
                      if str(d.get("partido", "")).strip()}
     partidos = sorted(partidos)
 
@@ -1066,6 +1078,8 @@ def render_descobrir() -> None:
         exp = _filtrar_descobrir(exp, busca, f_part, f_mun, ["municipios_pfc_diretos"])
     if mostra_fed:
         feds = _filtra_feds_descobrir(feds, busca, f_part)
+    if mostra_sen:  # reusa o filtro de nome/partido (genérico; município não se aplica)
+        sens = _filtra_feds_descobrir(sens, busca, f_part)
 
     if (busca and busca.strip()) or f_part != "Todos" or (f_mun and f_mun != "Todos"):
         partes = []
@@ -1073,6 +1087,8 @@ def render_descobrir() -> None:
             partes.append(f"{len(terr)} em Abordar já · {len(exp)} em Cortejar")
         if mostra_fed:
             partes.append(f"{len(feds)} federais")
+        if mostra_sen:
+            partes.append(f"{len(sens)} senadores")
         st.caption("Filtro ativo · " + " · ".join(partes) + ". Limpe os campos para ver todos.")
 
     # Checagem LIVE contra o CRM atual (não o flag estático do ranking, que fica
@@ -1113,24 +1129,38 @@ def render_descobrir() -> None:
         for i, dep in enumerate(feds):
             _linha_descobrir_federal(dep, i)
 
+    def _aba_senador():
+        st.markdown('<div class="dd-intro">Senadores de SP, curados à mão. O valor é faixa '
+                    '<b>sugerida</b> (potencial de emenda), <b>não</b> execução. Já ficam no CRM '
+                    'Senador (aba própria) — por isso não têm "Puxar".</div>',
+                    unsafe_allow_html=True)
+        if not sens:
+            st.caption("Nenhum senador para este filtro.")
+        for i, dep in enumerate(sens):
+            _linha_descobrir_senador(dep, i)
+
     # ---- Render por escopo ----
     if escopo_sel == "Federal":
         _aba_federal()
+    elif escopo_sel == "Senador":
+        _aba_senador()
     elif escopo_sel == "Estadual":
         aba1, aba2 = st.tabs([f"Abordar já · {len(terr)}", f"Cortejar · {len(exp)}"])
         with aba1:
             _aba_territorio()
         with aba2:
             _aba_expansao()
-    else:  # Geral — os três num só lugar, cada aba com o seu escopo
-        aba1, aba2, aba3 = st.tabs([f"Abordar já · {len(terr)}",
-                                    f"Cortejar · {len(exp)}", f"Federais · {len(feds)}"])
+    else:  # Geral — os quatro num só lugar, cada aba com o seu escopo
+        aba1, aba2, aba3, aba4 = st.tabs([f"Abordar já · {len(terr)}", f"Cortejar · {len(exp)}",
+                                          f"Federais · {len(feds)}", f"Senadores · {len(sens)}"])
         with aba1:
             _aba_territorio()
         with aba2:
             _aba_expansao()
         with aba3:
             _aba_federal()
+        with aba4:
+            _aba_senador()
 
 
 # =========================================================================== #

@@ -141,6 +141,19 @@ def test_capa_filtro_senador_renderiza_em_vez_do_placeholder():
     assert vazio["payload"]["deps"] == [] and vazio["top"] is None
 
 
+def test_card_descobrir_senador_contrato_de_dados():
+    """A linha do Descobrir usa o dict CRU do senador (o _raw que carregar_parlamentares
+    entrega e que dlg_senador espera). Confere os campos que o card renderiza (nome,
+    partido, base, score, valor_sugerido) e que a chave do registro unificado é o ID
+    — é por ID que o clique/gravação do senador roteia (nunca por nome, como o estadual)."""
+    reg = F._parlamentar_senador(F._sen_do_row(_row_falsa()))
+    raw = reg["_raw"]
+    for campo in ("nome", "partido", "base", "score", "valor_sugerido", "id"):
+        assert campo in raw, f"card do Descobrir precisa de {campo}"
+    assert raw["valor_sugerido"] == "R$ 200 mil a R$ 400 mil"   # faixa sugerida (não execução)
+    assert reg["chave"] == raw["id"] == "5322"                   # clique/dossiê por ID
+
+
 if __name__ == "__main__":
     test_sen_do_row_le_colunas_renomeadas()
     test_parlamentar_senador_forma_certa()
@@ -149,4 +162,5 @@ if __name__ == "__main__":
     test_roteamento_escrita_tres_escopos_nao_cruza()
     test_pdf_resumo_senador_smoke()
     test_capa_filtro_senador_renderiza_em_vez_do_placeholder()
-    print("OK — fundação + roteamento + dossiê/PDF + fix da capa (senadores) passaram.")
+    test_card_descobrir_senador_contrato_de_dados()
+    print("OK — senadores: fundação + escrita + dossiê/PDF + capa + Descobrir passaram.")
