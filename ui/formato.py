@@ -1377,6 +1377,29 @@ def _op_de_novidade(nv: dict) -> dict:
             "nv": nv}
 
 
+def _hoje_sp() -> datetime.date:
+    """Hoje em America/São_Paulo (o radar é de SP; o servidor pode estar em UTC).
+    Cai para date.today() se o zoneinfo não estiver disponível."""
+    try:
+        from zoneinfo import ZoneInfo
+        return datetime.datetime.now(ZoneInfo("America/Sao_Paulo")).date()
+    except Exception:
+        return datetime.date.today()
+
+
+def _op_vencida(op: dict, hoje: datetime.date | None = None) -> bool:
+    """True se o item tem prazo CONFIÁVEL (_prazo_confiavel) e a data JÁ PASSOU
+    (vencido) relativo a hoje em SP. Itens 'prazo a confirmar' (data não confiável)
+    NÃO são vencidos aqui — continuam passando. É o corte final da FILA; o scorer
+    não muda. Sem data parseável → não é vencido (na dúvida, mantém)."""
+    if not _prazo_confiavel(op.get("dias")):
+        return False
+    d = _data_prazo(op.get("prazo", ""))
+    if d is None:
+        return False
+    return d < (hoje or _hoje_sp())
+
+
 def _score_novidade(nv) -> float:
     try:
         return float(str(nv.get("Score Aderência", "")).replace(",", ".") or 0)

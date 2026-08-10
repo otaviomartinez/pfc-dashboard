@@ -96,6 +96,7 @@ from ui.formato import (
     _modo_emenda,
     _muns_pfc,
     _op_de_novidade,
+    _op_vencida,
     _orfaos_com_candidatos,
     _parse_data,
     _prazo_confiavel,
@@ -2780,6 +2781,7 @@ def page_visao():
     # fila real do radar (Sheets), ordenada por aderência
     fila = sorted(dados.carregar_novidades_pendentes(), key=_score_novidade, reverse=True)
     ops = [_op_de_novidade(nv) for nv in fila]
+    ops = [o for o in ops if not _op_vencida(o)]  # tira vencidos (prazo confiável já passado)
     n_fontes = _n_fontes_radar()
     # Encerrando = prazo confiável a até 7 dias. Guarda a LISTA (não só a contagem)
     # para o clique no "N encerrando" mostrar TODAS, não só a primeira.
@@ -2957,6 +2959,7 @@ def page_radar():
         help="Score = relevância · Dias restantes = os que fecham antes primeiro "
              "(prazo a confirmar vai para o fim) · Valor = maiores primeiro")
     ops = [_op_de_novidade(nv) for nv in dados.carregar_novidades_pendentes()]
+    ops = [o for o in ops if not _op_vencida(o)]  # tira vencidos (prazo confiável já passado)
     scores_spark = sorted((o["score"] for o in ops), reverse=True)[:16]  # sparkline por score
     ops = _ordenar_ops(ops, ordem)
     visiveis = ops[:_RADAR_MAX_LISTA]
