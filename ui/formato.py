@@ -1144,6 +1144,22 @@ def metodologia_emendas_conteudo() -> dict:
     }
 
 
+def explorador_parlamentar_comps(reg: dict) -> dict:
+    """Dados do explorador de score da Metodologia (a partir de UM registro do CRM,
+    carregar_parlamentares). Componentes REAIS — Aderência e Chance (0–100) — e o
+    Score Integrado como total; mesma régua p/ estadual e federal no CRM, sem inventar
+    breakdown. PURO/testável. Campo faltante vira 0 (nunca quebra)."""
+    return {
+        "nome": str(reg.get("nome", "")).strip() or "(sem nome)",
+        "escopo_nome": reg.get("escopo_nome", ""),
+        "total": _int0(reg.get("score")),
+        "comps": [
+            {"n": "Aderência", "v": _int0(reg.get("ader")), "c": "#8B7BF0"},
+            {"n": "Chance", "v": _int0(reg.get("chance")), "c": "#5B9BD5"},
+        ],
+    }
+
+
 def _destino_radar(radar_escolhido) -> str:
     """Mapa raiz do painel a renderizar a partir de session_state['radar_escolhido'].
     Função PURA, testável. None → 'hub' (Central); 'captacao'/'emendas'/'prospeccao'

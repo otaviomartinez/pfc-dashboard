@@ -9,7 +9,11 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from ui.formato import _modo_emenda, metodologia_emendas_conteudo  # noqa: E402
+from ui.formato import (  # noqa: E402
+    _modo_emenda,
+    explorador_parlamentar_comps,
+    metodologia_emendas_conteudo,
+)
 
 
 def test_tres_escopos_e_golden_rule():
@@ -44,9 +48,29 @@ def test_modo_emenda_roteia_metodologia():
     assert _modo_emenda("Metodologia") == "metodologia"
 
 
+def test_explorador_comps_reais_estadual_e_federal():
+    # federal e estadual usam as MESMAS colunas no CRM → mesma estrutura, valores reais
+    fed = explorador_parlamentar_comps(
+        {"nome": "Vitor Lippi", "escopo_nome": "Federal", "score": 97, "ader": 90, "chance": 70})
+    assert fed["total"] == 97 and fed["nome"] == "Vitor Lippi" and fed["escopo_nome"] == "Federal"
+    assert fed["comps"] == [{"n": "Aderência", "v": 90, "c": "#8B7BF0"},
+                            {"n": "Chance", "v": 70, "c": "#5B9BD5"}]
+    est = explorador_parlamentar_comps(
+        {"nome": "Ana Lima", "escopo_nome": "Estadual", "score": 61, "ader": 55, "chance": 40})
+    assert [c["v"] for c in est["comps"]] == [55, 40]   # componentes reais, não estimados
+
+
+def test_explorador_campo_faltante_vira_zero_sem_crashar():
+    d = explorador_parlamentar_comps({"nome": "X"})
+    assert d["total"] == 0 and [c["v"] for c in d["comps"]] == [0, 0]
+    assert explorador_parlamentar_comps({})["nome"] == "(sem nome)"
+
+
 if __name__ == "__main__":
     test_tres_escopos_e_golden_rule()
     test_pesos_estaduais_sao_os_reais_do_toml()
     test_federal_curado_criterios_e_faixa()
     test_modo_emenda_roteia_metodologia()
+    test_explorador_comps_reais_estadual_e_federal()
+    test_explorador_campo_faltante_vira_zero_sem_crashar()
     print("OK — testes da Metodologia de Emendas passaram.")

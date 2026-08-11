@@ -30,6 +30,7 @@ def test_metodologia_emendas_renderiza_sem_excecao():
     assert "Regra de ouro" in blob                          # callout da golden rule
     assert "Estadual" in blob                               # escopo estadual
     assert "Federal" in blob or "Senador" in blob           # escopo curado
+    assert "Ver o score de um parlamentar" in blob          # explorador presente
 
 
 if __name__ == "__main__":

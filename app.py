@@ -116,6 +116,7 @@ from ui.formato import (
     css_icones_botoes,
     esc,
     estilo_plotly,
+    explorador_parlamentar_comps,
     funil_parlamentares_colunas,
     itens_relatorio_parlamentares,
     linhas_placar_prospeccao,
@@ -1618,6 +1619,42 @@ def render_metodologia_emendas():
                 f'<div style="font-size:13px;color:var(--text);line-height:1.65">'
                 f'{esc(cr["desc"])}</div>', unsafe_allow_html=True)
     st.caption(fs["valor"])
+
+    # ---- Explorador: score de um parlamentar do CRM (Aderência + Chance REAIS) ----
+    # Reusa o mesmo mecanismo da Captação (selectbox + orb ORBITAL_TEMPLATE + card),
+    # mas com componentes reais (não ilustrativos). Lista só o CRM acompanhado.
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+    st.markdown('#### Ver o score de um parlamentar')
+    regs = carregar_parlamentares("Geral")
+    if not regs:
+        st.caption("Nenhum parlamentar no CRM ainda — o explorador aparece quando houver base.")
+    else:
+        opcoes = {f'{r["nome"]} · {r["escopo_nome"]}': r for r in regs}
+        g1, g2 = st.columns([1, 1])
+        with g1:
+            escolha = st.selectbox("Ver score de:", list(opcoes.keys()), key="metod_emenda_score")
+            ex = explorador_parlamentar_comps(opcoes[escolha])
+            orb = (ORBITAL_TEMPLATE
+                   .replace("__DATA__", json.dumps(ex["comps"]))
+                   .replace("__TOTAL__", str(ex["total"]))
+                   .replace("__NOME__", html.escape(ex["nome"])))
+            components.html(orb, height=470)
+            st.caption("Aderência e Chance são componentes REAIS (0–100) do CRM — não estimativas.")
+        with g2:
+            st.markdown(
+                '<div class="card"><div class="card-h"><div><h2>Como se lê</h2>'
+                '<div class="cap">CRM curado, não recalculado</div></div></div><div class="pad">'
+                '<p style="font-size:12.5px;color:var(--text);line-height:1.7">'
+                'O <b>Score Integrado</b> do CRM é a leitura curada de <b>Aderência</b> + '
+                '<b>Chance</b> (0–100). Estadual e federal usam a MESMA régua aqui — curada à '
+                'mão, não recalculada pelo app.</p>'
+                '<div class="divider"></div>'
+                '<p style="font-size:12.5px;color:var(--muted);line-height:1.7">'
+                'O selectbox lista <b>só os parlamentares acompanhados no CRM</b> — não a base '
+                'inteira de deputados. A fórmula de execução (Estadual, acima) é do '
+                '<b>levantamento</b> público, uma régua separada; e a faixa sugerida do '
+                'Federal/Senador nunca é somada com a execução (regra de ouro).</p>'
+                '</div></div>', unsafe_allow_html=True)
 
 
 def render_relatorio_emendas():
