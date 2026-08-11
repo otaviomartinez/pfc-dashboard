@@ -1,10 +1,10 @@
-"""AppTest headless: os federais do POOL DE EXECUÇÃO aparecem na Visão geral
-(escopo Federal), em dois blocos, sem quebrar — e sem tocar no Sheets (vêm do CSV).
+"""AppTest headless: federais aparecem na Visão geral (escopo Federal), em dois
+blocos, sem quebrar.
 
 Verifica:
   (a) render do escopo Federal sem exceção;
-  (b) o bloco "Execução real · fora do CRM" aparece;
-  (c) um novo conhecido (Marcio Alvino, execução 100) vira card clicável;
+  (b) os blocos "Curados à mão" e "Importados · score por execução real" aparecem;
+  (c) o pool CSV continua íntegro como referência para tag/score;
   (d) as funções puras que alimentam a tela (pool novos, tag de execução) batem.
 
     python tests/test_federais_execucao.py
@@ -35,14 +35,14 @@ def _run_federal():
 
 
 def test_federal_pool_render_dois_blocos():
+    # Novo desenho: os federais vêm TODOS da aba (curados + importados). O render
+    # divide em dois blocos por origem; ambos os cabeçalhos aparecem sem exceção,
+    # independentemente de haver conexão com o Sheets no ambiente de teste.
     at = _run_federal()
     assert not at.exception, f"exceção no render federal: {at.exception}"
     blob = " ".join(str(getattr(m, "value", "")) for m in at.markdown)
-    assert "Execução real · fora do CRM" in blob, "bloco de execução não apareceu"
-    labels = [str(getattr(b, "label", "")) for b in at.button]
-    # os novos viram card com botão "Abrir dossiê de <nome>" — vêm do CSV, sempre
-    assert any("Marcio Alvino" in x for x in labels), \
-        f"deputado novo (Marcio Alvino) não virou card: {labels[:12]}"
+    assert "Curados à mão" in blob, "bloco de curados não apareceu"
+    assert "Importados · score por execução real" in blob, "bloco de importados não apareceu"
 
 
 def test_pool_novos_pura():

@@ -459,6 +459,10 @@ def _dep_federal_do_row(row) -> dict:
         "valor_sugerido": g("Valor sugerido"), "estrategia": g("Estratégia PFC"),
         "obs": g("Observações"), "fonte_camara": g("Fonte oficial Câmara"),
         "follow_up": g("Follow-up sugerido"),
+        # 'origem' marca os importados do pool de execução (2023-25); vazio = curado
+        # à mão. 'gancho' é o argumento pronto (gerado dos dados) desses importados;
+        # quando existe, o dossiê o usa em vez de recompor por base/aderência.
+        "origem": g("Origem"), "gancho": g("Gancho"),
     }
 
 

@@ -407,6 +407,106 @@ def atualizar_deputado_federal(id_item, campos: dict) -> dict:
         return {"sucesso": False, "mensagem": f"Erro ao gravar no Google Sheets: {e}"}
 
 
+def adicionar_deputado_federal(novo: dict) -> dict:
+    """Acrescenta UM deputado federal à aba 'Deputados Federais'. Porta de ESCRITA
+    isolada (não mexe em atualizar_deputado_federal). {'sucesso', 'motivo'}.
+
+    novo: {coluna: valor}. Escreve POR NOME de coluna (respeita o cabeçalho real e
+    cria coluna nova no fim, ex. 'Origem'/'Gancho'). Append-only + RAW (nunca toca
+    linha existente; texto literal, um valor com '=' não vira fórmula). Dedup por
+    'ID' (recusa se o ID já existir). Para importações vindas da Câmara, use um ID
+    CRM sequencial e guarde o identificador público na coluna 'ID Câmara'."""
+    id_novo = str(novo.get("ID", "")).strip()
+    if not id_novo:
+        return {"sucesso": False, "motivo": "sem_id"}
+    sh = _conectar()
+    if sh is None:
+        return {"sucesso": False, "motivo": "sheets_indisponivel",
+                "mensagem": "Sem conexão com o Google Sheets — gravação bloqueada no modo local."}
+    try:
+        if ABA_DEPUTADOS_FEDERAIS not in [w.title for w in sh.worksheets()]:
+            return {"sucesso": False, "motivo": "sem_aba",
+                    "mensagem": "Aba 'Deputados Federais' não existe."}
+        ws = sh.worksheet(ABA_DEPUTADOS_FEDERAIS)
+        cab = [str(c).strip() for c in ws.row_values(1)]
+        if "ID" not in cab:
+            return {"sucesso": False, "motivo": "sem_coluna_id"}
+        ids = {str(v).strip() for v in ws.col_values(cab.index("ID") + 1)[1:]}
+        if id_novo in ids:
+            return {"sucesso": False, "motivo": "duplicado", "mensagem": f"ID {id_novo} já existe."}
+        novas_cols = []
+        for col in novo:  # cria coluna nova (Origem/Gancho) no fim do cabeçalho
+            col = str(col).strip()
+            if col and col not in cab and col not in novas_cols:
+                novas_cols.append(col)
+        if len(cab) + len(novas_cols) > ws.col_count:
+            ws.add_cols(len(cab) + len(novas_cols) - ws.col_count)
+        if len(ids) + 2 > ws.row_count:
+            ws.add_rows(len(ids) + 2 - ws.row_count)
+        for col in novas_cols:
+            cab.append(col)
+            ws.update_cell(1, len(cab), col)
+        linha = [str(novo.get(col, "")) for col in cab]
+        ws.append_row(linha, value_input_option="RAW")
+    except Exception as e:  # noqa: BLE001
+        return {"sucesso": False, "motivo": "escrita", "mensagem": str(e)}
+    carregar_deputados_federais.clear()
+    return {"sucesso": True, "motivo": "ok"}
+
+
+def adicionar_deputados_federais(novos: list[dict]) -> dict:
+    """Acrescenta VÁRIOS deputados federais em lote na aba 'Deputados Federais'.
+
+    Mesmas invariantes de adicionar_deputado_federal(), mas valida todos os IDs
+    antes e faz um único append RAW. Útil para promover um pool revisado sem tocar
+    nas linhas já existentes."""
+    novos = list(novos or [])
+    if not novos:
+        return {"sucesso": False, "motivo": "vazio", "mensagem": "Nenhum deputado informado."}
+    ids_novos = [str(n.get("ID", "")).strip() for n in novos]
+    if any(not i for i in ids_novos):
+        return {"sucesso": False, "motivo": "sem_id", "mensagem": "Há deputado sem ID."}
+    if len(ids_novos) != len(set(ids_novos)):
+        return {"sucesso": False, "motivo": "id_repetido_lote",
+                "mensagem": "Há IDs repetidos no lote."}
+    sh = _conectar()
+    if sh is None:
+        return {"sucesso": False, "motivo": "sheets_indisponivel",
+                "mensagem": "Sem conexão com o Google Sheets — gravação bloqueada no modo local."}
+    try:
+        if ABA_DEPUTADOS_FEDERAIS not in [w.title for w in sh.worksheets()]:
+            return {"sucesso": False, "motivo": "sem_aba",
+                    "mensagem": "Aba 'Deputados Federais' não existe."}
+        ws = sh.worksheet(ABA_DEPUTADOS_FEDERAIS)
+        cab = [str(c).strip() for c in ws.row_values(1)]
+        if "ID" not in cab:
+            return {"sucesso": False, "motivo": "sem_coluna_id"}
+        ids_atuais = {str(v).strip() for v in ws.col_values(cab.index("ID") + 1)[1:]}
+        duplicados = sorted(set(ids_novos) & ids_atuais)
+        if duplicados:
+            return {"sucesso": False, "motivo": "duplicado",
+                    "mensagem": f"ID(s) já existentes: {', '.join(duplicados)}"}
+        novas_cols = []
+        for novo in novos:
+            for col in novo:
+                col = str(col).strip()
+                if col and col not in cab and col not in novas_cols:
+                    novas_cols.append(col)
+        if len(cab) + len(novas_cols) > ws.col_count:
+            ws.add_cols(len(cab) + len(novas_cols) - ws.col_count)
+        if len(ids_atuais) + 1 + len(novos) > ws.row_count:
+            ws.add_rows(len(ids_atuais) + 1 + len(novos) - ws.row_count)
+        for col in novas_cols:
+            cab.append(col)
+            ws.update_cell(1, len(cab), col)
+        linhas = [[str(novo.get(col, "")) for col in cab] for novo in novos]
+        ws.append_rows(linhas, value_input_option="RAW")
+    except Exception as e:  # noqa: BLE001
+        return {"sucesso": False, "motivo": "escrita", "mensagem": str(e)}
+    carregar_deputados_federais.clear()
+    return {"sucesso": True, "motivo": "ok", "linhas": len(novos)}
+
+
 def atualizar_senador(id_item, campos: dict) -> dict:
     """Grava SÓ as células dos campos informados (casa por ID = CodigoParlamentar)
     na aba 'Senadores'. Preserva TODO o resto — RAW, célula a célula. Espelha
