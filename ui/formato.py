@@ -473,6 +473,80 @@ def _deputados_federais_ordenados() -> list:
     return out
 
 
+def _norm_nome_fed(s) -> str:
+    """Normaliza nome (sem acento/caixa/pontuação) para casar curado × execução."""
+    import unicodedata
+    s = "" if s is None else str(s)
+    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode()
+    return re.sub(r"\s+", " ", re.sub(r"[^A-Za-z ]", " ", s).upper()).strip()
+
+
+def _fmt_milhoes(v) -> str:
+    """R$ compacto em milhões, decimal PT-BR. Ex.: 29620329 -> 'R$ 29,6 mi'."""
+    try:
+        n = float(v)
+    except (TypeError, ValueError):
+        return "—"
+    if n <= 0:
+        return "R$ 0"
+    return ("R$ %.1f mi" % (n / 1e6)).replace(".", ",")
+
+
+def _mapa_execucao_federal() -> dict:
+    """{nome_norm: score_execucao_int} do pool — para taggar os 15 curados com a
+    execução deles ao lado do score curado. Read-only (CSV, nunca Sheets)."""
+    df = dados.carregar_pool_federal_execucao()
+    if df.empty:
+        return {}
+    out = {}
+    for _, r in df.iterrows():
+        nome = _norm_nome_fed(r.get("deputado", ""))
+        if nome:
+            out[nome] = _int0(round(float(r.get("score_execucao", 0) or 0)))
+    return out
+
+
+def _anexar_exec_aos_curados(feds: list) -> list:
+    """Anexa `exec_score` (do pool de execução) a cada federal CURADO, casando por
+    nome normalizado. Mutação in-place; devolve a mesma lista. Curado que não casou
+    no pool recebe exec 0. Não altera o score curado — só acrescenta a tag ao lado."""
+    mapa = _mapa_execucao_federal()
+    for d in feds:
+        d["exec_score"] = mapa.get(_norm_nome_fed(d.get("nome", "")), 0)
+    return feds
+
+
+def _federais_pool_novos() -> list:
+    """Federais de SP do POOL DE EXECUÇÃO que estão FORA do CRM (no_crm=True), em
+    formato de card, ordenados por execução desc. Estes NÃO entram no Funil (não
+    têm ID) — só na listagem Descobrir. O `score` aqui é EXECUÇÃO real, jamais
+    curado; `_execucao=True` marca a diferença de régua na tela."""
+    df = dados.carregar_pool_federal_execucao()
+    if df.empty:
+        return []
+    def _e_fora(v):
+        return str(v).strip().lower() in ("true", "1", "verdadeiro")
+    novos = []
+    for _, r in df.iterrows():
+        if not _e_fora(r.get("no_crm", "")):
+            continue
+        novos.append({
+            "escopo": "federal", "_execucao": True,
+            "nome": str(r.get("deputado", "")).strip(),
+            "partido": str(r.get("partido", "")).strip() or "—",
+            "exec_score": _int0(round(float(r.get("score_execucao", 0) or 0))),
+            "fracao_edusoc": float(r.get("fracao_edusoc", 0) or 0),
+            "edusoc_empenhado": float(r.get("edusoc_empenhado", 0) or 0),
+            "edusoc_pago": float(r.get("edusoc_pago", 0) or 0),
+            "n_municipios_pfc": _int0(r.get("n_municipios_pfc", 0)),
+            "municipios_pfc": str(r.get("municipios_pfc", "")).strip(),
+            "n_individuais": _int0(r.get("n_individuais", 0)),
+            "total_empenhado": float(r.get("total_empenhado", 0) or 0),
+        })
+    novos.sort(key=lambda d: d["exec_score"], reverse=True)
+    return novos
+
+
 def _parlamentar_estadual(d: dict) -> dict:
     """Registro estadual do CRM (_deputados_ordenados) → formato unificado.
     Chave de escrita = NOME (a porta atualizar_status_deputado casa por nome)."""

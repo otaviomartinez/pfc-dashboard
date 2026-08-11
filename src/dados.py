@@ -450,6 +450,10 @@ def atualizar_senador(id_item, campos: dict) -> dict:
 # sensível dos 16 deputados acima. Sem o arquivo, degrada para vazio.
 RANKING_TERRITORIO_CSV = Path(__file__).resolve().parent.parent / "data" / "emendas_ranking_pfc_territorio.csv"
 RANKING_EXPANSAO_CSV = Path(__file__).resolve().parent.parent / "data" / "emendas_ranking_pfc_expansao.csv"
+# Pool de EXECUÇÃO federal (Transparência 2023-25, individuais edu/social). Score
+# de execução JÁ calculado (régua 0,70/0,30 + bônus território). Read-only, vem do
+# CSV — NUNCA do Sheets. Porta isolada: não tem escrita associada.
+POOL_FEDERAL_EXECUCAO_CSV = Path(__file__).resolve().parent.parent / "data" / "emendas_federais_score_execucao.csv"
 # Contatos OFICIAIS (públicos) dos titulares da ALESP — email de gabinete,
 # telefone e página oficial. Enriquecido a partir do XML da ALESP. NÃO confundir
 # com os contatos pessoais/de assessor do Fábio (esses ficam no CRM sensível).
@@ -470,6 +474,18 @@ def carregar_ranking_expansao() -> pd.DataFrame:
     """Seção 'Cortejar': alinhados de fora, em camadas (prioritários / demais)."""
     try:
         return pd.read_csv(RANKING_EXPANSAO_CSV).fillna("")
+    except Exception:
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def carregar_pool_federal_execucao() -> pd.DataFrame:
+    """Pool de deputados federais de SP com score de EXECUÇÃO edu/social já
+    calculado (CSV público, Transparência 2023-25). Read-only, isolada — não há
+    escrita associada e NÃO toca no Sheets. Coluna `no_crm` = True quando o
+    deputado está FORA dos 15 curados. Vazio (sem quebrar) se o CSV não existir."""
+    try:
+        return pd.read_csv(POOL_FEDERAL_EXECUCAO_CSV).fillna("")
     except Exception:
         return pd.DataFrame()
 

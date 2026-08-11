@@ -88,8 +88,11 @@ from ui.formato import (
     _deputados_ordenados,
     _destino_radar,
     _dias_texto,
+    _anexar_exec_aos_curados,
     _etapa_de_status,
+    _federais_pool_novos,
     _filtrar_descobrir,
+    _fmt_milhoes,
     _fmt_prazo,
     _funil_emendas_colunas,
     _itens_relatorio_emendas,
@@ -801,6 +804,13 @@ def _linha_descobrir_curado(dep: dict, idx, escopo: str, escopo_nome: str,
     ouro). O card inteiro abre o dossiê do escopo (`abrir`). Sem 'Puxar': já é
     curado na sua própria aba. `dep` é o dict cru do escopo (o que o dossiê espera)."""
     val = str(dep.get("valor_sugerido", "")).strip() or "—"
+    # Tag de EXECUÇÃO ao lado do score curado (só federal, quando o pool casou o
+    # deputado). Régua diferente — rótulo próprio, nunca some com o curado.
+    exec_tag = ""
+    if "exec_score" in dep:
+        es = dep.get("exec_score", 0)
+        exec_tag = (f'<div class="dd-sub" style="color:{_cor_score(es)};font-weight:700">'
+                    f'exec {es}</div>')
     c_info, _c = st.columns([7, 1.15])
     c_info.markdown(
         '<div class="dd-cell">'
@@ -808,7 +818,7 @@ def _linha_descobrir_curado(dep: dict, idx, escopo: str, escopo_nome: str,
         f'<span class="dd-nome">{esc(dep.get("nome", ""))}</span></div>'
         f'<div class="dd-sub">{esc(dep.get("partido", ""))} · {esc(dep.get("base", "") or "base regional —")}</div></div>'
         f'<div class="dd-scorecol"><div class="dd-score" style="color:{_cor_score(dep.get("score", 0))}">'
-        f'{dep.get("score", 0)}</div><div class="dd-sub">score</div></div>'
+        f'{dep.get("score", 0)}</div><div class="dd-sub">curado</div>{exec_tag}</div>'
         f'<div class="dd-valcol"><div class="dd-val">sugerido <b>{esc(val)}</b></div>'
         f'<div class="dd-sub">valor sugerido · faixa</div></div>'
         '</div>', unsafe_allow_html=True)
@@ -825,6 +835,61 @@ def _linha_descobrir_federal(dep: dict, idx) -> None:
 def _linha_descobrir_senador(dep: dict, idx) -> None:
     """Card SENADOR na Descobrir — clique abre dlg_senador (NÃO o dossiê estadual)."""
     _linha_descobrir_curado(dep, idx, "senador", "Senador", dlg_senador, "dd_sen")
+
+
+def _linha_descobrir_federal_exec(dep: dict, idx) -> None:
+    """Card FEDERAL de EXECUÇÃO (fora do CRM) na Descobrir. O score é EXECUÇÃO real
+    (Transparência 2023-25) — NÃO curado, NÃO valor sugerido. Rótulos próprios para
+    nunca confundir as réguas. Clique abre o dossiê enxuto de execução. Estes NÃO
+    entram no Funil (não têm ID) — só na listagem."""
+    es = dep.get("exec_score", 0)
+    edu = _fmt_milhoes(dep.get("edusoc_empenhado", 0))
+    frac = (dep.get("fracao_edusoc", 0) or 0) * 100
+    muns = str(dep.get("municipios_pfc", "")).strip()
+    terr = f' · {muns}' if muns else ''
+    c_info, _c = st.columns([7, 1.15])
+    c_info.markdown(
+        '<div class="dd-cell">'
+        f'<div class="dd-nomecol"><div class="dd-top">{_dd_selo("federal", "Federal · execução")}'
+        f'<span class="dd-nome">{esc(dep.get("nome", ""))}</span></div>'
+        f'<div class="dd-sub">{esc(dep.get("partido", ""))} · fora do CRM{esc(terr)}</div></div>'
+        f'<div class="dd-scorecol"><div class="dd-score" style="color:{_cor_score(es)}">'
+        f'{es}</div><div class="dd-sub">execução</div></div>'
+        f'<div class="dd-valcol"><div class="dd-val">{esc(edu)}</div>'
+        f'<div class="dd-sub">edu/social · {frac:.0f}% das emendas</div></div>'
+        '</div>', unsafe_allow_html=True)
+    if c_info.button(f"Abrir dossiê de {dep.get('nome', '')}", key=f"dd_fedx_{idx}",
+                     use_container_width=True):
+        dlg_federal_execucao(dict(dep))
+
+
+@st.dialog("Execução do deputado federal", width="large")
+def dlg_federal_execucao(dep: dict) -> None:
+    """Dossiê ENXUTO de execução (federal fora do CRM). Só dado público de execução
+    (Transparência 2023-25) — NÃO é curado, NÃO tem valor sugerido nem CRM (não é
+    dos 15). Empenhado e pago SEPARADOS e rotulados (nunca somados). Read-only."""
+    es = dep.get("exec_score", 0)
+    st.markdown(f"### {esc(dep.get('nome', ''))}  ·  {esc(dep.get('partido', ''))}")
+    st.caption("Deputado federal de SP · dado de **execução real** (Portal da "
+               "Transparência 2023–2025) · **fora do CRM** (não é um dos 15 curados)")
+    k1, k2, k3 = st.columns(3)
+    k1.metric("Score de execução", es)
+    k2.metric("Fatia em edu/social", f"{(dep.get('fracao_edusoc', 0) or 0)*100:.0f}%")
+    k3.metric("Emendas individuais", dep.get("n_individuais", 0))
+    st.markdown("**Educação + assistência social (2023–2025)** — valores separados, "
+                "nunca somados:")
+    v1, v2 = st.columns(2)
+    v1.metric("Empenhado", _fmt_milhoes(dep.get("edusoc_empenhado", 0)))
+    v2.metric("Pago", _fmt_milhoes(dep.get("edusoc_pago", 0)))
+    muns = str(dep.get("municipios_pfc", "")).strip()
+    if muns:
+        st.markdown(f"**Município(s) do PFC atingido(s):** {esc(muns)}")
+    else:
+        st.caption("Nenhuma emenda edu/social localizada num município do PFC "
+                   "(caiu em destino agregado/estadual — limite da fonte, não demérito).")
+    st.info("Este deputado ainda **não está no CRM**. O score aqui é execução real, "
+            "de régua diferente do Score Integrado curado dos 15 — não são a mesma "
+            "coisa e não devem ser comparados como número absoluto.")
 
 
 def _filtra_feds_descobrir(feds: list, busca: str, f_part: str) -> list:
@@ -1027,7 +1092,10 @@ def render_descobrir_lista(escopo_sel: str) -> None:
     # ---- Fontes por escopo: estadual = levantamento (execução); federal/senador = curados ----
     terr = dados.carregar_ranking_territorio() if mostra_est else pd.DataFrame()
     exp = dados.carregar_ranking_expansao() if mostra_est else pd.DataFrame()
-    feds = _deputados_federais_ordenados() if mostra_fed else []
+    feds = _anexar_exec_aos_curados(_deputados_federais_ordenados()) if mostra_fed else []
+    # Novos federais do POOL DE EXECUÇÃO (fora do CRM, sem ID). Só na listagem —
+    # nunca no Funil. Score = execução real, régua diferente do curado.
+    feds_novos = _federais_pool_novos() if mostra_fed else []
     # senador espelha o federal: dict cru (o que dlg_senador espera) = registro _raw.
     sens = [r["_raw"] for r in carregar_parlamentares("Senador")] if mostra_sen else []
     if mostra_est and terr.empty and exp.empty and not mostra_fed:
@@ -1056,7 +1124,7 @@ def render_descobrir_lista(escopo_sel: str) -> None:
         partidos |= set(terr.get("partido", pd.Series(dtype=str)).dropna())
         partidos |= set(exp.get("partido", pd.Series(dtype=str)).dropna())
     if mostra_fed:
-        partidos |= {str(d.get("partido", "")).strip() for d in feds
+        partidos |= {str(d.get("partido", "")).strip() for d in feds + feds_novos
                      if str(d.get("partido", "")).strip()}
     if mostra_sen:
         partidos |= {str(d.get("partido", "")).strip() for d in sens
@@ -1079,6 +1147,7 @@ def render_descobrir_lista(escopo_sel: str) -> None:
         exp = _filtrar_descobrir(exp, busca, f_part, f_mun, ["municipios_pfc_diretos"])
     if mostra_fed:
         feds = _filtra_feds_descobrir(feds, busca, f_part)
+        feds_novos = _filtra_feds_descobrir(feds_novos, busca, f_part)
     if mostra_sen:  # reusa o filtro de nome/partido (genérico; município não se aplica)
         sens = _filtra_feds_descobrir(sens, busca, f_part)
 
@@ -1121,14 +1190,26 @@ def render_descobrir_lista(escopo_sel: str) -> None:
             _linha_descobrir(row, "expansao", i, no_crm(row["deputado"]))
 
     def _aba_federal():
-        st.markdown('<div class="dd-intro">Deputados federais de SP, curados à mão. O valor é '
-                    'faixa <b>sugerida</b> (potencial de emenda), <b>não</b> execução. Já ficam '
-                    'no CRM Federal (aba própria) — por isso não têm "Puxar".</div>',
+        st.markdown('<div class="dd-intro">Dois blocos: em cima os <b>15 do CRM</b> (curados à '
+                    'mão — valor <b>sugerido</b>, faixa; a tag <b>exec</b> mostra a execução real '
+                    'ao lado, régua diferente). Embaixo, os federais <b>fora do CRM</b> ordenados '
+                    'pela <b>execução real</b> (Transparência 2023-25) em educação/assistência '
+                    'social. As duas réguas <b>não</b> se comparam como número absoluto.</div>',
                     unsafe_allow_html=True)
+        st.markdown('<div class="dd-sub" style="font-weight:700;margin:4px 0 2px">'
+                    'CRM · curados à mão</div>', unsafe_allow_html=True)
         if not feds:
-            st.caption("Nenhum federal para este filtro.")
+            st.caption("Nenhum federal do CRM para este filtro.")
         for i, dep in enumerate(feds):
             _linha_descobrir_federal(dep, i)
+        st.markdown('<div class="hr-line" style="margin:16px 0 6px"></div>'
+                    '<div class="dd-sub" style="font-weight:700;margin:2px 0">'
+                    'Execução real · fora do CRM (Transparência 2023-25)</div>',
+                    unsafe_allow_html=True)
+        if not feds_novos:
+            st.caption("Nenhum federal de execução para este filtro.")
+        for i, dep in enumerate(feds_novos):
+            _linha_descobrir_federal_exec(dep, i)
 
     def _aba_senador():
         st.markdown('<div class="dd-intro">Senadores de SP, curados à mão. O valor é faixa '
@@ -1153,7 +1234,8 @@ def render_descobrir_lista(escopo_sel: str) -> None:
             _aba_expansao()
     else:  # Geral — os quatro num só lugar, cada aba com o seu escopo
         aba1, aba2, aba3, aba4 = st.tabs([f"Abordar já · {len(terr)}", f"Cortejar · {len(exp)}",
-                                          f"Federais · {len(feds)}", f"Senadores · {len(sens)}"])
+                                          f"Federais · {len(feds) + len(feds_novos)}",
+                                          f"Senadores · {len(sens)}"])
         with aba1:
             _aba_territorio()
         with aba2:
