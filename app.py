@@ -120,6 +120,7 @@ from ui.formato import (
     itens_relatorio_parlamentares,
     linhas_placar_prospeccao,
     lista_orgs_html,
+    metodologia_emendas_conteudo,
     plano_obs,
     PROSPECCAO_TIPOS,
     resumo_relatorio_parlamentares,
@@ -651,13 +652,14 @@ def dlg_em_articulacao(lista):
 # Federal/Senador) vive no segmented control de CONTEÚDO (emenda_escopo_filtro),
 # não na sidebar (Passo 8). "Descobrir" é planejamento, separado do CRM.
 EMENDA_PAGES = ["Visão geral", "Descobrir", "Territórios em Aberto",
-                "Funil de negociação", "Relatório"]
+                "Funil de negociação", "Relatório", "Metodologia"]
 # chave do botão -> ícone (a chave vira a classe st-key-<chave> que o CSS usa)
 EMENDA_ICONES = {"emnav_visao-geral": "visao-geral",
                  "emnav_descobrir": "descobrir",
                  "emnav_territorios-em-aberto": "local",
                  "emnav_funil-de-negociacao": "funil-negociacao",
                  "emnav_relatorio": "relatorio",
+                 "emnav_metodologia": "metodologia",
                  "emenda_trocar": "trocar-radar", "emenda_logout": "sair"}
 # chave do botão -> nome no tooltip do modo ícone
 EMENDA_ROTULOS = {**{f"emnav_{slug(p)}": p for p in EMENDA_PAGES},
@@ -667,7 +669,8 @@ EMENDA_ROTULOS = {**{f"emnav_{slug(p)}": p for p in EMENDA_PAGES},
 # ponto de entrada e ganha um realce permanente (ver _EMENDA_REALCE_CSS).
 EMENDA_CORES = {"emnav_visao-geral": "#8B7BF0", "emnav_descobrir": "#5B9BD5",
                 "emnav_territorios-em-aberto": "#4ADE80",
-                "emnav_funil-de-negociacao": "#E8B54A", "emnav_relatorio": "#EC6A8C"}
+                "emnav_funil-de-negociacao": "#E8B54A", "emnav_relatorio": "#EC6A8C",
+                "emnav_metodologia": "#7C8698"}
 # Realce da Visão Geral (ponto de entrada) + acento violeta na seção Articulação.
 # Tudo escopado à sidebar de EMENDAS: a chave emnav_visao-geral só existe aqui, e
 # o :has(...) garante que o acento em .sb-sec NÃO vaze pra sidebar de Captação
@@ -1560,6 +1563,63 @@ def render_prospeccao():
 # --------------------------------------------------------------------------- #
 
 
+# O componente de "pesos" (barra) é reusado pela Metodologia dos DOIS painéis. A
+# definição vive AQUI (antes do router que chama render_emendas) de propósito: o
+# fluxo de Emendas dá st.stop() antes de alcançar a Captação — se ficasse lá embaixo,
+# a Metodologia de Emendas quebraria com NameError. A Captação (page_metodo) usa a
+# MESMA def, agora só mais cedo no módulo.
+_pesos_v2 = components_v2.component("pfc_pesos", css=_PESOS_V2_CSS, js=_PESOS_V2_JS)
+
+
+def render_metodologia_emendas():
+    """Metodologia do Score de Emendas — reusa o padrão visual da Captação
+    (.phead + _pesos_v2 + expanders .ltrack), com conteúdo dos três escopos e a
+    regra de ouro. Pesos reais vêm de metodologia_emendas_conteudo() (config toml)."""
+    c = metodologia_emendas_conteudo()
+    st.markdown(
+        '<div class="phead"><h1>Como o Score de Emendas é calculado</h1>'
+        '<p>três escopos, réguas diferentes — execução real no Estadual, curadoria no '
+        'Federal/Senador</p></div>', unsafe_allow_html=True)
+    # Regra de ouro em callout (acento violeta, identidade de Emendas).
+    st.markdown(
+        '<div style="background:rgba(139,123,240,.08);border-left:3px solid #8B7BF0;'
+        'border-radius:0 10px 10px 0;padding:13px 16px;margin:4px 0 18px;font-size:13.5px;'
+        'color:var(--muted);line-height:1.6"><b style="color:#8B7BF0">Regra de ouro</b> · '
+        + esc(c["golden_rule"]) + '</div>', unsafe_allow_html=True)
+
+    # ---- Estadual: execução real, pesos de config/pfc_municipios.toml ----
+    est = c["estadual"]
+    st.markdown('#### Estadual · execução real (calculado pelo app)')
+    st.caption(est["resumo"])
+    for i, sec in enumerate(est["secoes"]):
+        st.markdown(f'**{esc(sec["nome"])}**', unsafe_allow_html=True)
+        _pesos_v2(data={"titulo": sec["nome"], "sub": sec["formula"],
+                        "rows": [{"n": p["n"], "w": p["w"], "cor": p["cor"]}
+                                 for p in sec["pesos"]]},
+                  key=f"pesos_emenda_{i}")
+        for p in sec["pesos"]:
+            with st.expander(f'{p["n"]} · {p["w"]}%'):
+                st.markdown(
+                    f'<div class="ltrack" style="height:6px;margin:2px 0 12px">'
+                    f'<i style="width:{p["w"]}%;background:{p["cor"]}"></i></div>'
+                    f'<div style="font-size:13px;color:var(--text);line-height:1.65">'
+                    f'{esc(p["desc"])}</div>', unsafe_allow_html=True)
+        st.caption(sec["min"])
+    st.caption(est["grupos"])
+
+    # ---- Federal e Senador: curado 0–100, não recalculado ----
+    fs = c["federal_senador"]
+    st.markdown(f'#### {esc(fs["titulo"])} · curadoria 0–100 (não recalculado)',
+                unsafe_allow_html=True)
+    st.caption(fs["resumo"])
+    for cr in fs["criterios"]:
+        with st.expander(cr["n"]):
+            st.markdown(
+                f'<div style="font-size:13px;color:var(--text);line-height:1.65">'
+                f'{esc(cr["desc"])}</div>', unsafe_allow_html=True)
+    st.caption(fs["valor"])
+
+
 def render_relatorio_emendas():
     st.markdown(
         '<div class="phead" style="margin-bottom:6px"><h1 style="color:var(--ink)">'
@@ -2088,7 +2148,8 @@ def render_emendas():
               "Descobrir": "Levantamento de emendas · quem abordar",
               "Territórios em Aberto": "Oportunidade de captação · sem emenda edu/social",
               "Funil de negociação": "Negociações por temperatura",
-              "Relatório": "Relatório de Prioridades · quem abordar"}.get(emenda_page, "")
+              "Relatório": "Relatório de Prioridades · quem abordar",
+              "Metodologia": "Como o Score de Emendas é calculado"}.get(emenda_page, "")
     st.markdown(
         f'<div class="topbar"><div>'
         f'<div class="hi">{saud}, {esc(primeiro)}</div>'
@@ -2113,6 +2174,10 @@ def render_emendas():
     # Relatório de Prioridades: quem abordar (do levantamento), tela + PDF.
     if modo == "relatorio":
         render_relatorio_emendas()
+        return
+    # Metodologia: como o Score de Emendas é calculado (documentação da régua real).
+    if modo == "metodologia":
+        render_metodologia_emendas()
         return
 
     # ===== Visão geral = CAPA GERAL (todos os escopos juntos) =====
@@ -3209,9 +3274,6 @@ def page_relatorio():
 # =========================================================================== #
 # PÁGINA · METODOLOGIA
 # =========================================================================== #
-
-
-_pesos_v2 = components_v2.component("pfc_pesos", css=_PESOS_V2_CSS, js=_PESOS_V2_JS)
 
 
 def page_metodo():

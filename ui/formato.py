@@ -1066,12 +1066,82 @@ def aviso_contexto_territorios(escopo_sel: str) -> str:
 # ou 'Deputados', ambas aposentadas) cai em 'visao' — blinda a migração de estado.
 _MODO_EMENDA = {"Visão geral": "visao",
                 "Descobrir": "descobrir", "Territórios em Aberto": "orfaos",
-                "Funil de negociação": "funil", "Relatório": "relatorio"}
+                "Funil de negociação": "funil", "Relatório": "relatorio",
+                "Metodologia": "metodologia"}
 
 
 def _modo_emenda(page: str) -> str:
     """Modo de conteúdo da página de Emendas; 'visao' para página desconhecida/legada."""
     return _MODO_EMENDA.get(page, "visao")
+
+
+def metodologia_emendas_conteudo() -> dict:
+    """Conteúdo (dados) da Metodologia de Emendas — PURO e testável; a casca (app.py)
+    só renderiza. Os pesos do Estadual são os REAIS de config/pfc_municipios.toml
+    (fonte de verdade do cálculo em src/emendas.py); se o toml mudar, ATUALIZE aqui.
+    Federal/Senador é curado à mão (0–100), NÃO recalculado pelo app."""
+    return {
+        "golden_rule": (
+            "Autorizado e pago são sempre mostrados SEPARADOS, nunca somados. E a "
+            "faixa sugerida do Federal/Senador (potencial) NUNCA é somada com a "
+            "execução real do Estadual — são réguas e escalas diferentes."
+        ),
+        "estadual": {
+            "resumo": ("Score 0–100 CALCULADO pelo app a partir da execução real de "
+                       "emendas (autorizado 2023–2025, Transparência SP), cruzada com os "
+                       "municípios do PFC e a vizinhança geográfica (Regiões Imediatas "
+                       "IBGE 2017). Sai em duas seções, com réguas diferentes."),
+            "grupos": ("Municípios do PFC pesam diferente: Operação ativa = 1,0; "
+                       "Tatuí (compromisso assinado, não iniciado) = 0,45."),
+            "fator_vizinho": 0.45,
+            "secoes": [
+                {"nome": "Abordar já (no território)",
+                 "formula": "SCORE = 0,30·ALINHAMENTO + 0,45·VOLUME + 0,25·PRESENÇA",
+                 "min": "Entra quem tem ≥ 2 emendas edu/social nos municípios do PFC "
+                        "(evita inflar o score com uma emenda só).",
+                 "pesos": [
+                     {"n": "Volume", "w": 45, "cor": "#4ADE80",
+                      "desc": "R$ autorizado a educação/social NOS municípios do PFC, "
+                              "ponderado pelo peso do grupo. O sinal mais forte — maior peso."},
+                     {"n": "Alinhamento", "w": 30, "cor": "#8B7BF0",
+                      "desc": "Fatia % das emendas do deputado que vão para educação/social "
+                              "(orientação geral; independe do território do PFC)."},
+                     {"n": "Presença", "w": 25, "cor": "#5B9BD5",
+                      "desc": "Em quantos municípios do PFC ele atua, cada um pelo peso do grupo."},
+                 ]},
+                {"nome": "Cortejar (expansão)",
+                 "formula": "SCORE = 0,40·ALINHAMENTO + 0,45·VOLUME GERAL + 0,15·PROXIMIDADE",
+                 "min": "Alvo de expansão precisa de volume geral edu/social ≥ R$ 1 mi; "
+                        "≥ R$ 5 mi entra como 'prioritário'.",
+                 "pesos": [
+                     {"n": "Volume geral", "w": 45, "cor": "#4ADE80",
+                      "desc": "R$ autorizado a edu/social em TODO o estado — a 'potência' "
+                              "de emenda do deputado na área."},
+                     {"n": "Alinhamento", "w": 40, "cor": "#8B7BF0",
+                      "desc": "Mesma fatia % edu/social da seção anterior."},
+                     {"n": "Proximidade", "w": 15, "cor": "#E8B54A",
+                      "desc": "Facilitador em 3 níveis: DIRETO (emenda no próprio município "
+                              "do PFC = peso cheio) · VIZINHO (mesma Região Imediata IBGE = "
+                              "0,45× o direto) · LONGE (zero)."},
+                 ]},
+            ],
+        },
+        "federal_senador": {
+            "titulo": "Federal e Senador",
+            "resumo": ("Score qualitativo 0–100 CURADO à mão (não recalculado pelo app — "
+                       "não há série de execução como no Estadual). Combina três leituras:"),
+            "criterios": [
+                {"n": "Aderência", "desc": "Fit temático com o PFC: ciência, educação, "
+                                           "juventude, inclusão."},
+                {"n": "Chance", "desc": "Viabilidade da emenda: poder + máquina + "
+                                        "pragmatismo + peso regional."},
+                {"n": "Empurrão territorial", "desc": "Base ou atuação em Sorocaba e Região "
+                                                      "Metropolitana (RMS) dá um empurrão."},
+            ],
+            "valor": ("O valor é uma FAIXA SUGERIDA (potencial mín–máx), rotulada "
+                      "'sugerido' — nunca execução, nunca somada com o Estadual."),
+        },
+    }
 
 
 def _destino_radar(radar_escolhido) -> str:
