@@ -651,12 +651,12 @@ def dlg_em_articulacao(lista):
 
 # Navegação do painel de Emendas — páginas próprias. O escopo (Geral/Estadual/
 # Federal/Senador) vive no segmented control de CONTEÚDO (emenda_escopo_filtro),
-# não na sidebar (Passo 8). "Descobrir" é planejamento, separado do CRM.
-EMENDA_PAGES = ["Visão geral", "Descobrir", "Territórios em Aberto",
+# não na sidebar (Passo 8). A lista "quem abordar" (ex-aba "Descobrir") foi fundida
+# na Visão geral (aparece abaixo da capa, no mesmo escopo).
+EMENDA_PAGES = ["Visão geral", "Territórios em Aberto",
                 "Funil de negociação", "Relatório", "Metodologia"]
 # chave do botão -> ícone (a chave vira a classe st-key-<chave> que o CSS usa)
 EMENDA_ICONES = {"emnav_visao-geral": "visao-geral",
-                 "emnav_descobrir": "descobrir",
                  "emnav_territorios-em-aberto": "local",
                  "emnav_funil-de-negociacao": "funil-negociacao",
                  "emnav_relatorio": "relatorio",
@@ -668,7 +668,7 @@ EMENDA_ROTULOS = {**{f"emnav_{slug(p)}": p for p in EMENDA_PAGES},
 # chave do botão -> cor da pastilha (só as 5 páginas; o rodapé fica neutro).
 # Paleta reusando as cores do app, uma por página. A Visão Geral (violeta) é o
 # ponto de entrada e ganha um realce permanente (ver _EMENDA_REALCE_CSS).
-EMENDA_CORES = {"emnav_visao-geral": "#8B7BF0", "emnav_descobrir": "#5B9BD5",
+EMENDA_CORES = {"emnav_visao-geral": "#8B7BF0",
                 "emnav_territorios-em-aberto": "#4ADE80",
                 "emnav_funil-de-negociacao": "#E8B54A", "emnav_relatorio": "#EC6A8C",
                 "emnav_metodologia": "#7C8698"}
@@ -1009,20 +1009,16 @@ def _municipios_pfc_lista() -> list:
         return []
 
 
-def render_descobrir() -> None:
-    """Descobrir GERAL (Passo 4): junta o levantamento estadual (execução real,
-    território/expansão) com os federais curados (valor sugerido), sob o mesmo
-    controle de Escopo da Visão geral. Cada card leva o selo do seu escopo; o
-    valor SEMPRE sai com o rótulo do seu tipo — execução (aut/pago estadual) e
-    sugerido (faixa federal) NUNCA se somam nem se confundem."""
+def render_descobrir_lista(escopo_sel: str) -> None:
+    """Lista "quem abordar" (ex-aba "Descobrir", agora FUNDIDA abaixo da capa da
+    Visão geral, no mesmo escopo). Junta o levantamento estadual (execução real
+    30/45/25 + vizinhança) com os curados federal/senador. Cada card leva o selo do
+    escopo; o valor SEMPRE sai rotulado pelo tipo — execução (aut/pago) e sugerido
+    (faixa) NUNCA se somam. `escopo_sel` vem do controle da Visão geral (não repete)."""
     st.markdown(_DESCOBRIR_CSS, unsafe_allow_html=True)
-
-    # ---- Controle de Escopo (compartilha o estado com a Visão geral) ----
-    st.session_state.setdefault("emenda_escopo_filtro", "Geral")
-    escopo_sel = st.segmented_control(
-        "Escopo", options=["Geral", "Estadual", "Federal", "Senador"],
-        key="emenda_escopo_filtro", label_visibility="collapsed") or "Geral"
-    st.caption("Escopo · Geral junta os três · Estadual / Federal / Senador filtram.")
+    st.markdown('<div class="hr-line" style="margin:24px 0 6px"></div>'
+                '<div style="font-weight:700;font-size:16px;color:var(--ink);margin-bottom:2px">'
+                'Deputados · quem abordar</div>', unsafe_allow_html=True)
 
     mostra_est = escopo_sel in ("Geral", "Estadual")
     mostra_fed = escopo_sel in ("Geral", "Federal")
@@ -2182,7 +2178,6 @@ def render_emendas():
     saud = "Bom dia" if hora < 12 else "Boa tarde" if hora < 18 else "Boa noite"
     primeiro = USER["nome"].split()[0]
     subttl = {"Visão geral": "Articulação política",
-              "Descobrir": "Levantamento de emendas · quem abordar",
               "Territórios em Aberto": "Oportunidade de captação · sem emenda edu/social",
               "Funil de negociação": "Negociações por temperatura",
               "Relatório": "Relatório de Prioridades · quem abordar",
@@ -2196,10 +2191,6 @@ def render_emendas():
         unsafe_allow_html=True,
     )
 
-    # Tela de PLANEJAMENTO (levantamento de emendas), separada do CRM dos 16.
-    if modo == "descobrir":
-        render_descobrir()
-        return
     # Municípios do PFC sem emenda edu/social + candidatos da região.
     if modo == "orfaos":
         render_orfaos()
@@ -2232,6 +2223,9 @@ def render_emendas():
         # incondicional de "ainda sem cadastro" foi removido (bloqueava os senadores
         # reais depois que a aba passou a ter linhas).
         _render_capa_geral(escopo_sel)
+        # Ex-aba "Descobrir" fundida aqui: a lista "quem abordar" (levantamento
+        # estadual + curados federal/senador) aparece ABAIXO da capa, mesmo escopo.
+        render_descobrir_lista(escopo_sel)
         return
 
 

@@ -14,13 +14,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from ui.formato import _modo_emenda  # noqa: E402
 
-# As 6 páginas atuais da sidebar (espelham EMENDA_PAGES em app.py).
+# As 5 páginas atuais da sidebar (espelham EMENDA_PAGES em app.py).
 ESPERADO = {
     "Visão geral": "visao",
-    "Descobrir": "descobrir",
     "Territórios em Aberto": "orfaos",
     "Funil de negociação": "funil",
     "Relatório": "relatorio",
+    "Metodologia": "metodologia",
 }
 
 
@@ -30,10 +30,11 @@ def test_paginas_validas_mapeiam_certo():
 
 
 def test_legado_e_desconhecido_caem_em_visao():
-    # 'Lista' (painel Federal antigo) e 'Deputados' foram aposentadas — não podem
-    # quebrar a migração de estado legado
+    # 'Lista' (painel Federal antigo), 'Deputados' e 'Descobrir' foram aposentadas —
+    # não podem quebrar a migração de estado legado
     assert _modo_emenda("Lista") == "visao"
     assert _modo_emenda("Deputados") == "visao"
+    assert _modo_emenda("Descobrir") == "visao"
     # valores estranhos / vazio / None
     assert _modo_emenda("Qualquer coisa") == "visao"
     assert _modo_emenda("") == "visao"
