@@ -1552,12 +1552,16 @@ def _hoje_sp() -> datetime.date:
 
 
 def _op_vencida(op: dict, hoje: datetime.date | None = None) -> bool:
-    """True se o item tem prazo CONFIÁVEL (_prazo_confiavel) e a data JÁ PASSOU
-    (vencido) relativo a hoje em SP. Itens 'prazo a confirmar' (data não confiável)
-    NÃO são vencidos aqui — continuam passando. É o corte final da FILA; o scorer
-    não muda. Sem data parseável → não é vencido (na dúvida, mantém)."""
-    if not _prazo_confiavel(op.get("dias")):
-        return False
+    """True se o item tem data de prazo PARSEÁVEL e ela JÁ PASSOU (vencido)
+    relativo a hoje em SP. Corte final da FILA; o scorer não muda.
+
+    Corta QUALQUER prazo já vencido — inclusive vencido há muito (antes havia
+    uma trava de 60 dias que deixava passar o vencido antigo como 'a confirmar';
+    o usuário pediu para sumir com todos). Datas FUTURAS nunca são vencidas,
+    inclusive o chute de ano distante — essas seguem exibidas como 'prazo a
+    confirmar' pela lógica de rótulo (_prazo_confiavel), que NÃO muda aqui.
+    Sem data parseável ('inscrições em andamento', texto livre) → não é vencido:
+    na dúvida mantém (regra 3 — não esconder por data incerta)."""
     d = _data_prazo(op.get("prazo", ""))
     if d is None:
         return False

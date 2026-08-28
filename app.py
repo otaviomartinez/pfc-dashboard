@@ -138,6 +138,11 @@ from ui.formato import (
     verificada_ok,
 )
 
+# Filtro geográfico do radar (restrito a fora de SP/Sudeste). Roda na coleta
+# (radar.scorer.avaliar_sinal), mas também na EXIBIÇÃO da fila — assim itens que
+# já estavam na planilha antes do filtro existir também somem da lista.
+from radar.scorer import e_restrito_fora_sudeste
+
 try:
     import plotly.graph_objects as go
     PLOTLY_OK = True
@@ -2921,7 +2926,8 @@ def page_visao():
     # fila real do radar (Sheets), ordenada por aderência
     fila = sorted(dados.carregar_novidades_pendentes(), key=_score_novidade, reverse=True)
     ops = [_op_de_novidade(nv) for nv in fila]
-    ops = [o for o in ops if not _op_vencida(o)]  # tira vencidos (prazo confiável já passado)
+    ops = [o for o in ops if not _op_vencida(o)]  # tira vencidos (data de prazo já passada)
+    ops = [o for o in ops if not e_restrito_fora_sudeste(o["titulo"], o["desc"])]  # tira restrito a fora do Sudeste
     n_fontes = _n_fontes_radar()
     # Encerrando = prazo confiável a até 7 dias. Guarda a LISTA (não só a contagem)
     # para o clique no "N encerrando" mostrar TODAS, não só a primeira.
@@ -3099,7 +3105,8 @@ def page_radar():
         help="Score = relevância · Dias restantes = os que fecham antes primeiro "
              "(prazo a confirmar vai para o fim) · Valor = maiores primeiro")
     ops = [_op_de_novidade(nv) for nv in dados.carregar_novidades_pendentes()]
-    ops = [o for o in ops if not _op_vencida(o)]  # tira vencidos (prazo confiável já passado)
+    ops = [o for o in ops if not _op_vencida(o)]  # tira vencidos (data de prazo já passada)
+    ops = [o for o in ops if not e_restrito_fora_sudeste(o["titulo"], o["desc"])]  # tira restrito a fora do Sudeste
     scores_spark = sorted((o["score"] for o in ops), reverse=True)[:16]  # sparkline por score
     ops = _ordenar_ops(ops, ordem)
     visiveis = ops[:_RADAR_MAX_LISTA]
