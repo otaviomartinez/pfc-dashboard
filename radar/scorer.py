@@ -125,7 +125,8 @@ REGIOES_PFC = [
     "sorocaba", "ipero", "tatui", "salto", "sao roque", "rio claro",
     "coronel macedo", "mirassol", "dois corregos", "corumbatai",
 ]
-REGIOES_AMPLAS = ["sao paulo", "nacional", "todo o brasil", "todo brasil", "em todo o pais"]
+REGIOES_AMPLAS = ["sao paulo", "nacional", "todo o brasil", "todo brasil",
+                  "em todo o pais", "todo o pais"]
 
 # --- Restrição geográfica (fora de SP/Sudeste) -------------------------------
 # O PFC é do estado de SP (Sudeste). Barra editais RESTRITOS a outra macro-região
@@ -137,6 +138,22 @@ INCLUI_SUDESTE_NACIONAL = REGIOES_PFC + REGIOES_AMPLAS + [
     "sudeste", "paulista", "ambito nacional", "territorio nacional",
     "todas as regioes", "todos os estados", "qualquer estado", "qualquer regiao",
     "todo o territorio",
+    # outros estados do Sudeste (o PFC é SP, mas Sudeste é "mantém" por decisão do
+    # filtro): protege sub-regiões tipo "nordeste de Minas", "norte fluminense",
+    # "noroeste mineiro" de serem barradas pela âncora macro-regional forte abaixo.
+    "minas gerais", "mineiro", "mineira", "rio de janeiro", "fluminense",
+    "carioca", "espirito santo", "capixaba",
+]
+# Macro-regiões FORTES: fora do Sudeste de forma inequívoca — barram pela simples
+# MENÇÃO (não precisam de marcador colado), depois de descartar quem cita
+# SP/Sudeste/nacional acima. Pega "organizações do Norte e Nordeste", "programa do
+# semiárido" etc. — casos em que a restrição vem por "do/para <região>", sem uma
+# palavra tipo "exclusivo" por perto.
+ANCORAS_FORA_SUDESTE_FORTES = [
+    "nordeste", "centro-oeste", "centro oeste", "norte e nordeste",
+    "regiao norte", "regiao sul", "regiao nordeste", "regiao centro-oeste",
+    "estados do norte", "estados do nordeste", "estados do sul",
+    "semiarido", "sertao", "amazonia legal", "regiao amazonica",
 ]
 ANCORAS_FORA_SUDESTE = [
     # macro-regiões (NÃO 'sul'/'norte' soltos — falso positivo)
@@ -265,6 +282,10 @@ def e_restrito_fora_sudeste(titulo: str, descricao: str) -> bool:
     texto = _norm(f"{titulo or ''} {descricao or ''}")
     if any(k in texto for k in INCLUI_SUDESTE_NACIONAL):
         return False
+    # macro-região fora do Sudeste citada = restrição, mesmo sem marcador colado
+    # (ex.: "organizações sociais do Norte e Nordeste"):
+    if any(a in texto for a in ANCORAS_FORA_SUDESTE_FORTES):
+        return True
     for m in RESTRICAO_MARCADORES:
         i = texto.find(m)
         while i != -1:

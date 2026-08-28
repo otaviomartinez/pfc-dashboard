@@ -30,6 +30,18 @@ def test_barra_restritos_fora_do_sudeste():
     assert _barra("Chamada limitada a municípios de Goiás")
 
 
+def test_barra_macro_regiao_sem_marcador_colado():
+    # restrição vinda por "do/para <macro-região>", SEM palavra tipo "exclusivo"
+    # por perto (caso real que escapava — BNDES Norte e Nordeste):
+    assert _barra("BNDES abre edital de R$ 35 milhões para fortalecer "
+                  "organizações sociais do Norte e Nordeste")
+    assert _barra("Programa de apoio a organizações do semiárido")
+    assert _barra("Chamada para iniciativas da região Sul")
+    # mas sub-região de estado do Sudeste NÃO barra (é 'mantém'):
+    assert not _barra("Edital para projetos no nordeste de Minas Gerais")
+    assert not _barra("Apoio ao norte fluminense")
+
+
 def test_nao_barra_nacional_ou_sudeste():
     assert not _barra("Edital nacional de educação científica")
     assert not _barra("Chamada para projetos em São Paulo e na Bahia")   # cita SP → mantém
@@ -76,6 +88,7 @@ def test_integra_no_avaliar_sinal():
 
 if __name__ == "__main__":
     test_barra_restritos_fora_do_sudeste()
+    test_barra_macro_regiao_sem_marcador_colado()
     test_nao_barra_nacional_ou_sudeste()
     test_nao_barra_sul_solto_nem_sudeste_states()
     test_marcador_sem_regiao_nao_barra()
