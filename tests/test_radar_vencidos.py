@@ -1,8 +1,9 @@
 """Teste puro do corte de vencidos da fila do radar — ui/formato._op_vencida.
 
-Regra: item com prazo CONFIÁVEL (_prazo_confiavel) e data JÁ PASSADA (relativo a
-hoje em SP) é vencido → descartado. 'Prazo a confirmar' (data não confiável, ex.:
-chute de ano a 200+ dias, ou vencido há muito) NÃO é vencido — continua passando.
+Regra: item com data de prazo PARSEÁVEL e JÁ PASSADA (relativo a hoje em SP) é
+vencido → descartado, inclusive vencido há muito. Data FUTURA nunca é vencida
+(o chute de ano distante segue exibido como 'a confirmar'). Sem data parseável
+(texto livre) NÃO é vencido — na dúvida, mantém (regra 3).
 
     python tests/test_radar_vencidos.py
 """
@@ -31,12 +32,17 @@ def test_hoje_e_futuro_nao_sao_vencidos():
     assert _op_vencida(_op("2026-08-20", 10), HOJE) is False    # futuro
 
 
-def test_prazo_a_confirmar_continua_passando():
-    # dias fora da janela confiável (-60..180) → 'a confirmar', NÃO vencido:
+def test_futuro_e_sem_data_continuam_passando():
+    # data FUTURA (mesmo chute de ano distante) nunca é vencida:
     assert _op_vencida(_op("2027-03-01", 203), HOJE) is False   # chute de ano (futuro distante)
-    assert _op_vencida(_op("2020-01-01", -100), HOJE) is False  # vencido há muito, mas não confiável
     assert _op_vencida(_op("", None), HOJE) is False            # sem prazo
-    assert _op_vencida(_op("prazo aberto", "n/d"), HOJE) is False  # dias não-int
+    assert _op_vencida(_op("prazo aberto", "n/d"), HOJE) is False  # texto livre não parseável
+
+
+def test_vencido_ha_muito_agora_e_cortado():
+    # antes a trava de 60 dias deixava passar; agora qualquer data passada corta:
+    assert _op_vencida(_op("2020-01-01", -100), HOJE) is True   # vencido há muito
+    assert _op_vencida(_op("2026-05-01", -101), HOJE) is True   # vencido há +60 dias
 
 
 def test_sem_data_parseavel_mantem():
@@ -53,7 +59,8 @@ def test_usa_sp_por_padrao_sem_quebrar():
 if __name__ == "__main__":
     test_confiavel_e_passado_e_vencido()
     test_hoje_e_futuro_nao_sao_vencidos()
-    test_prazo_a_confirmar_continua_passando()
+    test_futuro_e_sem_data_continuam_passando()
+    test_vencido_ha_muito_agora_e_cortado()
     test_sem_data_parseavel_mantem()
     test_usa_sp_por_padrao_sem_quebrar()
     print("OK — corte de vencidos da fila do radar (SP tz) passou.")

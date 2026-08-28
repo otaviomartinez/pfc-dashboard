@@ -25,11 +25,30 @@ POSITIVAS_FORTES = [
 # e QUEM participa (estudante/olimpíada) sai por NEGATIVAS_ALUNO — não aqui.
 POSITIVAS = POSITIVAS_FORTES + [
     "educacao", "juventude", "vulnerabilidade social", "ciencia", "stem",
-    "projeto de vida", "impacto social", "socioambiental", "comunitario",
+    "projeto de vida", "impacto social", "comunitario",
     "comunidade", "desenvolvimento comunitario", "terceiro setor",
     "sociedade civil", "organizacoes sociais", "organizacao social", "inovacao",
     "formacao", "empreendedorismo", "periferia", "inclusao", "direitos humanos",
     "cultura educativa", "assistencia social",
+]
+# AMBIENTAL / ECOLOGIA (fora do escopo do PFC, por decisão do Fábio): meio
+# ambiente, preservação, biodiversidade, clima etc. NÃO tem a ver com educação
+# científica — barra no pré-filtro (avaliar_sinal) e não some com socioambiental
+# (que saiu das POSITIVAS). Termos PRECISOS de propósito: nada de "eco" solto
+# (pegaria "economia"/"ecossistema de inovação") nem "ambiente" solto (pegaria
+# "ambiente escolar/de aprendizagem/virtual"). "ambiental"/"ambientais" (com -al)
+# é quase sempre meio ambiente; clima só nas formas compostas ("mudança
+# climática", nunca "clima escolar/organizacional").
+AMBIENTAL = [
+    "meio ambiente", "ambiental", "ambientais", "socioambiental", "socio-ambiental",
+    "ecologia", "ecologic", "biodiversidade", "preservacao ambiental",
+    "conservacao ambiental", "unidade de conservacao", "reflorestamento",
+    "desmatamento", "reciclagem", "residuos solidos", "coleta seletiva",
+    "flora", "mata atlantica", "poluicao", "recursos hidricos", "bacia hidrografica",
+    "mudanca climatica", "mudancas climaticas", "emergencia climatica",
+    "crise climatica", "aquecimento global", "credito de carbono",
+    "neutralidade de carbono", "energia renovavel", "energias renovaveis",
+    "sustentabilidade ambiental",
 ]
 NEGATIVAS = [
     "pos-graduacao", "mestrado", "doutorado", "curso pago", "mensalidade",
@@ -227,6 +246,15 @@ def e_nao_elegivel(titulo: str, descricao: str) -> bool:
     return any(k in texto for k in NAO_ELEGIVEL)
 
 
+def e_ambiental(titulo: str, descricao: str) -> bool:
+    """True se o edital é sobre meio ambiente/ecologia — fora do escopo do PFC.
+    Barra tudo que é ambiental (inclusive socioambiental/educação ambiental), por
+    decisão do coordenador. Termos precisos (ver AMBIENTAL): nunca 'eco'/'ambiente'
+    soltos. Normaliza acentos (chaves em AMBIENTAL são sem acento)."""
+    texto = _norm(f"{titulo or ''} {descricao or ''}")
+    return any(k in texto for k in AMBIENTAL)
+
+
 def e_restrito_fora_sudeste(titulo: str, descricao: str) -> bool:
     """True se o edital é RESTRITO a região/estado FORA de SP/Sudeste (o PFC é de
     SP). NÃO barra: nacional/sem recorte, ou que cite SP/Sudeste/Sorocaba/município
@@ -268,6 +296,8 @@ def avaliar_sinal(op: dict) -> tuple[bool, str]:
         return False, "prêmio para pessoa física (professor/indivíduo), não captação institucional"
     if e_nao_elegivel(titulo, descricao):
         return False, "inaplicável ao PFC (bem-estar animal/saúde hospitalar/aldeia indígena)"
+    if e_ambiental(titulo, descricao):
+        return False, "ambiental/ecologia (fora do escopo do PFC)"
     if e_restrito_fora_sudeste(titulo, descricao):
         return False, "restrito a região fora de SP/Sudeste (o PFC é de São Paulo)"
     if tem_sinal_de_oportunidade(titulo, descricao):
