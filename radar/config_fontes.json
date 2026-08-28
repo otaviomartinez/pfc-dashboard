@@ -12,5 +12,17 @@
   { "nome": "UNICEF Brasil", "url": "https://www.unicef.org/brazil/", "categoria": "generico", "ativo": true },
   { "nome": "Instituto Natura", "url": "https://www.institutonatura.org/", "categoria": "generico", "ativo": true },
   { "nome": "Fundação Tide Setubal", "url": "https://fundacaotidesetubal.org.br/", "categoria": "generico", "ativo": true },
-  { "nome": "FECTI/CECIERJ", "url": "https://www.cecierj.edu.br/", "categoria": "generico", "ativo": true }
+  { "nome": "FECTI/CECIERJ", "url": "https://www.cecierj.edu.br/", "categoria": "generico", "ativo": true },
+
+  { "_ajuda2": "ADICIONADAS: dinheiro público que uma OSC de educação em Sorocaba realmente capta (fundos da criança/adolescente, editais municipais e estaduais). URLs NÃO verificadas no ambiente de dev — o rendimento por fonte no resumo da rodada dirá quais funcionam; as que vierem VAZIAS devem ser corrigidas ou desativadas.",
+    "nome": "Exemplo2", "url": "https://exemplo.org/x", "categoria": "generico", "ativo": false },
+  { "nome": "Prefeitura de Sorocaba", "url": "https://www.sorocaba.sp.gov.br/", "categoria": "publico", "ativo": true },
+  { "nome": "CONDECA-SP / Desenvolvimento Social SP", "url": "https://www.desenvolvimentosocial.sp.gov.br/", "categoria": "publico", "ativo": true },
+  { "nome": "Secretaria da Educação de SP", "url": "https://www.educacao.sp.gov.br/", "categoria": "publico", "ativo": true },
+  { "nome": "Fundo Social de SP", "url": "https://www.fundosocial.sp.gov.br/", "categoria": "publico", "ativo": true },
+
+  { "nome": "Instituto Iungo", "url": "https://iungo.org.br/", "categoria": "generico", "ativo": true },
+  { "nome": "Movimento Bem Maior", "url": "https://www.movimentobemmaior.org.br/", "categoria": "generico", "ativo": true },
+  { "nome": "Fundação Salvador Arena", "url": "https://www.fundacaosalvadorarena.org.br/", "categoria": "generico", "ativo": true },
+  { "nome": "Instituto Sabin", "url": "https://institutosabin.org.br/", "categoria": "generico", "ativo": true }
 ]
