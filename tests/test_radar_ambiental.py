@@ -28,6 +28,9 @@ def test_barra_ambiental():
     assert _amb("Chamada sobre mudanças climáticas") is True
     assert _amb("Editais de reciclagem e resíduos sólidos") is True
     assert _amb("Iniciativa de ecologia urbana") is True
+    assert _amb("Comunicação para Ação Climática no Brasil") is True
+    assert _amb("Edital de projetos de comunicação climática") is True
+    assert _amb("Chamada sobre justiça climática") is True
 
 
 def test_nao_barra_educacao_ciencia():

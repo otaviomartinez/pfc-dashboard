@@ -42,6 +42,17 @@ def test_barra_macro_regiao_sem_marcador_colado():
     assert not _barra("Apoio ao norte fluminense")
 
 
+def test_barra_estado_fora_do_sudeste_por_mencao():
+    # nome de estado fora do SE barra mesmo sem marcador colado (caso real Banrisul):
+    assert _barra("Banrisul abre edital para premiar 50 organizações do Rio Grande do Sul")
+    assert _barra("Programa para organizações de Pernambuco e do Ceará")
+    # sufixo de edição regional no título (caso real BNDES Periferias Fortes – Norte):
+    assert _barra("Edital BNDES Periferias Fortes – Norte")
+    assert _barra("Programa de apoio - Sul")
+    # 'paraná' NÃO barra por menção (casa Paranapanema/Paranapiacaba, de SP):
+    assert not _barra("Edital para o Vale do Paranapanema")
+
+
 def test_nao_barra_nacional_ou_sudeste():
     assert not _barra("Edital nacional de educação científica")
     assert not _barra("Chamada para projetos em São Paulo e na Bahia")   # cita SP → mantém
@@ -89,6 +100,7 @@ def test_integra_no_avaliar_sinal():
 if __name__ == "__main__":
     test_barra_restritos_fora_do_sudeste()
     test_barra_macro_regiao_sem_marcador_colado()
+    test_barra_estado_fora_do_sudeste_por_mencao()
     test_nao_barra_nacional_ou_sudeste()
     test_nao_barra_sul_solto_nem_sudeste_states()
     test_marcador_sem_regiao_nao_barra()

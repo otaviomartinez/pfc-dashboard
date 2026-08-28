@@ -12,7 +12,7 @@ import unicodedata
 # --- Aderência (35%) ---------------------------------------------------------
 POSITIVAS_FORTES = [
     "escola publica", "educacao basica", "ensino fundamental", "ensino medio",
-    "iniciacao cientifica", "feira de ciencias", "clube de ciencia",
+    "iniciacao cientifica", "clube de ciencia",
     "permanencia escolar", "tecnologia social", "formacao de professores",
     "equidade educacional",
 ]
@@ -45,6 +45,7 @@ AMBIENTAL = [
     "conservacao ambiental", "unidade de conservacao", "reflorestamento",
     "desmatamento", "reciclagem", "residuos solidos", "coleta seletiva",
     "flora", "mata atlantica", "poluicao", "recursos hidricos", "bacia hidrografica",
+    "climatic", "acao climatica", "justica climatica", "comunicacao climatica",
     "mudanca climatica", "mudancas climaticas", "emergencia climatica",
     "crise climatica", "aquecimento global", "credito de carbono",
     "neutralidade de carbono", "energia renovavel", "energias renovaveis",
@@ -66,6 +67,10 @@ NEGATIVAS_ALUNO = [
     "premia alunos", "bolsa para aluno", "bolsa para estudante",
     "bolsa de estudo", "inscricao de participante", "inscricoes de participantes",
     "competicao estudantil", "gabarito", "prova classificatoria",
+    # feira/mostra científica: EVENTO que aluno/escola participa, não captação
+    # (as fontes de feira já saíram; isto pega feiras que vêm por outras fontes):
+    "feira de ciencias", "feira cientifica", "feira de ciencia",
+    "mostra cientifica", "mostra de ciencias", "feira de educacao",
 ]
 # INAPLICÁVEL ao PFC (não é falta de tema — é falta de elegibilidade): editais
 # que o PFC genuinamente não tem como concorrer. Régua estreita DE PROPÓSITO: só
@@ -155,6 +160,17 @@ ANCORAS_FORA_SUDESTE_FORTES = [
     "estados do norte", "estados do nordeste", "estados do sul",
     "semiarido", "sertao", "amazonia legal", "regiao amazonica",
 ]
+# Estados fora do Sudeste também barram pela simples MENÇÃO (nome de estado é
+# inequívoco). FORA daqui de propósito: 'parana' (casa 'paranapanema'/
+# 'paranapiacaba', que são de SP) e 'acre' (casa 'massacre') — esses seguem só no
+# modo com marcador (ANCORAS_FORA_SUDESTE). Sub-região de estado do Sudeste já é
+# protegida pelo INCLUI (minas/rio de janeiro/espirito santo).
+ESTADOS_FORA_SUDESTE_FORTES = [
+    "bahia", "ceara", "pernambuco", "maranhao", "piaui", "rio grande do norte",
+    "paraiba", "alagoas", "sergipe", "amazonas", "rondonia", "roraima",
+    "amapa", "tocantins", "goias", "mato grosso", "mato grosso do sul",
+    "distrito federal", "santa catarina", "rio grande do sul",
+]
 ANCORAS_FORA_SUDESTE = [
     # macro-regiões (NÃO 'sul'/'norte' soltos — falso positivo)
     "nordeste", "centro-oeste", "centro oeste", "amazonia legal", "regiao amazonica",
@@ -213,6 +229,10 @@ EXCLUSAO_TITULOS = [
     "valores praticados", "importação e exportação", "execução de processos",
     "alterações da concessão", "submissão de relatórios", "sistemática de análise",
     "outros programas",
+    # aula/tutorial sobre captação (não é edital, é conteúdo):
+    "aula ensina", "como elaborar proposta", "webinar", "curso de captação",
+    # contratação/licitação (prefeitura contrata prestador — não é captação):
+    "contratar organização especializada", "contratação de organização",
     # links de menu/seção de fontes de contexto (não são editais):
     "imposto de renda", "editais públicos",
 ]
@@ -282,9 +302,13 @@ def e_restrito_fora_sudeste(titulo: str, descricao: str) -> bool:
     texto = _norm(f"{titulo or ''} {descricao or ''}")
     if any(k in texto for k in INCLUI_SUDESTE_NACIONAL):
         return False
-    # macro-região fora do Sudeste citada = restrição, mesmo sem marcador colado
-    # (ex.: "organizações sociais do Norte e Nordeste"):
-    if any(a in texto for a in ANCORAS_FORA_SUDESTE_FORTES):
+    # macro-região OU estado fora do Sudeste citado = restrição, mesmo sem
+    # marcador colado (ex.: "organizações sociais do Norte e Nordeste",
+    # "organizações do Rio Grande do Sul"):
+    if any(a in texto for a in ANCORAS_FORA_SUDESTE_FORTES + ESTADOS_FORA_SUDESTE_FORTES):
+        return True
+    # sufixo de edição regional: "Edital ... – Norte", "... - Sul":
+    if re.search(r"[-–]\s*(norte|sul)\b", texto):
         return True
     for m in RESTRICAO_MARCADORES:
         i = texto.find(m)
