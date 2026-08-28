@@ -149,6 +149,20 @@ try:
 except Exception:
     PLOTLY_OK = False
 
+
+def _ops_radar_filtradas(novidades=None) -> list[dict]:
+    """Fila do radar já LIMPA para exibição — PONTO ÚNICO. Toda tela que mostra a
+    fila (dashboard, tela do Radar, Relatório de Prioridades) deve passar por
+    aqui, senão um filtro escapa numa tela e não na outra (já aconteceu).
+    Tira: vencidos (data de prazo já passada), restritos a fora do Sudeste e
+    ambientais/ecologia. Não ordena — quem chama ordena como precisar."""
+    fonte = novidades if novidades is not None else dados.carregar_novidades_pendentes()
+    ops = [_op_de_novidade(nv) for nv in fonte]
+    ops = [o for o in ops if not _op_vencida(o)]
+    ops = [o for o in ops if not e_restrito_fora_sudeste(o["titulo"], o["desc"])]
+    ops = [o for o in ops if not e_ambiental(o["titulo"], o["desc"])]
+    return ops
+
 # Componente de drag-and-drop do funil (HTML5 nativo, sem dependências externas).
 _KANBAN_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "kanban_component")
 try:
@@ -330,7 +344,7 @@ def render_hub():
     """Renderiza a Central e trata a escolha do radar (grava e entra no painel)."""
     st.markdown(_HUB_CHROME_CSS, unsafe_allow_html=True)
     try:
-        novas = len(dados.carregar_novidades_pendentes())
+        novas = len(_ops_radar_filtradas())  # conta a fila JÁ filtrada (bate com a lista)
     except Exception:
         novas = 0
     try:
@@ -2924,11 +2938,8 @@ def page_visao():
     pct_pros = round(n_prospectar / TOTAL * 100) if TOTAL else 0
 
     # fila real do radar (Sheets), ordenada por aderência
-    fila = sorted(dados.carregar_novidades_pendentes(), key=_score_novidade, reverse=True)
-    ops = [_op_de_novidade(nv) for nv in fila]
-    ops = [o for o in ops if not _op_vencida(o)]  # tira vencidos (data de prazo já passada)
-    ops = [o for o in ops if not e_restrito_fora_sudeste(o["titulo"], o["desc"])]  # tira restrito a fora do Sudeste
-    ops = [o for o in ops if not e_ambiental(o["titulo"], o["desc"])]  # tira ambiental/ecologia
+    ops = _ops_radar_filtradas()  # ponto único: tira vencidos, fora do Sudeste e ambiental
+    ops.sort(key=lambda o: o["score"], reverse=True)
     n_fontes = _n_fontes_radar()
     # Encerrando = prazo confiável a até 7 dias. Guarda a LISTA (não só a contagem)
     # para o clique no "N encerrando" mostrar TODAS, não só a primeira.
@@ -3105,10 +3116,7 @@ def page_radar():
         "Ordenar por", ["Score", "Dias restantes", "Valor"], horizontal=True, key="radar_ordem",
         help="Score = relevância · Dias restantes = os que fecham antes primeiro "
              "(prazo a confirmar vai para o fim) · Valor = maiores primeiro")
-    ops = [_op_de_novidade(nv) for nv in dados.carregar_novidades_pendentes()]
-    ops = [o for o in ops if not _op_vencida(o)]  # tira vencidos (data de prazo já passada)
-    ops = [o for o in ops if not e_restrito_fora_sudeste(o["titulo"], o["desc"])]  # tira restrito a fora do Sudeste
-    ops = [o for o in ops if not e_ambiental(o["titulo"], o["desc"])]  # tira ambiental/ecologia
+    ops = _ops_radar_filtradas()  # ponto único: tira vencidos, fora do Sudeste e ambiental
     scores_spark = sorted((o["score"] for o in ops), reverse=True)[:16]  # sparkline por score
     ops = _ordenar_ops(ops, ordem)
     visiveis = ops[:_RADAR_MAX_LISTA]
@@ -3265,8 +3273,7 @@ def _itens_relatorio_captacao() -> list[dict]:
     Fontes reais: fila do Radar + editais da base/privados. Dedupe por nome."""
     hoje = datetime.date.today()
     brutos = []
-    for nv in dados.carregar_novidades_pendentes():
-        op = _op_de_novidade(nv)
+    for op in _ops_radar_filtradas():  # ponto único: já sem vencidos/fora do Sudeste/ambiental
         if str(op.get("prazo", "")).strip():
             brutos.append((op["titulo"], op["fonte"], op["valor"], op["prazo"], op["dias"]))
     for e in _coletar_editais():
