@@ -29,6 +29,13 @@ DESCARTADO_CSV = os.path.join(BASE, "log_descartado_sem_sinal.csv")
 CANDIDATAS_CSV = os.path.join(BASE, "fontes_candidatas.csv")
 
 LIMIAR_FILA = 45  # score_total mínimo para entrar na fila
+# Aderência mínima. O score_total sozinho não segurava lixo: um item SEM nenhuma
+# relação com o PFC já soma 53 (valor "não informado" = 50, região "não
+# informada" = 50, e só "tem link + tem prazo" = acionabilidade 100), passando do
+# limiar de 45 sem nada a ver com educação/ciência. _score_aderencia parte de 30
+# e sobe 11 por termo do universo do PFC, então 41 = "pelo menos UM termo".
+# Abaixo disso é captação genérica de terceiro setor — não é o que buscamos.
+LIMIAR_ADERENCIA = 41
 ABA = "Novidades_pendentes"
 # Mesmo cabeçalho de src/dados.py (mantido aqui para não importar Streamlit).
 # "Dias restantes" entra por ÚLTIMO para não desalinhar linhas já gravadas
@@ -42,30 +49,41 @@ HEADERS = ["Data", "Fonte", "Título", "Descrição", "Score Aderência",
 # Coleta (com isolamento por fonte)
 # --------------------------------------------------------------------------- #
 def coletar_ancoras():
-    """Roda as fontes-âncora isoladas. Devolve (itens, n_ok, falhas)."""
-    itens, falhas, n_ok = [], {}, 0
+    """Roda as fontes-âncora isoladas. Devolve (itens, n_ok, falhas, contagens).
+
+    `contagens` = {nome: nº de itens} para TODA fonte que não estourou exceção —
+    inclusive as que voltaram ZERO. Uma fonte muda (seletor quebrou, site mudou
+    de layout) não levanta erro: ela só devolve [] e antes era contada como "ok",
+    então o radar dizia "27 fontes varridas" mesmo com 25 sem trazer nada. É por
+    isso que a contagem por fonte existe — é o único jeito de ver fonte morta.
+    """
+    itens, falhas, n_ok, contagens = [], {}, 0, {}
     for nome, func in FONTES.items():
         try:
             achados = func() or []
             itens.extend(achados)
+            contagens[nome] = len(achados)
             n_ok += 1
         except Exception as e:  # falha em uma nunca derruba as outras
             falhas[nome] = f"{type(e).__name__}: {str(e)[:80]}"
-    return itens, n_ok, falhas
+    return itens, n_ok, falhas, contagens
 
 
 def coletar_genericas():
-    """Roda as fontes ativas de config_fontes.json via extrator genérico."""
-    itens, n_ok, falhas = [], 0, {}
+    """Roda as fontes ativas de config_fontes.json via extrator genérico.
+    Devolve (itens, n_ok, falhas, contagens) — ver coletar_ancoras."""
+    itens, n_ok, falhas, contagens = [], 0, {}, {}
     for entrada in _ler_config():
         nome = entrada.get("nome", entrada.get("url", "?"))
         url = entrada.get("url", "")
         try:
-            itens.extend(extrair_generico(url) or [])
+            achados = extrair_generico(url) or []
+            itens.extend(achados)
+            contagens[nome] = len(achados)
             n_ok += 1
         except Exception as e:
             falhas[nome] = f"{type(e).__name__}: {str(e)[:80]}"
-    return itens, n_ok, falhas
+    return itens, n_ok, falhas, contagens
 
 
 def _ler_config():
@@ -168,9 +186,10 @@ def executar():
     t_desc.start()
 
     # Camadas 1 e 2.
-    ancora_itens, ancora_ok, ancora_falhas = coletar_ancoras()
-    generica_itens, generica_ok, generica_falhas = coletar_genericas()
+    ancora_itens, ancora_ok, ancora_falhas, ancora_cont = coletar_ancoras()
+    generica_itens, generica_ok, generica_falhas, generica_cont = coletar_genericas()
     brutos = ancora_itens + generica_itens
+    contagens = {**ancora_cont, **generica_cont}
 
     # PRÉ-FILTRO DE SINAL — descarta lixo institucional ANTES de pontuar.
     # (fontes de contexto-edital ganham passe livre; exclusão sempre vale.)
@@ -199,7 +218,11 @@ def executar():
     fila, filtradas = [], []
     for op in com_sinal:
         op.update(pontuacao(op))
-        (fila if op["score_total"] >= LIMIAR_FILA else filtradas).append(op)
+        entra = (op["score_total"] >= LIMIAR_FILA
+                 and op["score_aderencia"] >= LIMIAR_ADERENCIA)
+        if not entra and op["score_aderencia"] < LIMIAR_ADERENCIA:
+            op["motivo"] = f"aderência {op['score_aderencia']} < {LIMIAR_ADERENCIA}; " + op["motivo"]
+        (fila if entra else filtradas).append(op)
     fila.sort(key=lambda o: o["score_total"], reverse=True)
 
     # Deduplicação contra a fila existente.
@@ -254,11 +277,11 @@ def executar():
 
     _resumo(ancora_ok, generica_ok, brutos, com_sinal, descartados, unicas, filtradas,
             {**ancora_falhas, **generica_falhas}, resultado_desc["n"], destino, stats_enr,
-            stats_alerta)
+            stats_alerta, contagens)
 
 
 def _resumo(ancora_ok, generica_ok, brutos, com_sinal, descartados, unicas, filtradas,
-            falhas, n_cand, destino, stats_enr, stats_alerta=None):
+            falhas, n_cand, destino, stats_enr, stats_alerta=None, contagens=None):
     n_com_prazo = sum(1 for o in unicas if isinstance(o.get("dias_restantes"), int))
     n_vencidas = sum(1 for o in unicas
                      if isinstance(o.get("dias_restantes"), int) and o["dias_restantes"] < 0)
@@ -266,7 +289,27 @@ def _resumo(ancora_ok, generica_ok, brutos, com_sinal, descartados, unicas, filt
     print(f"{ancora_ok} fontes-âncora + {generica_ok} fontes genéricas varridas")
     print(f"{len(brutos)} itens extraídos · {len(com_sinal)} com sinal de oportunidade · "
           f"{len(descartados)} descartados sem sinal")
-    print(f"{len(unicas)} na fila (score >= {LIMIAR_FILA}) · {len(filtradas)} filtradas (score baixo)")
+    print(f"{len(unicas)} na fila (score >= {LIMIAR_FILA} e aderência >= {LIMIAR_ADERENCIA}) · "
+          f"{len(filtradas)} filtradas (score/aderência baixos)")
+    n_sem_ader = sum(1 for o in filtradas
+                     if isinstance(o.get("score_aderencia"), int)
+                     and o["score_aderencia"] < LIMIAR_ADERENCIA)
+    if n_sem_ader:
+        print(f"   destes, {n_sem_ader} por aderência < {LIMIAR_ADERENCIA} "
+              f"(captação genérica, sem termo de educação/ciência)")
+    # Rendimento por fonte: o ponto cego histórico. Fonte que devolve ZERO não
+    # levanta exceção — sem esta lista, ela passa por "ok" para sempre.
+    if contagens:
+        vivas = {n: c for n, c in contagens.items() if c > 0}
+        mudas = sorted(n for n, c in contagens.items() if c == 0)
+        print(f"Rendimento por fonte: {len(vivas)} entregaram itens · "
+              f"{len(mudas)} vieram VAZIAS · {len(falhas)} com erro")
+        for nome, c in sorted(vivas.items(), key=lambda kv: -kv[1]):
+            print(f"   {c:4d}  {nome}")
+        if mudas:
+            print("   VAZIAS (0 itens — checar se o site mudou de layout):")
+            for nome in mudas:
+                print(f"      - {nome}")
     print(f"Prazos: {n_com_prazo} itens da fila com data-limite detectada"
           + (f" ({n_vencidas} vencida(s))" if n_vencidas else ""))
     print(f"Enriquecimento: {stats_enr['tentadas']} páginas visitadas · "
