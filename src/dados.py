@@ -24,6 +24,7 @@ Regras:
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -152,18 +153,52 @@ _MSG_CSV = ("Modo local (CSV): a alteração não foi gravada. "
 # --------------------------------------------------------------------------- #
 # Conexão com o Google Sheets (silenciosa: qualquer falha vira modo CSV)
 # --------------------------------------------------------------------------- #
+# Motivo da ÚLTIMA falha de conexão, para o aviso na tela. Antes, qualquer erro
+# aqui virava "return None" mudo e a tela ficava vazia sem explicação — a pessoa
+# não tinha como saber se era secret ausente, private_key quebrada ou planilha
+# não compartilhada. NUNCA guarda o conteúdo da credencial (ver _sanitizar_erro).
+_ERRO_CONEXAO = ""
+
+
+def _sanitizar_erro(e) -> str:
+    """Mensagem curta e SEGURA de uma exceção de conexão.
+
+    Remove bloco PEM e qualquer sequência longa tipo base64 antes de devolver:
+    a mensagem vai para a TELA, então não pode carregar pedaço de chave privada.
+    """
+    txt = f"{type(e).__name__}: {e}"
+    txt = re.sub(r"-----BEGIN[\s\S]*?-----END[^-]*-----", "[chave omitida]", txt)
+    txt = re.sub(r"[A-Za-z0-9+/=]{40,}", "[omitido]", txt)
+    return " ".join(txt.split())[:180]
+
+
+def motivo_desconexao() -> str:
+    """Por que o app está em modo local. Vazio = conectado ou ainda não tentou."""
+    return _ERRO_CONEXAO
+
+
 @st.cache_resource(show_spinner=False)
 def _conectar():
-    """Devolve o objeto Spreadsheet do gspread ou None (sem credenciais/erro)."""
-    try:
-        # Acessar st.secrets sem arquivo configurado pode lançar exceção.
-        try:
-            tem_credenciais = "gcp_service_account" in st.secrets
-        except Exception:
-            return None
-        if not tem_credenciais:
-            return None
+    """Devolve o objeto Spreadsheet do gspread ou None (sem credenciais/erro).
 
+    Registra em _ERRO_CONEXAO o estágio que falhou — secret, credencial ou
+    planilha —, porque cada um tem um conserto diferente.
+    """
+    global _ERRO_CONEXAO
+    _ERRO_CONEXAO = ""
+    # Estágio 1: o secret existe? (acessar st.secrets sem arquivo pode estourar)
+    try:
+        tem_credenciais = "gcp_service_account" in st.secrets
+    except Exception as e:
+        _ERRO_CONEXAO = f"secret não configurado ({_sanitizar_erro(e)})"
+        return None
+    if not tem_credenciais:
+        _ERRO_CONEXAO = ("secret 'gcp_service_account' não encontrado — "
+                         "confira o nome do bloco em Settings > Secrets")
+        return None
+
+    # Estágio 2: a credencial é válida? (private_key mal colada cai aqui)
+    try:
         import gspread
         from google.oauth2.service_account import Credentials
 
@@ -174,16 +209,28 @@ def _conectar():
         info = dict(st.secrets["gcp_service_account"])
         creds = Credentials.from_service_account_info(info, scopes=escopos)
         cliente = gspread.authorize(creds)
+    except Exception as e:
+        _ERRO_CONEXAO = (f"credencial inválida — {_sanitizar_erro(e)}. "
+                         "Causa mais comum: private_key sem os \\n numa linha só")
+        return None
 
-        # Localiza a planilha por URL, por chave ou por nome (nessa ordem).
+    # Estágio 3: achou a planilha? (aqui mora "não compartilhei com a conta")
+    try:
         if "spreadsheet_url" in st.secrets:
             return cliente.open_by_url(st.secrets["spreadsheet_url"])
         if "spreadsheet_key" in st.secrets:
             return cliente.open_by_key(st.secrets["spreadsheet_key"])
         nome = st.secrets.get("spreadsheet_name", "PFC Captação")
         return cliente.open(nome)
-    except Exception:
-        # Falha de credencial/rede/planilha -> opera em modo CSV.
+    except Exception as e:
+        email = ""
+        try:
+            email = str(dict(st.secrets["gcp_service_account"]).get("client_email", ""))
+        except Exception:
+            pass
+        _ERRO_CONEXAO = (f"planilha não acessível — {_sanitizar_erro(e)}. "
+                         + (f"Compartilhe a planilha com {email} como Editor"
+                            if email else "Confira spreadsheet_url/key"))
         return None
 
 

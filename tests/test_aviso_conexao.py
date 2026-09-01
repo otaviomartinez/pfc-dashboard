@@ -58,8 +58,32 @@ def test_conectado_nao_mostra_aviso():
         dados.carregar_empresas = original
 
 
+def test_aviso_mostra_o_motivo_real():
+    md = _render(None)
+    assert "Motivo" in md, "o aviso não trouxe o motivo da falha"
+    assert "__MOTIVO__" not in md, "placeholder do motivo vazou para a tela"
+
+
+def test_motivo_nunca_vaza_a_chave_privada():
+    """O motivo vai para a TELA — não pode carregar pedaço da chave privada."""
+    from src.dados import _sanitizar_erro
+    chave = ("-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0B\n"
+             "SEGREDO123\n-----END PRIVATE KEY-----\n")
+    saida = _sanitizar_erro(ValueError(f"Could not parse: {chave} conta x"))
+    assert "BEGIN PRIVATE KEY" not in saida
+    assert "SEGREDO123" not in saida
+    assert "[chave omitida]" in saida
+    # sequência longa tipo base64 (chave colada sem cabeçalho) também sai:
+    longo = _sanitizar_erro(ValueError("tok AAAAB3NzaC1yc2EAAAADAQABAAABgQDZ123456789abcdefghij"))
+    assert "[omitido]" in longo
+    # e a mensagem fica curta o suficiente para caber no banner:
+    assert len(_sanitizar_erro(ValueError("x" * 900))) <= 180
+
+
 if __name__ == "__main__":
     test_desconectado_mostra_aviso_em_todas_as_telas()
     test_aviso_explica_e_tranquiliza()
+    test_aviso_mostra_o_motivo_real()
+    test_motivo_nunca_vaza_a_chave_privada()
     test_conectado_nao_mostra_aviso()
     print("OK — aviso de conexão (aparece no modo local, some conectado) passou.")
