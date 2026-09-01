@@ -2019,3 +2019,49 @@ export default function(component){
   return function(){ root.remove(); };
 }
 """
+
+
+# --------------------------------------------------------------------------- #
+# Aviso de conexão perdida com o Google Sheets.
+# Motivo de existir: src/dados.py engole exceções e devolve vazio, então falha
+# de credencial ficava IDÊNTICA a "não há dados" — telas mudas que parecem bug.
+# Este banner diz o que houve e onde consertar. Acento #F0663F (alerta do design
+# system) e ícone SVG (a interface não usa emoji).
+# --------------------------------------------------------------------------- #
+_AVISO_CONEXAO_HTML = """
+<style>
+.pfc-aviso-conx{display:flex;gap:14px;align-items:flex-start;
+  background:linear-gradient(180deg,#1C1517 0%,#161A21 100%);
+  border:1px solid rgba(240,102,63,.34);border-left:3px solid #F0663F;
+  border-radius:12px;padding:14px 16px;margin:0 0 18px 0;
+  box-shadow:0 8px 22px rgba(0,0,0,.30)}
+.pfc-aviso-conx .ic{flex:0 0 34px;height:34px;border-radius:9px;
+  background:rgba(240,102,63,.14);display:flex;align-items:center;justify-content:center}
+.pfc-aviso-conx .tx{flex:1;min-width:0}
+.pfc-aviso-conx .tag{font-family:'JetBrains Mono',monospace;font-size:.66rem;
+  letter-spacing:.09em;text-transform:uppercase;color:#F0663F;margin:0 0 5px}
+.pfc-aviso-conx .tt{font-family:'Inter',system-ui,sans-serif;font-weight:650;
+  font-size:.95rem;color:#F5F7FA;margin:0 0 4px}
+.pfc-aviso-conx .ds{font-family:'Inter',system-ui,sans-serif;font-size:.83rem;
+  line-height:1.55;color:#A9B2C0;margin:0}
+.pfc-aviso-conx code{font-family:'JetBrains Mono',monospace;font-size:.78rem;
+  background:rgba(240,102,63,.12);color:#F0A183;padding:1px 5px;border-radius:4px}
+</style>
+<div class="pfc-aviso-conx">
+  <div class="ic">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F0663F"
+         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+      <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
+  </div>
+  <div class="tx">
+    <p class="tag">Sem conexao &middot; modo local</p>
+    <p class="tt">Não estou conseguindo ler o Google Sheets</p>
+    <p class="ds">As telas est&atilde;o vazias porque os dados n&atilde;o foram carregados &mdash;
+      <strong>nada foi perdido</strong>, a planilha continua intacta. Para religar, confira as
+      credenciais <code>gcp_service_account</code> e <code>spreadsheet_url</code> em
+      <strong>Settings &rarr; Secrets</strong> no Streamlit.</p>
+  </div>
+</div>
+"""

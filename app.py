@@ -68,6 +68,7 @@ from ui.estilos import (
     EMAIL_COPY_TEMPLATE,
     _PESOS_V2_CSS,
     _PESOS_V2_JS,
+    _AVISO_CONEXAO_HTML,
 )
 
 # --- Helpers de formatação/lógica pura extraídos para ui/formato.py ---
@@ -374,6 +375,7 @@ def render_hub():
         "emendas": {**em, "tag": "Setor 02 · Recursos públicos"},
         "prospeccao": {**pros, "tag": "Setor 03 · Verba em captação"},
     }
+    _render_aviso_conexao()  # o hub não tem topnav: avisa aqui também
     res = _hub_component(data=payload, key="hub", on_escolha_change=lambda: None)
     esc = getattr(res, "escolha", None)
     if isinstance(esc, dict) and esc.get("radar") in ("captacao", "emendas", "prospeccao"):
@@ -2314,6 +2316,7 @@ def render_topnav(radar_atual: str, crumb: str = ""):
         data={"radar": radar_atual, "crumb": crumb,
               "inicial": USER.get("inicial", ""), "email": USER.get("email", "")},
         key="topnav", on_acao_change=lambda: None)
+    _render_aviso_conexao()  # avisa se o Sheets caiu (senão a tela vazia parece bug)
     ac = getattr(res, "acao", None)
     if not isinstance(ac, dict):
         return
@@ -2347,6 +2350,18 @@ st.session_state.setdefault("page", "Visão geral")
 df, modo_conectado = dados.carregar_empresas()
 TOTAL = len(df)
 HINT_ESCRITA = "🔒 Conecte ao Google Sheets para habilitar escrita."
+
+
+def _render_aviso_conexao():
+    """Mostra o aviso de que o app está SEM Google Sheets (modo local).
+
+    Sem isto, falha de credencial fica idêntica a "não há dados": todas as telas
+    vazias, sem explicação — parece bug do app, mas é conexão. Usa globals() por
+    segurança: se algum caminho chamar a topnav antes do carregamento, o padrão
+    é não avisar (nunca quebrar a tela por causa do aviso)."""
+    if globals().get("modo_conectado", True):
+        return
+    st.markdown(_AVISO_CONEXAO_HTML, unsafe_allow_html=True)
 
 # --------------------------------------------------------------------------- #
 # Hub de entrada: escolha do radar antes do painel (Central de Captação).
