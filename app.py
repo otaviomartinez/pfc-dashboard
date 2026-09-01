@@ -69,6 +69,7 @@ from ui.estilos import (
     _PESOS_V2_CSS,
     _PESOS_V2_JS,
     _AVISO_CONEXAO_HTML,
+    _AVISO_CONEXAO_MOTIVO,
 )
 
 # --- Helpers de formatação/lógica pura extraídos para ui/formato.py ---
@@ -2361,7 +2362,16 @@ def _render_aviso_conexao():
     é não avisar (nunca quebrar a tela por causa do aviso)."""
     if globals().get("modo_conectado", True):
         return
-    st.markdown(_AVISO_CONEXAO_HTML, unsafe_allow_html=True)
+    # Motivo REAL da falha (já higienizado em dados._sanitizar_erro: nunca traz
+    # pedaço de chave). Escapado de novo aqui porque vai em unsafe_allow_html.
+    try:
+        motivo = dados.motivo_desconexao()
+    except Exception:
+        motivo = ""
+    bloco = (_AVISO_CONEXAO_MOTIVO.replace("__TEXTO__", html.escape(motivo))
+             if motivo else "")
+    st.markdown(_AVISO_CONEXAO_HTML.replace("__MOTIVO__", bloco),
+                unsafe_allow_html=True)
 
 # --------------------------------------------------------------------------- #
 # Hub de entrada: escolha do radar antes do painel (Central de Captação).

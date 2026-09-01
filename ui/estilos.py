@@ -2062,6 +2062,15 @@ _AVISO_CONEXAO_HTML = """
       <strong>nada foi perdido</strong>, a planilha continua intacta. Para religar, confira as
       credenciais <code>gcp_service_account</code> e <code>spreadsheet_url</code> em
       <strong>Settings &rarr; Secrets</strong> no Streamlit.</p>
+    __MOTIVO__
   </div>
 </div>
 """
+
+# Bloco do motivo real da falha (injetado no lugar de __MOTIVO__ pelo app.py).
+# Fica separado porque só aparece quando dados.motivo_desconexao() traz algo.
+_AVISO_CONEXAO_MOTIVO = (
+    '<p class="ds" style="margin-top:8px;padding-top:8px;'
+    'border-top:1px solid rgba(240,102,63,.20)">'
+    '<span class="tag" style="margin:0 6px 0 0">Motivo</span>__TEXTO__</p>'
+)
