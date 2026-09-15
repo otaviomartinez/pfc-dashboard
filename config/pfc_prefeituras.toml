@@ -1,0 +1,76 @@
+# =============================================================================
+# Municípios do PFC — painel de Prefeituras
+# =============================================================================
+# Fonte editável do painel. Para ADICIONAR um município: acrescente um bloco
+# [[municipios]] com o `nome`; depois rode para preencher/validar os códigos:
+#     python -m src.prefeituras.resolver_ibge
+#
+# cod_ibge e regiao_imediata_* são RESOLVIDOS da tabela oficial do IBGE já
+# versionada no repo (data/ibge_regioes_imediatas_sp.csv) — NUNCA chute.
+# =============================================================================
+
+[[municipios]]
+nome = "Capela do Alto"
+cod_ibge = "3510302"
+regiao_imediata_id = "350003"
+regiao_imediata_nome = "Sorocaba"
+
+[[municipios]]
+nome = "Cesário Lange"
+cod_ibge = "3511607"
+regiao_imediata_id = "350008"
+regiao_imediata_nome = "Tatuí"
+
+[[municipios]]
+nome = "Corumbataí"
+cod_ibge = "3512704"
+regiao_imediata_id = "350046"
+regiao_imediata_nome = "Rio Claro"
+
+[[municipios]]
+nome = "Guareí"
+cod_ibge = "3518503"
+regiao_imediata_id = "350006"
+regiao_imediata_nome = "Itapetininga"
+
+[[municipios]]
+nome = "Iperó"
+cod_ibge = "3521002"
+regiao_imediata_id = "350003"
+regiao_imediata_nome = "Sorocaba"
+
+[[municipios]]
+nome = "Juquiá"
+cod_ibge = "3526100"
+regiao_imediata_id = "350005"
+regiao_imediata_nome = "Registro"
+
+[[municipios]]
+nome = "Mirassol"
+cod_ibge = "3530300"
+regiao_imediata_id = "350025"
+regiao_imediata_nome = "São José do Rio Preto"
+
+[[municipios]]
+nome = "Rio Claro"
+cod_ibge = "3543907"
+regiao_imediata_id = "350046"
+regiao_imediata_nome = "Rio Claro"
+
+[[municipios]]
+nome = "Salto"
+cod_ibge = "3545209"
+regiao_imediata_id = "350003"
+regiao_imediata_nome = "Sorocaba"
+
+[[municipios]]
+nome = "São Roque"
+cod_ibge = "3550605"
+regiao_imediata_id = "350003"
+regiao_imediata_nome = "Sorocaba"
+
+[[municipios]]
+nome = "Tatuí"
+cod_ibge = "3554003"
+regiao_imediata_id = "350008"
+regiao_imediata_nome = "Tatuí"
