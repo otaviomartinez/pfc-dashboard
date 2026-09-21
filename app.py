@@ -2528,9 +2528,17 @@ def dlg_prefeitura(pref: dict):
                           f'<span class="v">{esc(v)}</span></div>'
                           for k, v in linhas_edu if str(v).strip())
                 + '</div>', unsafe_allow_html=True)
-    st.caption("Mínimo de 25% da receita de impostos (art. 212 da CF). Dado "
-               "**declarado pelo município** (SICONFI/SIOPE), **não julgado** pelo "
-               "TCE-SP.")
+    # A procedência muda a FORÇA do dado (regra 5a): o índice do TCE é apurado
+    # pelo Tribunal; o do SICONFI/SIOPE é declarado pela própria prefeitura.
+    # Rotular errado nos dois sentidos é desonesto — o rótulo segue a origem.
+    if pref.get("mde_origem") == "tce-sp":
+        st.caption("Mínimo de 25% da receita de impostos (art. 212 da CF). "
+                   "Índice **apurado pelo TCE-SP** (Audesp) — é o valor "
+                   "fiscalizado, não apenas o declarado pela prefeitura.")
+    elif pref.get("mde_percentual") is not None:
+        st.caption("Mínimo de 25% da receita de impostos (art. 212 da CF). Dado "
+                   "**declarado pelo município** (SICONFI/SIOPE), **não julgado** "
+                   "pelo TCE-SP.")
     c1, c2 = st.columns(2)
     c1.link_button("Ver no SIOPE", "https://www.fnde.gov.br/siope/",
                    use_container_width=True)

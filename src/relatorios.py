@@ -666,10 +666,14 @@ def pdf_resumo_prefeitura(pref: dict, gerado_em: str) -> bytes:
         ("LEFTPADDING", (0, 0), (-1, -1), 10), ("RIGHTPADDING", (0, 0), (-1, -1), 8),
     ]))
     story.append(box)
+    proc = ("Índice <b>apurado pelo TCE-SP</b> (Audesp): é o valor fiscalizado, "
+            "não apenas o declarado pela prefeitura."
+            if pref.get("mde_origem") == "tce-sp" else
+            "Dado <b>declarado pelo município</b> (SICONFI/SIOPE), "
+            "<b>não julgado</b> pelo TCE-SP.")
     story.append(_P("MDE é o mínimo de 25% da receita de impostos (art. 212 da CF). "
-                    "Dado <b>declarado pelo município</b> (SICONFI/SIOPE), "
-                    "<b>não julgado</b> pelo TCE-SP. Ausência de nota CAPAG "
-                    "significa não avaliado — não é nota ruim.", est["secao_cap"]))
+                    + proc + " Ausência de nota CAPAG significa não avaliado — "
+                    "não é nota ruim.", est["secao_cap"]))
     story.append(Spacer(1, 12))
 
     # 3) Quem manda no município (TSE — campo factual, sem editorial).

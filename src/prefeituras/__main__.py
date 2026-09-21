@@ -16,7 +16,7 @@ import datetime
 import os
 import sys
 
-from src.prefeituras import siconfi
+from src.prefeituras import siconfi, tce
 from src.prefeituras.config import carregar_municipios
 
 # A string de `no_anexo` é o ponto frágil: errada, a API devolve 200 com
@@ -117,8 +117,46 @@ def sondar(cod_ibge: str, exercicios: list[int]) -> tuple[str, int] | None:
 
 
 def construir_mde(exercicio: int) -> list[dict]:
-    """Uma linha por município COM dado. Quem não tem fica de fora (não vira 0)."""
+    """Uma linha por município COM dado. Quem não tem fica de fora (não vira 0).
+
+    ORDEM DAS FONTES, da mais forte para a mais fraca:
+      1. TCE-SP (AUDESP) — índice APURADO pelo Tribunal. O SICONFI não publica
+         o Anexo 08 (MDE) para estes municípios, e o TCE publica os 644 de SP.
+      2. SICONFI — mantido caso um dia o Anexo 08 apareça.
+      3. Arquivo manual — último recurso.
+    """
     muns = carregar_municipios()
+
+    # 1) TCE-SP: se tem o exercício pedido, resolve tudo de uma vez.
+    dados_tce = tce.carregar(exercicio)
+    if not dados_tce:
+        for ano in tce.exercicios_disponiveis():
+            dados_tce = tce.carregar(ano)
+            if dados_tce:
+                print(f"  TCE-SP: exercício {exercicio} não existe no arquivo; "
+                      f"usando {ano}")
+                exercicio = ano
+                break
+    if dados_tce:
+        linhas, sem = [], []
+        for mun in muns:
+            reg = dados_tce.get(mun["cod_ibge"])
+            if not reg:
+                sem.append(mun["nome"])
+                continue
+            linhas.append({"cod_ibge": mun["cod_ibge"], "municipio": mun["nome"],
+                           "percentual": reg["percentual"],
+                           "valor_aplicado": reg.get("valor_aplicado") or "",
+                           "receita_base": "", "exercicio": reg["exercicio"],
+                           "periodo": "", "origem": "tce-sp"})
+        print(f"  TCE-SP (AUDESP): {len(linhas)} de {len(muns)} municípios, "
+              f"exercício {exercicio} — índice APURADO pelo Tribunal")
+        if sem:
+            print(f"  sem dado no TCE: {', '.join(sem)}")
+        if linhas:
+            return linhas
+
+    print("  TCE-SP indisponível; tentando SICONFI…")
     anexo, exercicio = siconfi.ANEXO_MDE, exercicio
     achado = sondar(muns[0]["cod_ibge"], [exercicio, exercicio - 1])
     if achado:
