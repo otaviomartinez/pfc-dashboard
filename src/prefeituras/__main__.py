@@ -39,6 +39,44 @@ COLUNAS = ["cod_ibge", "municipio", "percentual", "valor_aplicado", "receita_bas
            "exercicio", "periodo", "origem"]
 
 
+def vocabulario(cod_ibge: str, exercicio: int) -> None:
+    """Descobre os nomes de anexo que a API REALMENTE usa, em vez de chutar.
+
+    As linhas de resposta trazem os campos `anexo` e `demonstrativo`. Buscando um
+    anexo que sabidamente responde (o 02), lemos dali a grafia exata — se ela for
+    "RREO-Anexo 02", nossa grafia está certa e o Anexo 08 está de fato vazio;
+    se for outra, achamos o nome certo sem adivinhação.
+    """
+    itens = siconfi.buscar_rreo(cod_ibge, exercicio, 6, "RREO-Anexo 02", tentativas=1)
+    if not itens:
+        print("    (o Anexo 02 também não respondeu; sem vocabulário para comparar)")
+        return
+    anexos = sorted({str(i.get("anexo", "")) for i in itens if i.get("anexo")})
+    demos = sorted({str(i.get("demonstrativo", "")) for i in itens if i.get("demonstrativo")})
+    print(f"    grafia REAL de anexo nas respostas: {anexos[:5]}")
+    print(f"    demonstrativo: {demos[:3]}")
+
+
+def varrer_anexo_08(cod_ibge: str) -> None:
+    """Procura o Anexo 08 em vários exercícios E períodos.
+
+    O MDE é publicado no 6º bimestre, mas se a entidade lançou noutro período a
+    busca fixa em 6 nunca acharia. Isto é DIAGNÓSTICO: só relata.
+    """
+    print("  procurando o Anexo 08 em outros exercícios/períodos…")
+    achou = False
+    for exe in (2025, 2024, 2023):
+        for per in (6, 5, 4, 3, 2, 1):
+            n = len(siconfi.buscar_rreo(cod_ibge, exe, per, "RREO-Anexo 08",
+                                        tentativas=1) or [])
+            if n:
+                print(f"    ACHOU: exercício {exe} · período {per} -> {n} linha(s)")
+                achou = True
+    if not achou:
+        print("    nada em 2023-2025, períodos 1-6. O Anexo 08 não está exposto "
+              "para este município.")
+
+
 def sondar(cod_ibge: str, exercicios: list[int]) -> tuple[str, int] | None:
     """Descobre qual (anexo, exercício) a API realmente responde para um ente.
 
@@ -93,9 +131,12 @@ def construir_mde(exercicio: int) -> list[dict]:
             n = len(siconfi.buscar_rreo(muns[0]["cod_ibge"], exercicio, 6,
                                         anexo, tentativas=1) or [])
             print(f"    {anexo!r} -> {n} linha(s)")
+        vocabulario(muns[0]["cod_ibge"], exercicio)
+        varrer_anexo_08(muns[0]["cod_ibge"])
         print("  -> sem Anexo 08, o MDE fica SEM DADO. Não substituímos por "
               "percentual de outro demonstrativo (foi o erro que inventou "
-              "9 municípios 'abaixo do mínimo').")
+              "9 municípios 'abaixo do mínimo'). Alternativa sem depender da "
+              "API: preencher data/prefeituras_manual/<ano>.csv (ver LEIA-ME).")
 
     linhas, sem_dado = [], []
     for m in muns:
