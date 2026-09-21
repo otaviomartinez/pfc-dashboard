@@ -21,6 +21,18 @@ Duas frentes, escolhidas num **hub** de entrada:
 2. **O campo "Diálogo" dos deputados é sensível** (anotações de negociação, nomes de assessores, telefones). Só renderiza para usuário logado. Nunca exponha em versão pública nem commite o CSV.
 3. **Acurácia de datas de edital é prioridade.** Só mostre "faltam X dias" quando a data for confiável; se for estimada ou incerta, marque "prazo a confirmar". **Uma data errada é pior que nenhuma** — já tivemos um edital exibido como 2027 por chute de ano.
 4. Nunca commite `secrets.toml` nem o CSV dos deputados.
+5. **Prefeituras — honestidade sobre dado público municipal.** (a) Nunca afirmar
+   que "a prefeitura descumpriu o mínimo" a partir de RREO não homologado:
+   distinguir sempre *declarado pelo município* (SICONFI/SIOPE) de *julgado pelo
+   TCE-SP*, e escrever "declarado (não julgado)" quando for o caso. (b)
+   **Percentual sem exercício + bimestre não existe** — é "sem dado", igual ao
+   "prazo a confirmar" do radar. (c) **Sem dado ≠ dado ruim:** CAPAG ausente, MDE
+   não declarado e TCE sem parecer são três rótulos distintos, todos neutros. (d)
+   **Zero editorial político:** partido é campo factual do TSE — sem adjetivo,
+   sem juízo, sem ranking por partido. (e) Nunca inferir o exercício anterior
+   como se fosse o atual. (f) **Não existe número público de "verba disponível da
+   prefeitura"** — MDE e CAPAG mostram capacidade e prioridade, nunca
+   disponibilidade; a UI é obrigada a dizer isso (é o análogo do autorizado×pago).
 
 ## Design system
 
@@ -213,6 +225,21 @@ PDF). Pendências:
    telefone/email/gabinete/página; o que falta é **validar WhatsApp/Instagram**
    (hoje "A validar") e completar o que estiver vazio.
 3. **Avaliar adicionar mais deputados federais** (hoje são 15 de SP curados à mão).
+
+**Painel Prefeituras — construído (Passos 1-8 do PLANO_PREFEITURAS).** Terceira
+perna do funil: quem recebe a emenda e assina o convênio. `config/pfc_prefeituras.toml`
+(11 municípios, cod_ibge validado contra o IBGE do repo), `src/prefeituras/`
+(siconfi/capag/eleitos/mde + construtor offline `python -m src.prefeituras`),
+camada pura em `ui/formato.py` (situacao_mde, temperatura_prefeitura, gancho,
+ponte_partidaria), tela + dossiê + PDF + "Puxar para Prospecção".
+**PENDÊNCIA DE DADOS (não de código):** SICONFI, Tesouro Transparente (CAPAG) e
+TSE estão bloqueados por política de rede no ambiente do agente (403 no gateway),
+então nenhum CSV foi baixado e o painel abre inteiro em "sem dado". Para
+preencher, rode NA SUA MÁQUINA:
+`python -m src.prefeituras`, `python scripts/importar_eleitos_tse.py <zip do TSE>`
+e `python scripts/capturar_fixture_siconfi.py` (esta última fecha a dívida da
+fixture real do parser). Passo 9 (expandir para toda a região imediata) segue
+adiado, como o plano previu.
 
 **Depois:**
 - Notificação por **e-mail** quando faltarem 15 dias para um prazo.

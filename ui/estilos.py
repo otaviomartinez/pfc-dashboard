@@ -18,6 +18,11 @@ _SVG_TRACO = ("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill=
 
 
 ICONES = {
+    # Prefeituras: prédio público com frontão e colunas (painel Prefeituras).
+    "prefeitura": ("<path d='M3 21h18'/><path d='M4 21V10l8-5 8 5v11'/>"
+                   "<line x1='9' y1='21' x2='9' y2='14'/>"
+                   "<line x1='15' y1='21' x2='15' y2='14'/>"
+                   "<line x1='12' y1='21' x2='12' y2='17'/>"),
     "visao-geral": ("<rect x='3' y='3' width='7' height='9' rx='1'/>"
                     "<rect x='14' y='3' width='7' height='5' rx='1'/>"
                     "<rect x='14' y='12' width='7' height='9' rx='1'/>"
@@ -2074,3 +2079,60 @@ _AVISO_CONEXAO_MOTIVO = (
     'border-top:1px solid rgba(240,102,63,.20)">'
     '<span class="tag" style="margin:0 6px 0 0">Motivo</span>__TEXTO__</p>'
 )
+
+
+# --------------------------------------------------------------------------- #
+# PAINEL PREFEITURAS — acento teal #4FA8A0 (não colide com violeta/âmbar/verde/
+# rosa já usados nas outras páginas de Emendas). Reusa a família .dd-cell dos
+# cards de Descobrir para manter uma só linguagem visual.
+# --------------------------------------------------------------------------- #
+_PREFEITURAS_CSS = """
+<style>
+.pf-aviso{display:flex;gap:12px;align-items:flex-start;background:rgba(79,168,160,.08);
+  border:1px solid rgba(79,168,160,.28);border-left:3px solid #4FA8A0;border-radius:11px;
+  padding:12px 15px;margin:0 0 16px}
+.pf-aviso .pf-tag{font-family:'JetBrains Mono',monospace;font-size:.64rem;letter-spacing:.09em;
+  text-transform:uppercase;color:#4FA8A0;margin:0 0 4px}
+.pf-aviso p{font-family:'Inter',system-ui,sans-serif;font-size:.83rem;line-height:1.55;
+  color:#A9B2C0;margin:0}
+.pf-placar{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 16px}
+.pf-kpi{flex:1;min-width:118px;background:#161A21;border:1px solid rgba(255,255,255,.06);
+  border-radius:11px;padding:11px 13px}
+.pf-kpi .n{font-family:'JetBrains Mono',monospace;font-size:1.5rem;font-weight:700;line-height:1.1}
+.pf-kpi .r{font-family:'Inter',system-ui,sans-serif;font-size:.71rem;color:#7C8698;
+  text-transform:uppercase;letter-spacing:.06em;margin-top:3px}
+.pf-cell{display:flex;align-items:center;gap:14px;background:#161A21;
+  border:1px solid rgba(255,255,255,.06);border-left:3px solid #4FA8A0;border-radius:11px;
+  padding:12px 15px;margin-bottom:8px}
+.pf-cell:hover{background:#1A1F27}
+.pf-nomecol{flex:1;min-width:0}
+.pf-nome{font-family:'Inter',system-ui,sans-serif;font-weight:640;font-size:.97rem;color:#F5F7FA}
+.pf-sub{font-family:'Inter',system-ui,sans-serif;font-size:.76rem;color:#7C8698;margin-top:3px}
+.pf-mdecol{flex:0 0 150px;text-align:right}
+.pf-mde{font-family:'JetBrains Mono',monospace;font-size:1.02rem;font-weight:700}
+.pf-capcol{flex:0 0 92px;text-align:center}
+.pf-capag{font-family:'JetBrains Mono',monospace;font-size:1.02rem;font-weight:700;color:#C6CEDA}
+.pf-selo{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:.6rem;
+  letter-spacing:.07em;text-transform:uppercase;padding:2px 7px;border-radius:5px;
+  margin-right:6px;vertical-align:middle}
+.pf-bloco{background:#161A21;border:1px solid rgba(255,255,255,.06);border-radius:11px;
+  padding:14px 16px;margin-bottom:12px}
+.pf-bloco h4{font-family:'Inter',system-ui,sans-serif;font-size:.8rem;font-weight:660;
+  color:#4FA8A0;text-transform:uppercase;letter-spacing:.07em;margin:0 0 10px}
+.pf-linha{display:flex;justify-content:space-between;gap:12px;padding:5px 0;
+  border-bottom:1px solid rgba(255,255,255,.04);font-family:'Inter',system-ui,sans-serif;
+  font-size:.84rem}
+.pf-linha:last-child{border-bottom:none}
+.pf-linha .k{color:#7C8698}
+.pf-linha .v{color:#E6EBF2;text-align:right;font-weight:560}
+.pf-gancho{background:linear-gradient(180deg,#14201F 0%,#161A21 100%);
+  border:1px solid rgba(79,168,160,.30);border-left:3px solid #4FA8A0;border-radius:11px;
+  padding:13px 16px;margin-bottom:12px}
+.pf-gancho .k{font-family:'JetBrains Mono',monospace;font-size:.63rem;letter-spacing:.09em;
+  text-transform:uppercase;color:#4FA8A0;margin-bottom:5px}
+.pf-gancho .t{font-family:'Inter',system-ui,sans-serif;font-size:.9rem;line-height:1.55;color:#EAF0F6}
+.pf-vazio{text-align:center;padding:30px 18px;color:#7C8698;
+  font-family:'Inter',system-ui,sans-serif;font-size:.86rem;background:#13171E;
+  border:1px dashed rgba(255,255,255,.10);border-radius:11px}
+</style>
+"""

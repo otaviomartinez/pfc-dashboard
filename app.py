@@ -70,6 +70,7 @@ from ui.estilos import (
     _PESOS_V2_JS,
     _AVISO_CONEXAO_HTML,
     _AVISO_CONEXAO_MOTIVO,
+    _PREFEITURAS_CSS,
 )
 
 # --- Helpers de formatação/lógica pura extraídos para ui/formato.py ---
@@ -98,6 +99,13 @@ from ui.formato import (
     _itens_relatorio_emendas,
     _modo_emenda,
     _muns_pfc,
+    AVISO_PREFEITURAS,
+    SITUACAO_MDE_COR,
+    SITUACAO_MDE_ROTULO,
+    TEMPERATURA_PREF_COR,
+    TEMPERATURA_PREF_ROTULO,
+    contagens_prefeituras,
+    normalizar_prefeituras,
     _op_de_novidade,
     _op_vencida,
     _orfaos_com_candidatos,
@@ -676,11 +684,12 @@ def dlg_em_articulacao(lista):
 # Federal/Senador) vive no segmented control de CONTEÚDO (emenda_escopo_filtro),
 # não na sidebar (Passo 8). A lista "quem abordar" (ex-aba "Descobrir") foi fundida
 # na Visão geral (aparece abaixo da capa, no mesmo escopo).
-EMENDA_PAGES = ["Visão geral", "Territórios em Aberto",
+EMENDA_PAGES = ["Visão geral", "Territórios em Aberto", "Prefeituras",
                 "Funil de negociação", "Relatório", "Metodologia"]
 # chave do botão -> ícone (a chave vira a classe st-key-<chave> que o CSS usa)
 EMENDA_ICONES = {"emnav_visao-geral": "visao-geral",
                  "emnav_territorios-em-aberto": "local",
+                 "emnav_prefeituras": "prefeitura",
                  "emnav_funil-de-negociacao": "funil-negociacao",
                  "emnav_relatorio": "relatorio",
                  "emnav_metodologia": "metodologia",
@@ -693,6 +702,7 @@ EMENDA_ROTULOS = {**{f"emnav_{slug(p)}": p for p in EMENDA_PAGES},
 # ponto de entrada e ganha um realce permanente (ver _EMENDA_REALCE_CSS).
 EMENDA_CORES = {"emnav_visao-geral": "#8B7BF0",
                 "emnav_territorios-em-aberto": "#4ADE80",
+                "emnav_prefeituras": "#4FA8A0",
                 "emnav_funil-de-negociacao": "#E8B54A", "emnav_relatorio": "#EC6A8C",
                 "emnav_metodologia": "#7C8698"}
 # Realce da Visão Geral (ponto de entrada) + acento violeta na seção Articulação.
@@ -2245,6 +2255,7 @@ def render_emendas():
     primeiro = USER["nome"].split()[0]
     subttl = {"Visão geral": "Articulação política",
               "Territórios em Aberto": "Oportunidade de captação · sem emenda edu/social",
+              "Prefeituras": "Quem recebe a emenda e assina o convênio",
               "Funil de negociação": "Negociações por temperatura",
               "Relatório": "Relatório de Prioridades · quem abordar",
               "Metodologia": "Como o Score de Emendas é calculado"}.get(emenda_page, "")
@@ -2260,6 +2271,10 @@ def render_emendas():
     # Municípios do PFC sem emenda edu/social + candidatos da região.
     if modo == "orfaos":
         render_orfaos()
+        return
+    # Prefeituras: saúde fiscal (CAPAG) + prioridade em educação (MDE) + quem manda.
+    if modo == "prefeituras":
+        render_prefeituras()
         return
     # Funil de negociação com drag-and-drop (grava a etapa na aba Deputados).
     if modo == "funil":
@@ -2293,6 +2308,321 @@ def render_emendas():
         # estadual + curados federal/senador) aparece ABAIXO da capa, mesmo escopo.
         render_descobrir_lista(escopo_sel)
         return
+
+
+# =========================================================================== #
+# PAINEL PREFEITURAS — a terceira perna do funil (Passos 6, 7 e 8 do plano)
+# ---------------------------------------------------------------------------
+# Emendas diz QUEM abordar; Captação, QUAL edital existe. Aqui: a prefeitura é
+# quem RECEBE a emenda e ASSINA o convênio.
+#
+# REGRA DE OURO (irmã do "autorizado nunca soma com pago"): não existe número
+# público de "verba disponível da prefeitura". MDE e CAPAG mostram CAPACIDADE e
+# PRIORIDADE, nunca DISPONIBILIDADE — e a tela é obrigada a dizer isso (o aviso
+# fixo no topo não é decoração, é contrato).
+#
+# Os dados vêm de CSV construído offline (python -m src.prefeituras). Nenhuma
+# chamada de API em runtime, igual ao molde de src/emendas.py. Todo loader
+# degrada para vazio: sem CSV, o painel abre inteiro em "sem dado" — que é o
+# comportamento honesto, não uma falha.
+# =========================================================================== #
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _dados_prefeituras() -> list:
+    """Linhas do painel, já normalizadas. Cacheado: é leitura de arquivo.
+
+    Blindado: qualquer fonte que falte vira vazio e o município continua na
+    lista como "sem dado". Nunca levanta — a tela precisa abrir.
+    """
+    try:
+        from src.prefeituras import capag as _capag
+        from src.prefeituras import eleitos as _eleitos
+        from src.prefeituras import mde as _mde
+        from src.prefeituras.config import carregar_municipios
+        municipios = carregar_municipios()
+    except Exception:
+        return []
+
+    exercicio = None
+    try:
+        exercicio = _mde.exercicio_disponivel()
+    except Exception:
+        pass
+    reg_mde = {}
+    reg_capag = {}
+    if exercicio:
+        try:
+            reg_mde = _mde.carregar(exercicio)
+        except Exception:
+            reg_mde = {}
+        try:
+            reg_capag = _capag.carregar(exercicio)
+        except Exception:
+            reg_capag = {}
+    try:
+        lista_eleitos = _eleitos.carregar()
+    except Exception:
+        lista_eleitos = []
+
+    # Cruzamento com o levantamento de emendas: REUSA o CSV pronto (regra do
+    # plano — o painel de Prefeituras lê o de Emendas, nunca recalcula).
+    ranking = []
+    for arq in ("emendas_ranking_pfc_territorio.csv", "emendas_ranking_pfc_expansao.csv"):
+        try:
+            caminho = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", arq)
+            if os.path.isfile(caminho):
+                ranking += pd.read_csv(caminho).to_dict("records")
+        except Exception:
+            continue
+
+    # Parlamentares do CRM (para a ponte partidária). Sem Sheets -> lista vazia.
+    try:
+        crm = [{"deputado": d.get("nome", ""), "partido": d.get("partido", "")}
+               for d in _deputados_ordenados()]
+    except Exception:
+        crm = []
+
+    try:
+        return normalizar_prefeituras(municipios, reg_mde, reg_capag, lista_eleitos,
+                                      ranking, crm)
+    except Exception:
+        return []
+
+
+def _pf_selo(texto: str, cor: str) -> str:
+    return (f'<span class="pf-selo" style="background:{cor}1F;color:{cor}">'
+            f'{esc(texto)}</span>')
+
+
+def render_prefeituras():
+    """Tela Prefeituras: aviso da regra de ouro, placar, filtros e cards."""
+    st.markdown(_PREFEITURAS_CSS, unsafe_allow_html=True)
+    linhas = _dados_prefeituras()
+
+    # O aviso é FIXO e vem antes de qualquer número — a pessoa não pode ler um
+    # percentual achando que é dinheiro disponível.
+    st.markdown(
+        '<div class="pf-aviso"><div><p class="pf-tag">Como ler esta tela</p>'
+        f'<p>{esc(AVISO_PREFEITURAS)}</p></div></div>', unsafe_allow_html=True)
+
+    if not linhas:
+        st.markdown(
+            '<div class="pf-vazio">Nenhum município carregado.<br>'
+            'Confira <code>config/pfc_prefeituras.toml</code>.</div>',
+            unsafe_allow_html=True)
+        return
+
+    c = contagens_prefeituras(linhas)
+    st.markdown(
+        '<div class="pf-placar">'
+        f'<div class="pf-kpi"><div class="n" style="color:#4FA8A0">{c["total"]}</div>'
+        '<div class="r">municípios</div></div>'
+        f'<div class="pf-kpi"><div class="n" style="color:#F0663F">{c["quentes"]}</div>'
+        '<div class="r">leads quentes</div></div>'
+        f'<div class="pf-kpi"><div class="n" style="color:#E8B54A">{c["mornos"]}</div>'
+        '<div class="r">mornos</div></div>'
+        f'<div class="pf-kpi"><div class="n" style="color:#8B7BF0">{c["com_ponte"]}</div>'
+        '<div class="r">com emenda edu/social</div></div>'
+        f'<div class="pf-kpi"><div class="n" style="color:#7C8698">{c["sem_dado"]}</div>'
+        '<div class="r">sem dado de MDE</div></div>'
+        '</div>', unsafe_allow_html=True)
+
+    if c["sem_dado"] == c["total"]:
+        st.info("Nenhum dado de MDE/CAPAG baixado ainda. Rode "
+                "`python -m src.prefeituras` (e `scripts/importar_eleitos_tse.py`) "
+                "na sua máquina para preencher. Até lá, o painel mostra a estrutura "
+                "e rotula tudo como **sem dado** — de propósito, para não inventar "
+                "número.", icon=":material/info:")
+
+    f1, f2, f3 = st.columns(3)
+    f_temp = f1.multiselect("Temperatura", ["quente", "morno", "frio", "sem_dado"],
+                            format_func=lambda x: TEMPERATURA_PREF_ROTULO.get(x, x),
+                            key="pf_f_temp")
+    f_mde = f2.multiselect("Situação do MDE", ["cumpriu", "nao_cumpriu", "sem_dado"],
+                           format_func=lambda x: SITUACAO_MDE_ROTULO.get(x, x),
+                           key="pf_f_mde")
+    f_cap = f3.multiselect("CAPAG", ["A", "B", "C", "D", "não avaliado"], key="pf_f_cap")
+
+    vis = [l for l in linhas
+           if (not f_temp or l["temperatura"] in f_temp)
+           and (not f_mde or l["situacao_mde"] in f_mde)
+           and (not f_cap or l["capag_rotulo"] in f_cap)]
+
+    if not vis:
+        st.markdown('<div class="pf-vazio">Nenhum município com esses filtros.</div>',
+                    unsafe_allow_html=True)
+        return
+
+    ordem = {"quente": 0, "morno": 1, "sem_dado": 2, "frio": 3}
+    for i, l in enumerate(sorted(vis, key=lambda x: (ordem.get(x["temperatura"], 9),
+                                                     x["municipio"]))):
+        cor_t = TEMPERATURA_PREF_COR.get(l["temperatura"], "#7C8698")
+        cor_m = SITUACAO_MDE_COR.get(l["situacao_mde"], "#7C8698")
+        sub = " · ".join(x for x in (
+            l.get("regiao_imediata", "") and f"Região {l['regiao_imediata']}",
+            (f"{l['prefeito']} ({l['prefeito_partido']})" if l.get("prefeito")
+             else "prefeito não carregado"),
+            (f"{len(l['deputados_emenda'])} parlamentar(es) com emenda aqui"
+             if l.get("deputados_emenda") else ""),
+        ) if x)
+        st.markdown(
+            '<div class="pf-cell">'
+            f'<div class="pf-nomecol"><div class="pf-nome">'
+            f'{_pf_selo(TEMPERATURA_PREF_ROTULO.get(l["temperatura"], ""), cor_t)}'
+            f'{esc(l["municipio"])}</div>'
+            f'<div class="pf-sub">{esc(sub)}</div></div>'
+            f'<div class="pf-mdecol"><div class="pf-mde" style="color:{cor_m}">'
+            f'{esc(l["mde_rotulo"])}</div>'
+            f'<div class="pf-sub">{esc(SITUACAO_MDE_ROTULO.get(l["situacao_mde"], ""))}</div></div>'
+            f'<div class="pf-capcol"><div class="pf-capag">{esc(l["capag_rotulo"])}</div>'
+            '<div class="pf-sub">CAPAG</div></div>'
+            '</div>', unsafe_allow_html=True)
+        if st.button(f"Abrir dossiê de {l['municipio']}", key=f"pf_{i}",
+                     use_container_width=True):
+            dlg_prefeitura(l)
+
+
+@st.dialog("Dossiê do município", width="large")
+def dlg_prefeitura(pref: dict):
+    """Dossiê: educação, fiscal, político, emendas, gancho, PDF e Prospecção."""
+    st.markdown(_PREFEITURAS_CSS, unsafe_allow_html=True)
+    breadcrumb("Emendas", pref["municipio"])
+    st.markdown(f"### {esc(pref['municipio'])}")
+    st.caption(" · ".join(x for x in (pref.get("grupo", ""),
+                                      pref.get("regiao_imediata", "")
+                                      and f"Região imediata: {pref['regiao_imediata']}")
+                          if x))
+    st.markdown(f'<div class="pf-aviso"><div><p class="pf-tag">Como ler</p>'
+                f'<p>{esc(AVISO_PREFEITURAS)}</p></div></div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="pf-gancho"><div class="k">Melhor argumento de abordagem</div>'
+                f'<div class="t">{esc(pref["gancho"])}</div></div>', unsafe_allow_html=True)
+
+    # --- Educação -----------------------------------------------------------
+    linhas_edu = [("Aplicação em educação (MDE)", pref["mde_rotulo"]),
+                  ("Situação", SITUACAO_MDE_ROTULO.get(pref["situacao_mde"], ""))]
+    if pref.get("mde_valor"):
+        linhas_edu.append(("Valor aplicado", brl(pref["mde_valor"])))
+    if pref.get("mde_receita"):
+        linhas_edu.append(("Receita base de impostos", brl(pref["mde_receita"])))
+    if pref.get("mde_origem"):
+        linhas_edu.append(("Origem do dado", pref["mde_origem"]))
+    st.markdown('<div class="pf-bloco"><h4>Educação</h4>'
+                + "".join(f'<div class="pf-linha"><span class="k">{esc(k)}</span>'
+                          f'<span class="v">{esc(v)}</span></div>'
+                          for k, v in linhas_edu if str(v).strip())
+                + '</div>', unsafe_allow_html=True)
+    st.caption("Mínimo de 25% da receita de impostos (art. 212 da CF). Dado "
+               "**declarado pelo município** (SICONFI/SIOPE), **não julgado** pelo "
+               "TCE-SP.")
+    c1, c2 = st.columns(2)
+    c1.link_button("Ver no SIOPE", "https://www.fnde.gov.br/siope/",
+                   use_container_width=True)
+    c2.link_button("Ver no TCE-SP", "https://transparencia.tce.sp.gov.br/",
+                   use_container_width=True)
+
+    # --- Fiscal -------------------------------------------------------------
+    fis = [("CAPAG (nota final)", pref["capag_rotulo"])]
+    st.markdown('<div class="pf-bloco"><h4>Situação fiscal</h4>'
+                + "".join(f'<div class="pf-linha"><span class="k">{esc(k)}</span>'
+                          f'<span class="v">{esc(v)}</span></div>' for k, v in fis)
+                + '</div>', unsafe_allow_html=True)
+    if pref["capag_rotulo"] == "não avaliado":
+        st.caption("**Não avaliado** não é nota ruim: o município pode não ter "
+                   "homologado a DCA no exercício.")
+
+    # --- Político (TSE, campo factual — zero editorial) ---------------------
+    eleitos_mun = pref.get("eleitos") or []
+    if eleitos_mun:
+        itens = "".join(
+            f'<div class="pf-linha"><span class="k">{esc(e["cargo"].title())}</span>'
+            f'<span class="v">{esc(e["nome_urna"])} ({esc(e["partido"])})</span></div>'
+            for e in eleitos_mun[:14])
+        st.markdown(f'<div class="pf-bloco"><h4>Quem manda no município</h4>{itens}</div>',
+                    unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="pf-bloco"><h4>Quem manda no município</h4>'
+                    '<div class="pf-linha"><span class="k">Eleitos 2024</span>'
+                    '<span class="v">não carregados</span></div></div>',
+                    unsafe_allow_html=True)
+        st.caption("Rode `python scripts/importar_eleitos_tse.py <zip do TSE>` "
+                   "para preencher.")
+
+    if pref.get("pontes"):
+        itens = "".join(
+            f'<div class="pf-linha"><span class="k">{esc(p["partido"])}</span>'
+            f'<span class="v">'
+            + esc(", ".join(str(d.get("deputado", "")) for d in p["parlamentares"][:3]))
+            + '</span></div>' for p in pref["pontes"][:5])
+        st.markdown(f'<div class="pf-bloco"><h4>Ponte partidária</h4>{itens}</div>',
+                    unsafe_allow_html=True)
+        st.caption("Partido é campo factual do TSE. Sem juízo de valor.")
+
+    # --- Emendas (REUSA o levantamento, não recalcula) ----------------------
+    deps = pref.get("deputados_emenda") or []
+    if deps:
+        itens = "".join(
+            f'<div class="pf-linha"><span class="k">{esc(d.get("deputado", ""))}</span>'
+            f'<span class="v">{esc(d.get("partido", ""))}</span></div>'
+            for d in deps[:10])
+        st.markdown(f'<div class="pf-bloco"><h4>Já destinam emenda aqui</h4>{itens}</div>',
+                    unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="pf-bloco"><h4>Já destinam emenda aqui</h4>'
+                    '<div class="pf-linha"><span class="k">Nenhum parlamentar do '
+                    'levantamento</span><span class="v">—</span></div></div>',
+                    unsafe_allow_html=True)
+        st.caption("Veja **Territórios em Aberto** para os financiadores da região.")
+
+    # --- Ações --------------------------------------------------------------
+    a1, a2 = st.columns(2)
+    try:
+        pdf = relatorios.pdf_resumo_prefeitura(
+            pref, datetime.datetime.now().strftime("%d/%m/%Y %H:%M"))
+        a1.download_button("Resumo para reunião (PDF)", data=pdf,
+                           file_name=f"prefeitura_{slug(pref['municipio'])}.pdf",
+                           mime="application/pdf", use_container_width=True)
+    except Exception as e:  # PDF nunca derruba o dossiê
+        a1.caption(f"PDF indisponível: {type(e).__name__}")
+    if a2.button("Puxar para Prospecção", use_container_width=True,
+                 help="Cria um item do tipo Prefeitura na aba Prospecção."):
+        res = _puxar_prefeitura_prospeccao(pref)
+        if res.get("sucesso"):
+            st.toast(f"{pref['municipio']} puxado para a Prospecção.")
+        elif res.get("motivo") == "duplicado":
+            st.toast(f"{pref['municipio']} já estava na Prospecção — não dupliquei.")
+        else:
+            st.toast(f"Não deu para puxar: {res.get('mensagem')}")
+
+
+def _puxar_prefeitura_prospeccao(pref: dict) -> dict:
+    """Cria o item na aba Prospecção com tipo 'Prefeitura'.
+
+    Sem duplicata e sem sobrescrita (mesma regra do "Puxar para o CRM"): se já
+    existe item com o mesmo nome, não grava. O tipo 'Prefeitura' JÁ existe em
+    PROSPECCAO_TIPOS — a lista não é tocada.
+    """
+    nome = str(pref.get("municipio", "")).strip()
+    if not nome:
+        return {"sucesso": False, "mensagem": "município sem nome"}
+    alvo = f"Prefeitura de {nome}"
+    try:
+        atuais = dados.carregar_prospeccao()
+        if not atuais.empty:
+            existentes = {str(x).strip().lower() for x in atuais.get("Nome", [])}
+            if alvo.lower() in existentes:
+                return {"sucesso": False, "motivo": "duplicado"}
+    except Exception:
+        pass   # sem leitura, segue: a porta de escrita ainda valida a conexão
+    return dados.adicionar_prospeccao({
+        "Nome": alvo,
+        "Tipo": "Prefeitura",
+        # PROSPECCAO_ETAPAS[0]: entra na PRIMEIRA etapa do funil. "Mapeada" não
+        # existe na régua (Indicada/Aprovada/Assinada/Paga) e cairia fora do funil.
+        "Status": PROSPECCAO_ETAPAS[0],
+        "Observações": pref.get("gancho", ""),
+    })
 
 
 # =========================================================================== #

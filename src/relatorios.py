@@ -606,3 +606,104 @@ def pdf_parlamentares(linhas: list[dict], resumo: str | None, gerado_em: str,
 
     doc.build(story, onFirstPage=rodape, onLaterPages=rodape)
     return buffer.getvalue()
+
+
+_TEAL = colors.HexColor("#4FA8A0")   # acento do painel Prefeituras
+
+
+def pdf_resumo_prefeitura(pref: dict, gerado_em: str) -> bytes:
+    """Resumo pré-reunião de UMA prefeitura — para o Fábio imprimir e levar.
+
+    REGRA DE OURO deste painel (irmã do "autorizado nunca soma com pago"): os
+    números são CAPACIDADE (CAPAG) e PRIORIDADE (MDE), nunca DISPONIBILIDADE.
+    O aviso vai impresso, não fica só na tela.
+
+    Omissão graciosa: campo ausente não aparece — nunca imprime "None", "0" nem
+    valor inventado. pref (montado pelo app):
+        {municipio, grupo, regiao_imediata, mde_rotulo, situacao_mde, mde_valor,
+         mde_origem, capag_rotulo, temperatura, prefeito, prefeito_partido,
+         n_vereadores, eleitos, deputados_emenda, pontes, gancho}
+    """
+    est = _estilos()
+    buffer = BytesIO()
+    nome = pref.get("municipio") or "Município"
+    doc, rodape = _doc(buffer, _TEAL, "Prefeitura · %s" % nome, gerado_em)
+
+    sub = " · ".join(x for x in (pref.get("grupo") or "",
+                                 ("Região imediata: %s" % pref["regiao_imediata"])
+                                 if pref.get("regiao_imediata") else "") if x)
+    story = _cabecalho(_TEAL, nome, sub or "Painel Prefeituras", gerado_em, est)
+
+    story.append(_P("<b>Atenção:</b> os indicadores abaixo mostram saúde fiscal e "
+                    "prioridade orçamentária — <b>não</b> verba disponível para "
+                    "parceria. Não existe número público de quanto a prefeitura tem "
+                    "livre para gastar.", est["secao_cap"]))
+    story.append(Spacer(1, 12))
+
+    # 1) Gancho: a primeira coisa que o Fábio lê.
+    story.append(_P("Melhor argumento de abordagem", est["secao"]))
+    story.append(_P(pref.get("gancho") or "—", est["cel"]))
+    story.append(Spacer(1, 12))
+
+    # 2) Educação (MDE) e situação fiscal (CAPAG), lado a lado e ROTULADOS.
+    rot_sit = {"cumpriu": "cumpre o mínimo de 25%",
+               "nao_cumpriu": "ABAIXO do mínimo de 25%",
+               "sem_dado": "sem dado do exercício"}.get(pref.get("situacao_mde") or "", "")
+    story.append(_P("Educação e situação fiscal", est["secao"]))
+    box = Table([[
+        _P("<b>Aplicação em educação · MDE</b><br/>%s%s"
+           % (pref.get("mde_rotulo") or "sem dado",
+              ("<br/>%s" % rot_sit) if rot_sit else ""), est["cel"]),
+        _P("<b>CAPAG · capacidade de pagamento</b><br/>%s"
+           % (pref.get("capag_rotulo") or "não avaliado"), est["cel"]),
+    ]], colWidths=[(A4[0] - 2 * _MARGEM) / 2] * 2)
+    box.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.5, _LINHA),
+        ("INNERGRID", (0, 0), (-1, -1), 0.5, _LINHA),
+        ("LINEBEFORE", (0, 0), (0, -1), 2, _TEAL),
+        ("LINEBEFORE", (1, 0), (1, -1), 2, _VIOLETA),
+        ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10), ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    story.append(box)
+    story.append(_P("MDE é o mínimo de 25% da receita de impostos (art. 212 da CF). "
+                    "Dado <b>declarado pelo município</b> (SICONFI/SIOPE), "
+                    "<b>não julgado</b> pelo TCE-SP. Ausência de nota CAPAG "
+                    "significa não avaliado — não é nota ruim.", est["secao_cap"]))
+    story.append(Spacer(1, 12))
+
+    # 3) Quem manda no município (TSE — campo factual, sem editorial).
+    story.append(_P("Quem manda no município", est["secao"]))
+    pol = []
+    if pref.get("prefeito"):
+        pol.append("Prefeito(a): %s%s" % (
+            pref["prefeito"],
+            (" (%s)" % pref["prefeito_partido"]) if pref.get("prefeito_partido") else ""))
+    if pref.get("n_vereadores"):
+        pol.append("Vereadores eleitos: %s" % pref["n_vereadores"])
+    for p in (pref.get("pontes") or [])[:3]:
+        alvos = ", ".join(str(d.get("deputado", "")) for d in (p.get("parlamentares") or [])[:2])
+        if alvos:
+            pol.append("Mesma sigla (%s) no CRM: %s" % (p.get("partido", ""), alvos))
+    story.append(_P("<br/>".join(pol) if pol
+                    else "Sem dados do TSE carregados para este município.", est["cel"]))
+    story.append(Spacer(1, 12))
+
+    # 4) Cruzamento com o levantamento de emendas (dado REUSADO, não recalculado).
+    deps = pref.get("deputados_emenda") or []
+    story.append(_P("Parlamentares que já destinam emenda aqui", est["secao"]))
+    if deps:
+        story.append(_P("<br/>".join(
+            "%s%s" % (d.get("deputado", ""),
+                      (" (%s)" % d.get("partido")) if d.get("partido") else "")
+            for d in deps[:8]), est["cel"]))
+    else:
+        story.append(_P("Nenhum parlamentar do levantamento destina emenda de "
+                        "educação/assistência social para este município.", est["cel"]))
+    story.append(Spacer(1, 10))
+    story.append(_P("Partido é campo factual do TSE (eleitos 2024, mandato "
+                    "2025–2028). Emendas: execução real 2023–2025 (Transparência SP).",
+                    est["secao_cap"]))
+
+    doc.build(story, onFirstPage=rodape, onLaterPages=rodape)
+    return buffer.getvalue()

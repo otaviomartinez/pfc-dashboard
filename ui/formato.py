@@ -14,6 +14,7 @@ import datetime
 import html
 import json  # noqa: F401
 import re
+import unicodedata
 from urllib.parse import quote
 
 import pandas as pd
@@ -1144,6 +1145,7 @@ def aviso_contexto_territorios(escopo_sel: str) -> str:
 # ou 'Deputados', ambas aposentadas) cai em 'visao' — blinda a migração de estado.
 _MODO_EMENDA = {"Visão geral": "visao",
                 "Territórios em Aberto": "orfaos",
+                "Prefeituras": "prefeituras",
                 "Funil de negociação": "funil", "Relatório": "relatorio",
                 "Metodologia": "metodologia"}
 
@@ -1592,3 +1594,260 @@ def _dias_texto(dias) -> str:
     if dias == 0:
         return "encerra hoje"
     return f"faltam {dias} dia(s)"
+
+
+# =========================================================================== #
+# PAINEL PREFEITURAS — camada PURA (sem I/O, sem st). Passo 5 do plano.
+# ---------------------------------------------------------------------------
+# A REGRA DE OURO deste painel (irmã do "autorizado nunca soma com pago"):
+# NÃO EXISTE número público de "verba disponível da prefeitura". MDE e CAPAG
+# mostram CAPACIDADE e PRIORIDADE — jamais DISPONIBILIDADE. A UI é obrigada a
+# dizer isso, e nenhuma função aqui devolve nada que sugira o contrário.
+# =========================================================================== #
+
+MDE_MINIMO = 25.0        # art. 212 da CF: mínimo de 25% da receita de impostos
+MDE_FOLGA = 28.0         # acima disto, educação é prioridade com folga
+
+AVISO_PREFEITURAS = (
+    "Estes indicadores mostram saúde fiscal e prioridade orçamentária — "
+    "não verba disponível para parceria. Não existe número público de "
+    "quanto a prefeitura tem livre para gastar."
+)
+
+
+def _norm_mun(s) -> str:
+    """Nome de município comparável: sem acento, sem caixa, sem espaço duplo."""
+    s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode()
+    return " ".join(s.split()).lower()
+
+
+def situacao_mde(percentual) -> str:
+    """'cumpriu' | 'nao_cumpriu' | 'sem_dado' — nunca infere de outro exercício.
+
+    Sem percentual é 'sem_dado', que é um estado NEUTRO (não é 'descumpriu').
+    Mesma régua do 'prazo a confirmar' do radar: dado ausente é dito, não
+    chutado.
+    """
+    try:
+        pct = float(percentual)
+    except (TypeError, ValueError):
+        return "sem_dado"
+    return "cumpriu" if pct >= MDE_MINIMO else "nao_cumpriu"
+
+
+def temperatura_prefeitura(situacao: str, capag_nota=None, percentual=None) -> str:
+    """'quente' | 'morno' | 'frio' | 'sem_dado', pela tabela do plano.
+
+    quente = precisa de despesa que conte como MDE (abaixo do mínimo) OU já
+             trata educação como prioridade (acima de 28%) — nos dois casos COM
+             caixa (CAPAG A/B).
+    frio   = CAPAG C/D: não tem dinheiro nem para o obrigatório.
+    morno  = cumpre no limite (25-28%), ou CAPAG não avaliado (sem nota não dá
+             para AFIRMAR caixa, então nunca promove a quente).
+    sem_dado = MDE não declarado. Nunca inferido.
+    """
+    if situacao == "sem_dado":
+        return "sem_dado"
+    saudavel = None
+    n = str(capag_nota or "").strip().upper()
+    if n in ("A", "B"):
+        saudavel = True
+    elif n in ("C", "D"):
+        saudavel = False
+    if saudavel is False:
+        return "frio"
+    if saudavel is None:
+        return "morno"                       # sem nota: não afirma capacidade
+    if situacao == "nao_cumpriu":
+        return "quente"
+    try:
+        pct = float(percentual)
+    except (TypeError, ValueError):
+        return "morno"                       # cumpriu, mas sem saber a folga
+    return "quente" if pct > MDE_FOLGA else "morno"
+
+
+TEMPERATURA_PREF_COR = {"quente": "#F0663F", "morno": "#E8B54A",
+                        "frio": "#7C8698", "sem_dado": "#7C8698"}
+TEMPERATURA_PREF_ROTULO = {"quente": "Lead quente", "morno": "Lead morno",
+                           "frio": "Frio", "sem_dado": "Sem dado"}
+SITUACAO_MDE_ROTULO = {"cumpriu": "Cumpre o mínimo", "nao_cumpriu": "Abaixo do mínimo",
+                       "sem_dado": "Sem dado"}
+SITUACAO_MDE_COR = {"cumpriu": "#4ADE80", "nao_cumpriu": "#F0663F",
+                    "sem_dado": "#7C8698"}
+
+
+def rotulo_mde(percentual, exercicio=None, periodo=None) -> str:
+    """Texto do MDE SEMPRE com o período amarrado.
+
+    Percentual sem exercício não existe (regra de honestidade nº 2 do plano):
+    nesse caso devolve o rótulo de ausência, não o número solto.
+    """
+    if percentual is None or str(percentual).strip() == "":
+        return f"sem dado do exercício {exercicio}" if exercicio else "sem dado"
+    if not exercicio:
+        return "sem dado"                     # número sem período: não publica
+    try:
+        pct = f"{float(percentual):.1f}".replace(".", ",")
+    except (TypeError, ValueError):
+        return "sem dado"
+    per = f" · {periodo}º bim." if str(periodo or "").strip() else ""
+    return f"{pct}% em {exercicio}{per}"
+
+
+def ponte_partidaria(eleitos_municipio: list, crm_parlamentares: list) -> list:
+    """Siglas que existem NO MUNICÍPIO e também entre os parlamentares do CRM.
+
+    Cruzamento factual partido x partido — sem juízo de valor, sem ranking
+    (regra 4 de honestidade). Devolve [{partido, locais, parlamentares}].
+    """
+    locais: dict[str, list] = {}
+    for e in eleitos_municipio or []:
+        p = str((e or {}).get("partido", "")).strip().upper()
+        if p:
+            locais.setdefault(p, []).append(e)
+    if not locais:
+        return []
+    externos: dict[str, list] = {}
+    for d in crm_parlamentares or []:
+        p = str((d or {}).get("partido", "")).strip().upper()
+        if p in locais:
+            externos.setdefault(p, []).append(d)
+    saida = []
+    for partido, gente in locais.items():
+        if partido in externos:
+            saida.append({"partido": partido, "locais": gente,
+                          "parlamentares": externos[partido]})
+    return sorted(saida, key=lambda x: (-len(x["parlamentares"]), x["partido"]))
+
+
+def deputados_do_municipio(municipio: str, ranking: list) -> list:
+    """Parlamentares do levantamento de emendas que já destinam ao município.
+
+    REUSA o resultado de src/emendas.py (coluna `municipios_pfc`) — não
+    recalcula nada (regra: o painel de Prefeituras LÊ o de Emendas).
+    """
+    alvo = _norm_mun(municipio)
+    achados = []
+    for row in ranking or []:
+        # a coluna junta municípios por '·' (expansão) ou ',' (território)
+        bruto = str((row or {}).get("municipios_pfc", "") or "").replace("·", ",")
+        nomes = {_norm_mun(x) for x in bruto.split(",") if x.strip()}
+        if alvo in nomes:
+            achados.append(row)
+    return achados
+
+
+def gancho_prefeitura(municipio: str, situacao: str, percentual=None,
+                      capag_nota=None, deputados: list | None = None,
+                      pontes: list | None = None, exercicio=None) -> str:
+    """Frase-gancho de abordagem, na prioridade do plano. NUNCA inventa.
+
+    1. abaixo do mínimo + caixa -> precisa comprovar aplicação em MDE
+    2. acima com folga          -> educação já é prioridade orçamentária
+    3. deputado do CRM já financia o município -> a ponte já existe
+    4. mesmo partido entre prefeitura e parlamentar do CRM -> alinhamento
+    5. honesto: diz que não há gancho forte (nunca fabrica um)
+    """
+    mun = str(municipio or "o município").strip()
+    tem_caixa = str(capag_nota or "").strip().upper() in ("A", "B")
+
+    if situacao == "nao_cumpriu" and tem_caixa:
+        alvo = rotulo_mde(percentual, exercicio)
+        return (f"{mun} está ABAIXO do mínimo constitucional de 25% em educação "
+                f"({alvo}) e tem caixa (CAPAG {str(capag_nota).upper()}): há "
+                "interesse direto em despesa que possa ser enquadrada como MDE.")
+    if situacao == "cumpriu" and tem_caixa:
+        try:
+            pct = float(percentual)
+        except (TypeError, ValueError):
+            pct = None
+        if pct is not None and pct > MDE_FOLGA:
+            return (f"{mun} aplica {rotulo_mde(percentual, exercicio)} em educação, "
+                    f"acima dos 25% obrigatórios, com CAPAG "
+                    f"{str(capag_nota).upper()}: educação já é prioridade "
+                    "orçamentária e há espaço fiscal.")
+    if deputados:
+        nomes = [str(d.get("deputado", "")).strip() for d in deputados[:2]
+                 if str(d.get("deputado", "")).strip()]
+        if nomes:
+            return (f"A ponte já existe: {' e '.join(nomes)} "
+                    f"{'já destinam' if len(nomes) > 1 else 'já destina'} emenda "
+                    f"de educação/assistência social para {mun}.")
+    if pontes:
+        p = pontes[0]
+        quem = str((p.get("locais") or [{}])[0].get("nome_urna", "")).strip()
+        alvo = str((p.get("parlamentares") or [{}])[0].get("deputado", "")).strip()
+        if quem and alvo:
+            return (f"Alinhamento partidário: {quem} ({p['partido']}) em {mun} e "
+                    f"{alvo} ({p['partido']}) no CRM — mesma sigla abre a porta.")
+    if situacao == "sem_dado":
+        return (f"Sem dado de aplicação em educação de {mun}"
+                + (f" no exercício {exercicio}" if exercicio else "")
+                + ". Antes de abordar, confirme no SIOPE ou no TCE-SP.")
+    return (f"Sem gancho forte para {mun} com os dados de hoje: nem folga "
+            "orçamentária clara, nem parlamentar do CRM atuando no município.")
+
+
+def normalizar_prefeituras(municipios: list, mde: dict | None = None,
+                           capag: dict | None = None, eleitos: list | None = None,
+                           ranking: list | None = None,
+                           crm_parlamentares: list | None = None) -> list:
+    """Uma linha por município, juntando MDE + CAPAG + eleitos + emendas.
+
+    PURA: recebe tudo pronto (quem lê arquivo é src/prefeituras/*). Município sem
+    dado nenhum continua na lista — some do painel seria esconder o problema.
+    """
+    mde = mde or {}
+    capag = capag or {}
+    eleitos = eleitos or []
+    ranking = ranking or []
+    linhas = []
+    for m in municipios or []:
+        cod = str(m.get("cod_ibge", ""))
+        nome = m.get("nome", "")
+        reg_mde = mde.get(cod) or {}
+        reg_cap = capag.get(cod) or {}
+        pct = reg_mde.get("percentual")
+        exercicio = reg_mde.get("exercicio")
+        sit = situacao_mde(pct)
+        nota = reg_cap.get("nota", "")
+        locais = [e for e in eleitos if _norm_mun(e.get("municipio")) == _norm_mun(nome)]
+        prefeito = next((e for e in locais if e.get("cargo") == "PREFEITO"), None)
+        deps = deputados_do_municipio(nome, ranking)
+        pontes = ponte_partidaria(locais, crm_parlamentares or [])
+        linhas.append({
+            "cod_ibge": cod, "municipio": nome, "grupo": m.get("grupo", ""),
+            "regiao_imediata": m.get("regiao_imediata", ""),
+            "mde_percentual": pct, "mde_exercicio": exercicio,
+            "mde_periodo": reg_mde.get("periodo", ""),
+            "mde_valor": reg_mde.get("valor_aplicado"),
+            "mde_receita": reg_mde.get("receita_base"),
+            "mde_origem": reg_mde.get("origem", ""),
+            "situacao_mde": sit, "mde_rotulo": rotulo_mde(pct, exercicio,
+                                                          reg_mde.get("periodo")),
+            "capag_nota": nota,
+            "capag_rotulo": nota if nota else "não avaliado",
+            "temperatura": temperatura_prefeitura(sit, nota, pct),
+            "prefeito": (prefeito or {}).get("nome_urna", ""),
+            "prefeito_partido": (prefeito or {}).get("partido", ""),
+            "n_vereadores": sum(1 for e in locais if e.get("cargo") == "VEREADOR"),
+            "eleitos": locais,
+            "deputados_emenda": deps,
+            "pontes": pontes,
+            "gancho": gancho_prefeitura(nome, sit, pct, nota, deps, pontes, exercicio),
+        })
+    return linhas
+
+
+def contagens_prefeituras(linhas: list) -> dict:
+    """Placar do topo da tela: total e quebra por temperatura/situação."""
+    linhas = linhas or []
+    return {
+        "total": len(linhas),
+        "quentes": sum(1 for x in linhas if x["temperatura"] == "quente"),
+        "mornos": sum(1 for x in linhas if x["temperatura"] == "morno"),
+        "frios": sum(1 for x in linhas if x["temperatura"] == "frio"),
+        "sem_dado": sum(1 for x in linhas if x["situacao_mde"] == "sem_dado"),
+        "com_ponte": sum(1 for x in linhas if x["deputados_emenda"]),
+    }
