@@ -1,9 +1,85 @@
 cod_ibge,municipio,nota,endividamento,poupanca,liquidez
+3500204,Adolfo,C,A,C,A
+3500758,Alambari,C,A,n.d.,B
+3500907,Altair,C,A,C,B
+3501152,Alumínio,B,A,B,B
+3502002,Analândia,C,A,C,C
+3502200,Angatuba,C,A,C,B
+3502754,Araçariguama,C,A,C,C
+3502903,Araçoiaba da Serra,C,A,C,B
+3504602,Bady Bassitt,C,A,C,C
+3505401,Barra do Turvo,A,A,B,A
+3507001,Boituva,C,A,C,C
+3504800,Bálsamo,C,A,C,C
+3509254,Cajati,A,A,A,A
+3509452,Campina do Monte Alegre,C,A,C,C
+3509908,Cananéia,C,A,C,C
 3510302,Capela do Alto,B,A,B,B
+3511300,Cedral,C,A,C,C
+3511508,Cerquilho,C,A,C,A
+3511607,Cesário Lange,B+,A,B,B
 3512704,Corumbataí,C,A,C,B
+3514809,Eldorado,B,A,B,B
+3517505,Guapiaçu,C,A,C,C
+3519402,Ibirá,C,A,C,B
+3519709,Ibiúna,C,A,B,C
+3519808,Icém,B+,A,C,B
+3520301,Iguape,C,A,C,C
+3520426,Ilha Comprida,C,A,C,C
 3521002,Iperó,C,A,C,C
+3521101,Ipeúna,A+,A,B,A
+3521150,Ipiguá,A,A,n.d.,B
+3521200,Iporanga,C,A,C,C
+3521507,Irapuã,C,A,C,C
+3522307,Itapetininga,C,A,C,C
+3523909,Itu,B,A,B,B
+3524501,Jaci,C,A,C,B
+3524600,Jacupiranga,C,A,C,B
+3525706,José Bonifácio,C,A,C,C
+3525854,Jumirim,A+,A,A,A
+3526100,Juquiá,A+,A,B,A
+3528106,Macaubal,C,A,n.d.,C
+3528403,Mairinque,C,A,C,C
+3529500,Mendonça,C,A,C,B
+3529906,Miracatu,A+,A,B,A
 3530300,Mirassol,A,A,A,A
+3530409,Mirassolândia,B,A,B,B
+3531407,Monte Aprazível,C,A,B,B
+3532504,Neves Paulista,B,A,B,B
+3532801,Nova Aliança,C,A,B,C
+3533007,Nova Granada,C,A,B,B
+3533502,Novo Horizonte,C,A,C,B
+3534005,Onda Verde,C,A,B,C
+3534203,Orindiúva,B,A,B,B
+3535002,Palestina,C,A,C,C
+3536208,Pariquera-Açu,A,A,B,A
+3536604,Paulo de Faria,C,A,C,C
+3537503,Pereiras,C,A,C,C
+3537800,Piedade,C,A,n.d.,C
+3537909,Pilar do Sul,A+,A,B,A
+3539608,Planalto,A,A,n.d.,B
+3539905,Poloni,C,A,C,A
+3540507,Porangaba,A+,A,n.d.,A
+3540606,Porto Feliz,A,A,A,A
+3540804,Potirendaba,C,A,B,C
+3541653,Quadra,C,A,C,B
+3542602,Registro,A+,A,B,A
 3543907,Rio Claro,C,A,C,C
+3544806,Sales,C,A,B,C
 3545209,Salto,C,A,C,B
+3545308,Salto de Pirapora,C,A,C,B
+3546702,Santa Gertrudes,A,A,A,A
+3551108,Sarapuí,C,A,C,C
+3551801,Sete Barras,C,A,C,C
+3552205,Sorocaba,C,A,C,C
+3549805,São José do Rio Preto,A+,A,B,A
+3550209,São Miguel Arcanjo,A,A,B,A
 3550605,São Roque,C,A,C,B
 3554003,Tatuí,C,A,C,C
+3554508,Tietê,C,A,C,A
+3554656,Torre de Pedra,C,A,n.d.,A
+3555356,Ubarana,B+,A,B,B
+3555604,Uchoa,C,A,C,C
+3555703,União Paulista,C,A,n.d.,C
+3556008,Urupês,C,A,C,B
+3557006,Votorantim,C,A,C,C
