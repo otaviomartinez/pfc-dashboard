@@ -257,8 +257,14 @@ ponte_partidaria), tela + dossiê + PDF + "Puxar para Prospecção".
   reserva). (2) **Escolas**: telefone/endereço do Catálogo do INEP
   (`src.prefeituras.escolas`). Os dois aparecem **prontos no dossiê**, sem
   clique; sem dado, a tela cai para os links de busca de `canais_oficiais` —
-  **nunca** inventar domínio ou e-mail. O TSE não serve para isso: e-mail de
-  candidato vem mascarado (8.329 de 8.329 em SP).
+  **nunca** inventar domínio ou e-mail. **Três becos sem saída já testados, não
+  repetir:** (i) **e-mail de prefeitura NÃO EXISTE** no cadastro de CNPJ — o
+  campo `email` vem e está vazio nas 88, conferido em duas fontes do mesmo
+  cadastro (rende telefone em 55/88 e endereço em 88/88, e só); (ii) o **TSE**
+  mascara e-mail de candidato (8.329 de 8.329 em SP); (iii) o **INEP só cadastra
+  escola** — em 645 municípios de SP, exatamente 1 tem a Secretaria de Educação
+  registrada. Telefone de secretaria municipal não tem base nacional aberta;
+  chega-se por telefone da prefeitura ou da escola.
 
 Coleta automática: **GitHub → Actions → "Dados do Painel Prefeituras" → Run
 workflow** (MDE/CAPAG/contatos; o TSE precisa do zip). Commita os CSVs sozinho.

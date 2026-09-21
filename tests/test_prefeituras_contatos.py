@@ -83,8 +83,9 @@ def _importador():
 
 
 def test_email_vem_de_qualquer_nome_de_campo():
-    """Na 1ª rodada REAL vieram 88 prefeituras e ZERO e-mails: o campo tinha
-    outro nome. Ler só 'email' faz a ausência parecer dado."""
+    """Na 1ª rodada REAL vieram 88 prefeituras e ZERO e-mails. A 2ª rodada
+    provou que o campo existe e está VAZIO na origem — o cadastro não tem
+    e-mail de prefeitura. O extrator tolerante fica para quando tiver."""
     imp = _importador()
     assert imp.extrair_email({"email": "GAB@Sorocaba.SP.GOV.BR"}) == "gab@sorocaba.sp.gov.br"
     assert imp.extrair_email({"correio_eletronico": "p@ipero.sp.gov.br"}) == "p@ipero.sp.gov.br"
