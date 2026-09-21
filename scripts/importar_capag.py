@@ -156,9 +156,9 @@ def main() -> int:
             cod = alvos6.get(cod[:6], "") if len(cod) >= 6 else ""
             if not cod:
                 continue
-        nota = _campo(linha, "capag") or _campo(linha, "nota")
-        nota = str(nota or "").strip().upper()
-        if nota not in ("A", "B", "C", "D"):
+        from src.prefeituras.capag import normalizar_nota
+        nota = normalizar_nota(_campo(linha, "capag") or _campo(linha, "nota"))
+        if not nota:
             print(f"  · {alvos[cod]}: sem nota válida ({nota!r}) — fica 'não avaliado'")
             continue
         ano = _campo(linha, "exercicio") or _campo(linha, "ano")
