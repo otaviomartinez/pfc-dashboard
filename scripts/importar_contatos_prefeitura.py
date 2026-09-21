@@ -12,6 +12,13 @@ PIPELINE (roda no GitHub Actions, onde a rede é livre):
   2. BrasilAPI /cnpj -> e-mail, telefone e endereço daquele CNPJ.
   3. Grava data/prefeituras/contatos_prefeitura.csv.
 
+ACHADO DA RODADA REAL (2 coletas, 88 municípios): o cadastro TEM o campo
+`email`, e ele vem VAZIO para todas as 88 prefeituras — conferido também numa
+segunda fonte do mesmo cadastro, que devolveu exatamente os mesmos campos e o
+mesmo vazio. Ou seja: **não existe e-mail de prefeitura nesse registro**. O que
+existe e serve: telefone (55 de 88) e endereço + CEP (88 de 88). O extrator de
+e-mail fica, tolerante a nome de campo, para o dia em que o cadastro preencher.
+
 NUNCA INVENTA: município sem CNPJ no SICONFI, ou CNPJ que a BrasilAPI não
 conhece, simplesmente NÃO entra no CSV — o painel cai para os links de busca.
 Campo vazio é ausência, não erro (regra 5c).
@@ -35,7 +42,6 @@ BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SAIDA = os.path.join(BASE, "data", "prefeituras", "contatos_prefeitura.csv")
 ENTES = "https://apidatalake.tesouro.gov.br/ords/siconfi/tt/entes"
 BRASILAPI = "https://brasilapi.com.br/api/cnpj/v1/"
-MINHARECEITA = "https://minhareceita.org/"   # 2ª fonte: traz correio_eletronico
 COLUNAS = ["cod_ibge", "municipio", "cnpj", "razao_social", "email", "telefone",
            "endereco", "cep", "fonte"]
 
@@ -93,14 +99,6 @@ def extrair_email(dados: dict) -> str:
     return ""
 
 
-def consultar_minhareceita(cnpj: str) -> dict | None:
-    """Fonte 2, só quando a 1ª não trouxe e-mail. Mesmo cadastro da Receita."""
-    try:
-        return _json(MINHARECEITA + cnpj, timeout=30)
-    except Exception:
-        return None
-
-
 def consultar_cnpj(cnpj: str, tentativas: int = 3) -> dict | None:
     """Contato do CNPJ na BrasilAPI. None quando não dá (nunca levanta).
 
@@ -140,7 +138,7 @@ def main() -> int:
         return 1
 
     linhas, sem = [], []
-    campos_vistos = campos_2 = False
+    campos_vistos = False
     for i, (cod, cnpj) in enumerate(sorted(com_cnpj.items()), 1):
         dados = consultar_cnpj(cnpj)
         if not dados:
@@ -150,14 +148,6 @@ def main() -> int:
             campos_vistos = True
             print(f"  campos do cadastro: {sorted(dados.keys())}")
         email = extrair_email(dados)
-        if not email:
-            outra = consultar_minhareceita(cnpj)
-            if outra:
-                if not campos_2:
-                    campos_2 = True
-                    print(f"  campos da 2ª fonte: {sorted(outra.keys())}")
-                email = extrair_email(outra)
-            time.sleep(0.4)
         endereco = " ".join(str(x) for x in (
             dados.get("logradouro"), dados.get("numero"), dados.get("bairro"),
             dados.get("municipio"), dados.get("uf")) if x)
