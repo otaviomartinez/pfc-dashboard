@@ -2108,10 +2108,12 @@ _PREFEITURAS_CSS = """
 .pf-nomecol{flex:1;min-width:0}
 .pf-nome{font-family:'Inter',system-ui,sans-serif;font-weight:640;font-size:.97rem;color:#F5F7FA}
 .pf-sub{font-family:'Inter',system-ui,sans-serif;font-size:.76rem;color:#7C8698;margin-top:3px}
-.pf-mdecol{flex:0 0 150px;text-align:right}
-.pf-mde{font-family:'JetBrains Mono',monospace;font-size:1.02rem;font-weight:700}
-.pf-capcol{flex:0 0 92px;text-align:center}
-.pf-capag{font-family:'JetBrains Mono',monospace;font-size:1.02rem;font-weight:700;color:#C6CEDA}
+.pf-mdecol{flex:0 0 158px;text-align:right;min-width:0}
+.pf-mde{font-family:'JetBrains Mono',monospace;font-size:.95rem;font-weight:700;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf-capcol{flex:0 0 124px;text-align:center;min-width:0}
+.pf-capag{font-family:'JetBrains Mono',monospace;font-size:.88rem;font-weight:700;
+  color:#C6CEDA;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pf-selo{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:.6rem;
   letter-spacing:.07em;text-transform:uppercase;padding:2px 7px;border-radius:5px;
   margin-right:6px;vertical-align:middle}
@@ -2131,6 +2133,25 @@ _PREFEITURAS_CSS = """
 .pf-gancho .k{font-family:'JetBrains Mono',monospace;font-size:.63rem;letter-spacing:.09em;
   text-transform:uppercase;color:#4FA8A0;margin-bottom:5px}
 .pf-gancho .t{font-family:'Inter',system-ui,sans-serif;font-size:.9rem;line-height:1.55;color:#EAF0F6}
+/* OVERLAY: o botão "Abrir dossiê" cobre o card inteiro, invisível mas clicável
+   — mesma técnica do .dd-cell da Descobrir. Sem isso aparecia uma caixa vazia
+   embaixo de cada card, feia e redundante. */
+[class*="st-key-pfrow_"]{position:relative}
+[class*="st-key-pfrow_"] .pf-cell{margin-bottom:0;cursor:pointer}
+[class*="st-key-pfrow_"] [class*="st-key-pf_"]{position:absolute;inset:0;z-index:4;
+  margin:0;padding:0}
+[class*="st-key-pfrow_"] [class*="st-key-pf_"] .stButton,
+[class*="st-key-pfrow_"] [class*="st-key-pf_"] button{height:100%;width:100%;
+  min-height:0;border:none;background:transparent;box-shadow:none}
+[class*="st-key-pfrow_"] [class*="st-key-pf_"] button{opacity:0;cursor:pointer}
+[class*="st-key-pfrow_"]:hover .pf-cell{background:#1A1F27;border-color:rgba(79,168,160,.35)}
+/* celular: as colunas da direita descem e alinham à esquerda, em vez de espremer */
+@media (max-width:640px){
+  .pf-cell{flex-wrap:wrap;gap:8px}
+  .pf-nomecol{flex:1 0 100%}
+  .pf-mdecol,.pf-capcol{flex:0 0 auto;text-align:left}
+  .pf-capcol{margin-left:auto;text-align:right}
+}
 .pf-vazio{text-align:center;padding:30px 18px;color:#7C8698;
   font-family:'Inter',system-ui,sans-serif;font-size:.86rem;background:#13171E;
   border:1px dashed rgba(255,255,255,.10);border-radius:11px}
