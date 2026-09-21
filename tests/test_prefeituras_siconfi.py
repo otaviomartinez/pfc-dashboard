@@ -1,12 +1,16 @@
 """Parsers do SICONFI — src/prefeituras/siconfi.py (PUROS, sem rede).
 
-ATENÇÃO, DÍVIDA CONHECIDA: o plano pede fixture REAL salva de uma resposta de
-verdade. O domínio do Tesouro está bloqueado por política da organização no
-ambiente de dev (gateway 403), então os casos abaixo usam estruturas SINTÉTICAS,
-rotuladas como tal — nunca apresentadas como resposta real. Para fechar a dívida,
-rode na sua máquina:  python scripts/capturar_fixture_siconfi.py
-Havendo tests/fixtures/siconfi_rreo_anexo08.json, o teste do fim valida o parser
-contra ela automaticamente.
+O FORMATO aqui não é suposto: veio do log real do GitHub Actions, onde a API
+respondeu 489 linhas com as colunas
+  ['exercicio','demonstrativo','periodo','periodicidade','instituicao',
+   'cod_ibge','uf','populacao','anexo','esfera','rotulo','coluna']
+O parser antigo procurava 'conta'/'vl_conta' e por isso lia ZERO de 489 — o bug
+que estes testes agora travam. A medida (%) vem na coluna `coluna`, não no
+rótulo.
+
+Ainda falta a fixture REAL salva (o dev não alcança o Tesouro: gateway 403).
+Rode `python scripts/capturar_fixture_siconfi.py` para fechar essa dívida; o
+último teste passa a validar contra ela sozinho.
 
     python tests/test_prefeituras_siconfi.py
 """
@@ -22,9 +26,9 @@ FIXTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                        "fixtures", "siconfi_rreo_anexo08.json")
 
 
-def _linha(conta, valor, exercicio=2025, periodo=6):
-    """Linha SINTÉTICA no formato do RREO (não é resposta real da API)."""
-    return {"conta": conta, "valor": valor,
+def _linha(rotulo, valor, coluna="Até o Bimestre", exercicio=2025, periodo=6):
+    """Linha no formato REAL da API (rotulo/coluna/valor), visto no log."""
+    return {"rotulo": rotulo, "coluna": coluna, "valor": valor,
             "exercicio": exercicio, "periodo": periodo}
 
 
@@ -36,11 +40,18 @@ def test_numero_tolera_formato_brasileiro():
     assert siconfi._num("abc") is None
 
 
-def test_percentual_pronto_na_linha():
-    itens = [_linha("APLICAÇÃO EM MDE (%) - MÍNIMO 25%", 27.4)]
+def test_percentual_vem_da_coluna_nao_do_rotulo():
+    """A medida (%) está em `coluna` — foi o que o parser antigo não viu."""
+    itens = [_linha("Aplicação em MDE", 27.4, coluna="% Aplicado Até o Bimestre")]
     mde = siconfi.extrair_mde(itens)
     assert mde["percentual"] == 27.4
     assert mde["exercicio"] == 2025 and mde["periodo"] == 6
+
+
+def test_aceita_formato_antigo_conta_por_compatibilidade():
+    itens = [{"conta": "Aplicação em ensino", "coluna": "% Aplicado",
+              "valor": 26.0, "exercicio": 2025, "periodo": 6}]
+    assert siconfi.extrair_mde(itens)["percentual"] == 26.0
 
 
 def test_percentual_calculado_quando_nao_vem_pronto():
@@ -54,7 +65,8 @@ def test_percentual_calculado_quando_nao_vem_pronto():
 
 def test_sem_exercicio_o_dado_nao_existe():
     """Regra de honestidade: percentual sem exercício amarrado -> None."""
-    itens = [{"conta": "APLICAÇÃO EM MDE (%)", "valor": 26.0}]   # sem exercício
+    itens = [{"rotulo": "Aplicação em MDE", "coluna": "% Aplicado",
+              "valor": 26.0}]   # sem exercício
     assert siconfi.extrair_mde(itens) is None
     # mas se o chamador souber o exercício, vale:
     assert siconfi.extrair_mde(itens, 2025, 6)["percentual"] == 26.0
@@ -94,7 +106,8 @@ def test_fixture_real_se_existir():
 
 if __name__ == "__main__":
     test_numero_tolera_formato_brasileiro()
-    test_percentual_pronto_na_linha()
+    test_percentual_vem_da_coluna_nao_do_rotulo()
+    test_aceita_formato_antigo_conta_por_compatibilidade()
     test_percentual_calculado_quando_nao_vem_pronto()
     test_sem_exercicio_o_dado_nao_existe()
     test_vazio_devolve_none_nao_zero()
