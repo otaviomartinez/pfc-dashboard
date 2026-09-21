@@ -1852,3 +1852,105 @@ def contagens_prefeituras(linhas: list) -> dict:
         "sem_dado": sum(1 for x in linhas if x["situacao_mde"] == "sem_dado"),
         "com_ponte": sum(1 for x in linhas if x["deputados_emenda"]),
     }
+
+
+# =========================================================================== #
+# PASSO 9 — MAPA DE EXPANSÃO (o "Cortejar" prefeitural)
+# ---------------------------------------------------------------------------
+# Municípios VIZINHOS (mesma Região Imediata do IBGE) onde o PFC ainda não atua.
+#
+# O plano definia o lead quente da expansão como "abaixo do mínimo de MDE +
+# CAPAG saudável". O dado real derrubou essa régua: NENHUM dos 77 vizinhos está
+# abaixo de 25%, e em SP inteiro são 2 de 644 (0,3%) — a tela nasceria vazia.
+# Usamos então o OUTRO caminho quente que a própria seção 0 do plano prevê
+# ("acima com folga + caixa = educação já é prioridade"), via a MESMA função
+# temperatura_prefeitura() já testada. Nada de régua nova e não validada.
+# =========================================================================== #
+
+FAIXA_MDE_ROTULO = {"abaixo": "Abaixo do mínimo", "limite": "No limite (25–28%)",
+                    "folga": "Com folga (>28%)", "sem_dado": "Sem dado"}
+
+
+def faixa_mde(percentual) -> str:
+    """'abaixo' | 'limite' | 'folga' | 'sem_dado'.
+
+    Mais informativo que situacao_mde para a expansão: separa quem cumpre COM
+    FOLGA (educação já é prioridade) de quem cumpre NO LIMITE (sem espaço).
+    """
+    try:
+        pct = float(percentual)
+    except (TypeError, ValueError):
+        return "sem_dado"
+    if pct < MDE_MINIMO:
+        return "abaixo"
+    return "limite" if pct <= MDE_FOLGA else "folga"
+
+
+def motivo_expansao(faixa: str, capag_nota, municipio_ancora: str = "") -> str:
+    """Por que este vizinho entra na lista. Honesto quando não há gancho forte."""
+    tem_caixa = str(capag_nota or "").strip().upper()[:1] in ("A", "B")
+    perto = f" Fica na mesma região de {municipio_ancora}." if municipio_ancora else ""
+    if faixa == "abaixo" and tem_caixa:
+        return ("Abaixo do mínimo de 25% e com caixa: precisa de despesa que "
+                "conte como MDE." + perto)
+    if faixa == "folga" and tem_caixa:
+        return ("Aplica bem acima dos 25% e tem caixa: educação já é prioridade "
+                "orçamentária." + perto)
+    if faixa == "limite" and tem_caixa:
+        return ("Cumpre o mínimo sem folga, mas tem caixa: um projeto que conte "
+                "como MDE ajuda a manter a margem." + perto)
+    if faixa == "sem_dado":
+        return "Sem índice de ensino publicado para o exercício." + perto
+    return ("Sem caixa confirmada (CAPAG não avaliado ou C/D) — vale só como "
+            "mapeamento." + perto)
+
+
+def candidatos_expansao(vizinhos: list, mde: dict | None = None,
+                        capag: dict | None = None,
+                        ancoras_por_regiao: dict | None = None) -> list:
+    """Ranqueia os vizinhos para expansão. PURA (recebe tudo pronto).
+
+    Ordem: temperatura (quente > morno > sem dado > frio) e, dentro dela, o
+    PORTE — quanto o município empenha em ensino. Porte é proxy de potencial:
+    não é juízo de valor, é tamanho de orçamento.
+    """
+    mde, capag = mde or {}, capag or {}
+    ancoras_por_regiao = ancoras_por_regiao or {}
+    ordem = {"quente": 0, "morno": 1, "sem_dado": 2, "frio": 3}
+    saida = []
+    for viz in vizinhos or []:
+        cod = str(viz.get("cod_ibge", ""))
+        reg_mde = mde.get(cod) or {}
+        pct = reg_mde.get("percentual")
+        nota = (capag.get(cod) or {}).get("nota", "")
+        faixa = faixa_mde(pct)
+        regiao = viz.get("regiao_imediata", "")
+        ancora = (ancoras_por_regiao.get(regiao) or [""])[0]
+        saida.append({
+            "cod_ibge": cod, "municipio": viz.get("nome", ""),
+            "regiao_imediata": regiao,
+            "mde_percentual": pct, "mde_exercicio": reg_mde.get("exercicio"),
+            "mde_rotulo": rotulo_mde(pct, reg_mde.get("exercicio")),
+            "mde_origem": reg_mde.get("origem", ""),
+            "faixa": faixa, "faixa_rotulo": FAIXA_MDE_ROTULO.get(faixa, ""),
+            "porte": reg_mde.get("valor_aplicado") or 0,
+            "capag_nota": nota, "capag_rotulo": nota if nota else "não avaliado",
+            "temperatura": temperatura_prefeitura(situacao_mde(pct), nota, pct),
+            "ancora": ancora,
+            "motivo": motivo_expansao(faixa, nota, ancora),
+        })
+    saida.sort(key=lambda x: (ordem.get(x["temperatura"], 9), -float(x["porte"] or 0)))
+    return saida
+
+
+def contagens_expansao(linhas: list) -> dict:
+    linhas = linhas or []
+    return {
+        "total": len(linhas),
+        "quentes": sum(1 for x in linhas if x["temperatura"] == "quente"),
+        "com_caixa": sum(1 for x in linhas
+                         if str(x["capag_nota"] or "")[:1] in ("A", "B")),
+        "folga": sum(1 for x in linhas if x["faixa"] == "folga"),
+        "limite": sum(1 for x in linhas if x["faixa"] == "limite"),
+        "regioes": len({x["regiao_imediata"] for x in linhas if x["regiao_imediata"]}),
+    }

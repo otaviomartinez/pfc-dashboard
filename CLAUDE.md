@@ -232,14 +232,33 @@ perna do funil: quem recebe a emenda e assina o convênio. `config/pfc_prefeitur
 (siconfi/capag/eleitos/mde + construtor offline `python -m src.prefeituras`),
 camada pura em `ui/formato.py` (situacao_mde, temperatura_prefeitura, gancho,
 ponte_partidaria), tela + dossiê + PDF + "Puxar para Prospecção".
-**PENDÊNCIA DE DADOS (não de código):** SICONFI, Tesouro Transparente (CAPAG) e
-TSE estão bloqueados por política de rede no ambiente do agente (403 no gateway),
-então nenhum CSV foi baixado e o painel abre inteiro em "sem dado". Para
-preencher, rode NA SUA MÁQUINA:
-`python -m src.prefeituras`, `python scripts/importar_eleitos_tse.py <zip do TSE>`
-e `python scripts/capturar_fixture_siconfi.py` (esta última fecha a dívida da
-fixture real do parser). Passo 9 (expandir para toda a região imediata) segue
-adiado, como o plano previu.
+**DADOS: resolvidos.** As três fontes entraram, cada uma por um caminho:
+- **MDE — TCE-SP (AUDESP), não SICONFI.** O SICONFI **não publica** o RREO-Anexo
+  08 (MDE) para estes municípios (varrido 2023-2025 x períodos 1-6, com a grafia
+  do anexo confirmada pela própria API). O índice vem de
+  `data/tce_sp/resultado_analises_audesp.csv` (644 municípios de SP, 2016-2025),
+  coluna "Despesa Empenhada Ensino (%)" — **apurado pelo Tribunal**, a versão
+  forte da regra 5(a). ARMADILHA: a coluna é FRAÇÃO (0,2736 = 27,36%); sem o
+  x100 o painel acusaria todo mundo de descumprir a Constituição.
+- **CAPAG — Tesouro Transparente**, via CKAN, no GitHub Actions. A pasta tem
+  várias abas "CAPAG *": a de municípios é a `Prévia da CAPAG`; a
+  `CAPAG Ano Base <ano>` é de INDICADORES e não serve. Por isso a aba é
+  escolhida por VALIDAÇÃO (tem coluna de código + de nota), nunca pelo nome.
+  Aceita gradações (A+, B+); `N.D.` é ausência.
+- **Eleitos — TSE**, baixado à mão: o CDN recusa o runner do GitHub (403 sempre,
+  inclusive via CKAN e com UA de navegador), mas funciona no navegador.
+  `scripts/importar_eleitos_tse.py <zip>` recorta os 11 (159 eleitos).
+
+Coleta automática: **GitHub → Actions → "Dados do Painel Prefeituras" → Run
+workflow** (MDE/CAPAG; o TSE precisa do zip). Commita os CSVs sozinho.
+
+**Passo 9 — FEITO.** Mapa de expansão: os **77 vizinhos** das nossas 6 Regiões
+Imediatas, ranqueados por temperatura e porte, num seletor na própria tela
+("Nossos municípios" x "Expansão"). **A régua do plano não sobreviveu ao dado:**
+ele definia o lead quente como "abaixo do mínimo de MDE", mas NENHUM vizinho
+está abaixo de 25% (em SP inteiro são 2 de 644). Usamos o outro caminho quente
+que a seção 0 do plano prevê — "acima com folga + caixa" — reusando
+`temperatura_prefeitura()`, que já era testada.
 
 **Depois:**
 - Notificação por **e-mail** quando faltarem 15 dias para um prazo.
