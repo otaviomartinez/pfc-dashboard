@@ -55,6 +55,15 @@ def main() -> int:
     exercicio = int(sys.argv[1]) if len(sys.argv) > 1 else datetime.date.today().year - 1
     print(f"== Painel Prefeituras · construindo MDE do exercício {exercicio} ==")
     linhas = construir_mde(exercicio)
+    if not linhas:
+        # Não grava CSV vazio: ele seria commitado a cada rodada sem acrescentar
+        # nada, e o painel já trata ausência de arquivo como "sem dado". Sai com
+        # código 1 para o passo aparecer VERMELHO no Actions — sinal visível de
+        # que a coleta não trouxe dado, em vez de um arquivo vazio silencioso.
+        print("NENHUM dado obtido. Provável causa: rede bloqueada para o Tesouro, "
+              "exercício ainda não publicado, ou string de no_anexo desatualizada. "
+              "Nada foi gravado; o painel segue em 'sem dado'.")
+        return 1
     os.makedirs(DIR_DADOS, exist_ok=True)
     destino = os.path.join(DIR_DADOS, f"mde_{exercicio}.csv")
     with open(destino, "w", encoding="utf-8", newline="") as f:
@@ -62,10 +71,6 @@ def main() -> int:
         w.writeheader()
         w.writerows(linhas)
     print(f"{len(linhas)} município(s) com dado -> {destino}")
-    if not linhas:
-        print("NENHUM dado obtido. Provável causa: rede bloqueada para o Tesouro, "
-              "ou string de no_anexo desatualizada. O painel abre mesmo assim, "
-              "todo em 'sem dado' — que é o comportamento honesto.")
     return 0
 
 

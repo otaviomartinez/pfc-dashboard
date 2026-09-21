@@ -1,0 +1,84 @@
+name: Dados do Painel Prefeituras
+
+# Por que isto existe: SICONFI, Tesouro Transparente (CAPAG) e TSE são
+# bloqueados no ambiente do agente, mas AQUI a internet é livre. Então a coleta
+# roda no GitHub e commita os CSVs de volta — assim dá para atualizar o painel
+# pelo celular, sem PC: aba Actions -> este workflow -> "Run workflow".
+#
+# Trimestral porque o dado muda devagar: o MDE é do 6º bimestre (publicado no
+# começo do ano seguinte) e os eleitos de 2024 valem até 2028.
+on:
+  workflow_dispatch:
+    inputs:
+      exercicio:
+        description: "Exercício do MDE/CAPAG (vazio = ano passado)"
+        required: false
+        default: ""
+  schedule:
+    - cron: "0 8 1 1,4,7,10 *"   # 05:00 Brasília, dia 1 de jan/abr/jul/out
+
+permissions:
+  contents: write                # precisa para commitar os CSVs de volta
+
+jobs:
+  dados:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}     # branch de verdade (não HEAD destacado)
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # pandas/openpyxl só aqui: a CAPAG vem em XLSX. NÃO entram no
+      # requirements.txt do app, para não mexer no ambiente do Streamlit.
+      - name: Instalar dependências
+        run: pip install pandas openpyxl
+
+      # Cada fonte é um passo isolado com continue-on-error: se o TSE cair, o
+      # MDE que já deu certo ainda é commitado. Nenhuma depende da outra.
+      - name: MDE (SICONFI)
+        id: mde
+        continue-on-error: true
+        run: python -m src.prefeituras ${{ github.event.inputs.exercicio }}
+
+      - name: CAPAG (Tesouro Transparente)
+        id: capag
+        continue-on-error: true
+        run: python scripts/importar_capag.py ${{ github.event.inputs.exercicio }}
+
+      - name: Eleitos 2024 (TSE)
+        id: tse
+        continue-on-error: true
+        run: python scripts/importar_eleitos_tse.py
+
+      - name: Conferir o que foi gerado
+        run: |
+          echo "### Arquivos em data/prefeituras/" >> $GITHUB_STEP_SUMMARY
+          if [ -d data/prefeituras ] && [ -n "$(ls -A data/prefeituras 2>/dev/null)" ]; then
+            for f in data/prefeituras/*.csv; do
+              echo "- \`$(basename "$f")\` — $(($(wc -l < "$f") - 1)) linha(s)" >> $GITHUB_STEP_SUMMARY
+            done
+          else
+            echo "- nenhum CSV gerado" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "MDE: ${{ steps.mde.outcome }} · CAPAG: ${{ steps.capag.outcome }} · TSE: ${{ steps.tse.outcome }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Commitar os CSVs
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/prefeituras/ 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "Nada mudou — nenhum commit."
+          else
+            git commit -m "dados: atualiza CSVs do painel Prefeituras (MDE/CAPAG/TSE)"
+            git push origin HEAD:${{ github.ref_name }}
+            echo "CSVs commitados na $(git rev-parse --abbrev-ref HEAD)."
+          fi
