@@ -104,6 +104,7 @@ from ui.formato import (
     SITUACAO_MDE_ROTULO,
     TEMPERATURA_PREF_COR,
     TEMPERATURA_PREF_ROTULO,
+    canais_oficiais,
     candidatos_expansao,
     contagens_expansao,
     contagens_prefeituras,
@@ -2593,21 +2594,90 @@ def _render_expansao():
 
     for i, l in enumerate(linhas[:40]):
         cor_t = TEMPERATURA_PREF_COR.get(l["temperatura"], "#7C8698")
-        st.markdown(
-            '<div class="pf-cell">'
-            f'<div class="pf-nomecol"><div class="pf-nome">'
-            f'{_pf_selo(TEMPERATURA_PREF_ROTULO.get(l["temperatura"], ""), cor_t)}'
-            f'{esc(l["municipio"])}</div>'
-            f'<div class="pf-sub">Região {esc(l["regiao_imediata"])} · '
-            f'{esc(l["motivo"])}</div></div>'
-            f'<div class="pf-mdecol"><div class="pf-mde" style="color:#C6CEDA">'
-            f'{esc(l["mde_rotulo"])}</div>'
-            f'<div class="pf-sub">{esc(l["faixa_rotulo"])}</div></div>'
-            f'<div class="pf-capcol"><div class="pf-capag">{esc(l["capag_rotulo"])}</div>'
-            '<div class="pf-sub">CAPAG</div></div>'
-            '</div>', unsafe_allow_html=True)
+        try:
+            from src.prefeituras import escolas as _esc
+            n_esc = _esc.resumo_municipio(l["municipio"])["total"]
+        except Exception:
+            n_esc = 0
+        # card clicável (mesmo overlay dos nossos municípios)
+        with st.container(key=f"pxrow_{i}"):
+            st.markdown(
+                '<div class="pf-cell">'
+                f'<div class="pf-nomecol"><div class="pf-nome">'
+                f'{_pf_selo(TEMPERATURA_PREF_ROTULO.get(l["temperatura"], ""), cor_t)}'
+                f'{esc(l["municipio"])}</div>'
+                f'<div class="pf-sub">Região {esc(l["regiao_imediata"])}'
+                + (f' · {n_esc} escolas públicas' if n_esc else '')
+                + f' · {esc(l["motivo"])}</div></div>'
+                f'<div class="pf-mdecol"><div class="pf-mde" style="color:#C6CEDA">'
+                f'{esc(l["mde_rotulo"])}</div>'
+                f'<div class="pf-sub">{esc(l["faixa_rotulo"])}</div></div>'
+                f'<div class="pf-capcol"><div class="pf-capag">{esc(l["capag_rotulo"])}</div>'
+                '<div class="pf-sub">CAPAG</div></div>'
+                '</div>', unsafe_allow_html=True)
+            if st.button(f"Abrir contatos de {l['municipio']}", key=f"px_{i}",
+                         use_container_width=True):
+                dlg_expansao(l)
     if len(linhas) > 40:
         st.caption(f"Mostrando 40 de {len(linhas)}.")
+
+
+@st.dialog("Município de expansão", width="large")
+def dlg_expansao(viz: dict):
+    """Dossiê ENXUTO do vizinho: indicadores + contatos.
+
+    Não reusa dlg_prefeitura porque aqui NÃO há CRM, eleitos nem emendas — o PFC
+    não atua neste município. Mostrar campos vazios daria a impressão de carteira
+    onde só há prospecção.
+    """
+    st.markdown(_PREFEITURAS_CSS, unsafe_allow_html=True)
+    breadcrumb("Emendas", viz["municipio"])
+    st.markdown(f"### {esc(viz['municipio'])}")
+    st.caption(f"Região imediata: {viz['regiao_imediata']} · "
+               "**o PFC ainda não atua aqui** — é prospecção")
+    st.markdown('<div class="pf-gancho"><div class="k">Por que este município</div>'
+                f'<div class="t">{esc(viz["motivo"])}</div></div>',
+                unsafe_allow_html=True)
+
+    st.markdown('<div class="pf-bloco"><h4>Indicadores</h4>'
+                f'<div class="pf-linha"><span class="k">Aplicação em educação (MDE)</span>'
+                f'<span class="v">{esc(viz["mde_rotulo"])} · '
+                f'{esc(viz["faixa_rotulo"])}</span></div>'
+                f'<div class="pf-linha"><span class="k">CAPAG</span>'
+                f'<span class="v">{esc(viz["capag_rotulo"])}</span></div>'
+                '</div>', unsafe_allow_html=True)
+    if viz.get("mde_origem") == "tce-sp":
+        st.caption("Índice **apurado pelo TCE-SP** (Audesp).")
+
+    try:
+        from src.prefeituras import escolas as _escolas
+        lista = _escolas.por_municipio(viz["municipio"])
+        resumo = _escolas.resumo_municipio(viz["municipio"])
+    except Exception:
+        lista, resumo = [], {"total": 0}
+    if lista:
+        st.markdown(
+            '<div class="pf-bloco"><h4>Escolas públicas</h4>'
+            f'<div class="pf-linha"><span class="k">Total</span>'
+            f'<span class="v">{resumo["total"]} ({resumo["municipais"]} municipais · '
+            f'{resumo["estaduais"]} estaduais)</span></div></div>',
+            unsafe_allow_html=True)
+        with st.expander(f"Ver as {len(lista)} escolas com contato", expanded=False):
+            for e in lista[:60]:
+                st.markdown(
+                    f'<div class="pf-linha"><span class="k">{esc(e["nome"][:46])}<br>'
+                    f'<span style="font-size:.72rem">{esc(e["endereco"][:78])}</span></span>'
+                    f'<span class="v">{esc(e["telefone"] or "sem telefone")}<br>'
+                    f'<span style="font-size:.72rem;color:#7C8698">{esc(e["dependencia"])}'
+                    '</span></span></div>', unsafe_allow_html=True)
+        st.caption("Cadastro do INEP. Telefone **institucional** da escola.")
+
+    st.markdown('<div class="pf-bloco"><h4>Como chegar no contato oficial</h4></div>',
+                unsafe_allow_html=True)
+    for canal in canais_oficiais(viz["municipio"]):
+        st.link_button(canal["rotulo"], canal["url"], use_container_width=True)
+        if canal["nota"]:
+            st.caption(canal["nota"])
 
 
 @st.dialog("Dossiê do município", width="large")
@@ -2709,6 +2779,42 @@ def dlg_prefeitura(pref: dict):
                     'levantamento</span><span class="v">—</span></div></div>',
                     unsafe_allow_html=True)
         st.caption("Veja **Territórios em Aberto** para os financiadores da região.")
+
+    # --- Escolas públicas (o contato mais acionável: o PFC atua DENTRO delas) --
+    try:
+        from src.prefeituras import escolas as _escolas
+        lista = _escolas.por_municipio(pref["municipio"])
+        resumo = _escolas.resumo_municipio(pref["municipio"])
+    except Exception:
+        lista, resumo = [], {"total": 0}
+    if lista:
+        st.markdown(
+            '<div class="pf-bloco"><h4>Escolas públicas</h4>'
+            f'<div class="pf-linha"><span class="k">Total</span>'
+            f'<span class="v">{resumo["total"]} '
+            f'({resumo["municipais"]} municipais · {resumo["estaduais"]} estaduais)'
+            '</span></div></div>', unsafe_allow_html=True)
+        with st.expander(f"Ver as {len(lista)} escolas com contato", expanded=False):
+            for e in lista[:60]:
+                tel = e["telefone"] or "sem telefone"
+                st.markdown(
+                    f'<div class="pf-linha"><span class="k">{esc(e["nome"][:46])}<br>'
+                    f'<span style="font-size:.72rem">{esc(e["endereco"][:78])}</span></span>'
+                    f'<span class="v">{esc(tel)}<br>'
+                    f'<span style="font-size:.72rem;color:#7C8698">{esc(e["dependencia"])}'
+                    '</span></span></div>', unsafe_allow_html=True)
+            if len(lista) > 60:
+                st.caption(f"Mostrando 60 de {len(lista)}.")
+        st.caption("Cadastro do INEP (Catálogo de Escolas). Telefone **institucional** "
+                   "da escola — não é contato pessoal de ninguém.")
+
+    # --- Canais oficiais (funciona para os 88, inclusive a expansão) ---------
+    st.markdown('<div class="pf-bloco"><h4>Como chegar no contato oficial</h4>'
+                '</div>', unsafe_allow_html=True)
+    for canal in canais_oficiais(pref["municipio"]):
+        st.link_button(canal["rotulo"], canal["url"], use_container_width=True)
+        if canal["nota"]:
+            st.caption(canal["nota"])
 
     # --- Ações --------------------------------------------------------------
     a1, a2 = st.columns(2)

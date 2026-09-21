@@ -2136,15 +2136,19 @@ _PREFEITURAS_CSS = """
 /* OVERLAY: o botão "Abrir dossiê" cobre o card inteiro, invisível mas clicável
    — mesma técnica do .dd-cell da Descobrir. Sem isso aparecia uma caixa vazia
    embaixo de cada card, feia e redundante. */
-[class*="st-key-pfrow_"]{position:relative}
-[class*="st-key-pfrow_"] .pf-cell{margin-bottom:0;cursor:pointer}
-[class*="st-key-pfrow_"] [class*="st-key-pf_"]{position:absolute;inset:0;z-index:4;
+[class*="st-key-pfrow_"],[class*="st-key-pxrow_"]{position:relative}
+[class*="st-key-pfrow_"] .pf-cell,[class*="st-key-pxrow_"] .pf-cell{margin-bottom:0;cursor:pointer}
+[class*="st-key-pfrow_"] [class*="st-key-pf_"],
+[class*="st-key-pxrow_"] [class*="st-key-px_"]{position:absolute;inset:0;z-index:4;
   margin:0;padding:0}
 [class*="st-key-pfrow_"] [class*="st-key-pf_"] .stButton,
-[class*="st-key-pfrow_"] [class*="st-key-pf_"] button{height:100%;width:100%;
+[class*="st-key-pxrow_"] [class*="st-key-px_"] .stButton,
+[class*="st-key-pfrow_"] [class*="st-key-pf_"] button,
+[class*="st-key-pxrow_"] [class*="st-key-px_"] button{height:100%;width:100%;
   min-height:0;border:none;background:transparent;box-shadow:none}
-[class*="st-key-pfrow_"] [class*="st-key-pf_"] button{opacity:0;cursor:pointer}
-[class*="st-key-pfrow_"]:hover .pf-cell{background:#1A1F27;border-color:rgba(79,168,160,.35)}
+[class*="st-key-pfrow_"] [class*="st-key-pf_"] button,
+[class*="st-key-pxrow_"] [class*="st-key-px_"] button{opacity:0;cursor:pointer}
+[class*="st-key-pfrow_"]:hover .pf-cell,[class*="st-key-pxrow_"]:hover .pf-cell{background:#1A1F27;border-color:rgba(79,168,160,.35)}
 /* celular: as colunas da direita descem e alinham à esquerda, em vez de espremer */
 @media (max-width:640px){
   .pf-cell{flex-wrap:wrap;gap:8px}
