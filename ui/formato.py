@@ -1648,11 +1648,12 @@ def temperatura_prefeitura(situacao: str, capag_nota=None, percentual=None) -> s
     """
     if situacao == "sem_dado":
         return "sem_dado"
+    # A LETRA manda; '+/-' é gradação do Tesouro (A+, B+, C-...).
     saudavel = None
-    n = str(capag_nota or "").strip().upper()
-    if n in ("A", "B"):
+    n = str(capag_nota or "").strip().upper().replace(" ", "")
+    if n[:1] in ("A", "B"):
         saudavel = True
-    elif n in ("C", "D"):
+    elif n[:1] in ("C", "D"):
         saudavel = False
     if saudavel is False:
         return "frio"
@@ -1750,7 +1751,7 @@ def gancho_prefeitura(municipio: str, situacao: str, percentual=None,
     5. honesto: diz que não há gancho forte (nunca fabrica um)
     """
     mun = str(municipio or "o município").strip()
-    tem_caixa = str(capag_nota or "").strip().upper() in ("A", "B")
+    tem_caixa = str(capag_nota or "").strip().upper()[:1] in ("A", "B")
 
     if situacao == "nao_cumpriu" and tem_caixa:
         alvo = rotulo_mde(percentual, exercicio)

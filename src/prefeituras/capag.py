@@ -19,7 +19,20 @@ import os
 BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DIR_DADOS = os.path.join(BASE, "data", "prefeituras")
 
+# O Tesouro publica gradações (A+, B+, C-...) além das letras puras. Aceitar só
+# "A/B/C/D" jogava fora nota REAL: Cesário Lange ('B+') e Juquiá ('A+') caíam
+# como "não avaliado". 'N.D.' (não disponível) continua sendo ausência.
 NOTAS_VALIDAS = ("A", "B", "C", "D")
+
+
+def normalizar_nota(nota) -> str:
+    """'a+' -> 'A+'. Devolve "" quando não é nota da escala CAPAG."""
+    n = str(nota or "").strip().upper().replace(" ", "")
+    if not n or n[0] not in NOTAS_VALIDAS:
+        return ""
+    if len(n) == 1:
+        return n
+    return n if (len(n) == 2 and n[1] in "+-") else ""
 ROTULO_SEM_NOTA = "não avaliado"
 
 
@@ -48,9 +61,9 @@ def carregar(exercicio: int) -> dict[str, dict]:
         cod = baixo.get("cod_ibge", "")
         if not cod:
             continue
-        nota = baixo.get("nota", "").upper()
+        nota = normalizar_nota(baixo.get("nota", ""))
         saida[cod] = {
-            "nota": nota if nota in NOTAS_VALIDAS else "",   # fora da escala = sem nota
+            "nota": nota,                     # "" = fora da escala = sem nota
             "endividamento": baixo.get("endividamento", ""),
             "poupanca": baixo.get("poupanca", ""),
             "liquidez": baixo.get("liquidez", ""),
@@ -60,9 +73,8 @@ def carregar(exercicio: int) -> dict[str, dict]:
 
 
 def rotulo_nota(nota) -> str:
-    """Rótulo de exibição. Sem nota -> 'não avaliado' (nunca 'ruim')."""
-    n = str(nota or "").strip().upper()
-    return n if n in NOTAS_VALIDAS else ROTULO_SEM_NOTA
+    """Rótulo de exibição (mantém a gradação: 'A+'). Sem nota -> 'não avaliado'."""
+    return normalizar_nota(nota) or ROTULO_SEM_NOTA
 
 
 def nota_saudavel(nota) -> bool | None:
@@ -71,12 +83,10 @@ def nota_saudavel(nota) -> bool | None:
     O None é o ponto todo desta função: quem chama é obrigado a tratar
     "não avaliado" como terceiro estado, não como False.
     """
-    n = str(nota or "").strip().upper()
-    if n in ("A", "B"):
-        return True
-    if n in ("C", "D"):
-        return False
-    return None
+    n = normalizar_nota(nota)
+    if not n:
+        return None
+    return n[0] in ("A", "B")      # a LETRA manda; o +/- é só gradação
 
 
 def exercicio_disponivel(preferido: int | None = None) -> int | None:

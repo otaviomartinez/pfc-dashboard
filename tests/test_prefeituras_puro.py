@@ -51,6 +51,14 @@ def test_tabela_estrategica_do_plano():
     assert temperatura_prefeitura("sem_dado", "C", None) == "sem_dado"
 
 
+def test_temperatura_aceita_gradacao_do_capag():
+    """A LETRA manda; '+/-' é gradação. B+ tem caixa igual a B."""
+    assert temperatura_prefeitura("nao_cumpriu", "B+", 20) == "quente"
+    assert temperatura_prefeitura("cumpriu", "A+", 31) == "quente"
+    assert temperatura_prefeitura("cumpriu", "C-", 31) == "frio"
+    assert temperatura_prefeitura("nao_cumpriu", "N.D.", 20) == "morno"  # sem nota
+
+
 def test_capag_ausente_nunca_promove_a_quente():
     """Sem nota não dá para AFIRMAR caixa — então no máximo morno."""
     assert temperatura_prefeitura("nao_cumpriu", "", 20) == "morno"

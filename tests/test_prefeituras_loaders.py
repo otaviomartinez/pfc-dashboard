@@ -47,6 +47,23 @@ def test_capag_ausencia_nao_e_nota_ruim():
 
 
 # ---- MDE ------------------------------------------------------------------ #
+def test_capag_aceita_gradacoes_mas_nao_nd():
+    """O Tesouro publica A+, B+, C-... Descartar isso jogava fora nota REAL:
+    Cesário Lange ('B+') e Juquiá ('A+') caíam como "não avaliado".
+    'N.D.' (não disponível) continua sendo ausência de verdade."""
+    assert capag.normalizar_nota("A+") == "A+"
+    assert capag.normalizar_nota("b-") == "B-"
+    assert capag.rotulo_nota("B+") == "B+"          # mantém a gradação na tela
+    assert capag.nota_saudavel("A+") is True
+    assert capag.nota_saudavel("B+") is True
+    assert capag.nota_saudavel("C-") is False
+    # ausência de verdade continua neutra:
+    for ausente in ("N.D.", "", None, "Z", "A++"):
+        assert capag.normalizar_nota(ausente) == ""
+        assert capag.rotulo_nota(ausente) == capag.ROTULO_SEM_NOTA
+        assert capag.nota_saudavel(ausente) is None
+
+
 def test_mde_sem_arquivo_nao_quebra():
     assert mde.carregar(1999) == {}
     assert mde.exercicio_disponivel(1999) in (None, mde.exercicio_disponivel())
@@ -109,6 +126,7 @@ def test_eleitos_casa_nome_com_acento():
 if __name__ == "__main__":
     test_capag_sem_arquivo_nao_quebra()
     test_capag_ausencia_nao_e_nota_ruim()
+    test_capag_aceita_gradacoes_mas_nao_nd()
     test_mde_sem_arquivo_nao_quebra()
     test_mde_linha_sem_percentual_nao_vira_zero()
     test_eleitos_sem_arquivo_nao_quebra()
