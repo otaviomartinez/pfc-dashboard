@@ -43,7 +43,17 @@ def baixar_zip() -> str | None:
     for url in URLS_TSE:
         try:
             print(f"  tentando {url[:88]}…")
-            req = urllib.request.Request(url, headers={"User-Agent": "pfc-dashboard/1.0"})
+            # O CDN do TSE devolve 403 para User-Agent de robô. Cabeçalhos de
+            # navegador resolvem — não é burlar nada: é dado aberto público,
+            # servido por um CDN que filtra UA.
+            req = urllib.request.Request(url, headers={
+                "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                               "AppleWebKit/537.36 (KHTML, like Gecko) "
+                               "Chrome/126.0 Safari/537.36"),
+                "Accept": "application/zip,application/octet-stream,*/*",
+                "Accept-Language": "pt-BR,pt;q=0.9",
+                "Referer": "https://dadosabertos.tse.jus.br/",
+            })
             with urllib.request.urlopen(req, timeout=300) as r:
                 dados = r.read()
             if len(dados) < 10_000:

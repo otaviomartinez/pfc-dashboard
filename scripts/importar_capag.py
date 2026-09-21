@@ -105,7 +105,17 @@ def main() -> int:
         return 1
     print(f"  {len(linhas)} linhas na planilha")
 
+    # DIAGNÓSTICO: sem isto, "0 de 11" não diz NADA sobre o porquê. Com as
+    # colunas e uma linha de exemplo no log, dá para consertar na próxima rodada.
+    if linhas:
+        print("  colunas encontradas:", list(linhas[0].keys())[:18])
+        exemplo = {k: v for k, v in list(linhas[0].items())[:8]}
+        print("  1ª linha (amostra):", exemplo)
+
     alvos = {m["cod_ibge"]: m["nome"] for m in carregar_municipios()}
+    # Alguns arquivos do Tesouro usam o código IBGE de 6 dígitos (sem o dígito
+    # verificador). Indexa pelos dois para casar nos dois formatos.
+    alvos6 = {cod[:6]: cod for cod in alvos}
     saida, ano_visto = [], exercicio
     for linha in linhas:
         cod = _campo(linha, "ibge")
@@ -113,7 +123,9 @@ def main() -> int:
             continue
         cod = str(cod).split(".")[0].strip()          # 3510302.0 -> 3510302
         if cod not in alvos:
-            continue
+            cod = alvos6.get(cod[:6], "") if len(cod) >= 6 else ""
+            if not cod:
+                continue
         nota = _campo(linha, "capag") or _campo(linha, "nota")
         nota = str(nota or "").strip().upper()
         if nota not in ("A", "B", "C", "D"):
@@ -134,6 +146,12 @@ def main() -> int:
     if not ano_visto:
         import datetime
         ano_visto = datetime.date.today().year - 1
+    if not saida:
+        # Não grava CSV vazio (ele seria commitado sem acrescentar nada) e sai
+        # com 1, para o passo ficar VERMELHO no Actions — sinal visível.
+        print("NENHUM dos 11 municípios casou. Compare o código do painel com a "
+              "coluna de IBGE impressa acima. Nada foi gravado.")
+        return 1
     os.makedirs(SAIDA_DIR, exist_ok=True)
     destino = os.path.join(SAIDA_DIR, f"capag_{ano_visto}.csv")
     with open(destino, "w", encoding="utf-8", newline="") as f:
