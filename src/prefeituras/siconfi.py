@@ -22,6 +22,7 @@ import json
 import os
 import time
 import urllib.parse
+import unicodedata
 import urllib.request
 
 BASE_URL = "https://apidatalake.tesouro.gov.br/ords/siconfi/tt"
@@ -106,7 +107,14 @@ def _num(v):
 
 
 def _casa(texto: str, *termos: str) -> bool:
-    t = str(texto or "").lower()
+    """True se TODOS os termos aparecem no texto, ignorando acento e caixa.
+
+    O strip de acento não é detalhe: sem ele, "Manutenção e Desenvolvimento do
+    Ensino" nunca casava com o termo "manutencao e desenvolvimento" e a conta
+    de MDE passava batida. Os termos devem vir SEM acento.
+    """
+    t = unicodedata.normalize("NFKD", str(texto or ""))
+    t = "".join(c for c in t if not unicodedata.combining(c)).lower()
     return all(x in t for x in termos)
 
 
@@ -146,11 +154,17 @@ def extrair_mde(items, exercicio: int | None = None,
         if v is None:
             continue
         texto = f"{rotulo} {coluna}"
-        # percentual: a medida vem na COLUNA ("% Aplicado ..."), não no rótulo
+        # O percentual de MDE exige casamento FORTE. A régua frouxa anterior
+        # ("ensino"/"educação" + qualquer coluna com %) pegou, no RREO-Anexo 02
+        # (Despesas por Função), a fatia da EDUCAÇÃO sobre a despesa total — que
+        # cai perto de 25% e passa por índice de MDE sem ser. Resultado: 9 de 11
+        # municípios apareceram "descumprindo a Constituição". Nunca mais:
+        # só conta a conta que diz MDE ou "manutenção e desenvolvimento do
+        # ensino" POR EXTENSO, numa coluna que seja de percentual aplicado.
         e_percentual = "%" in coluna or _casa(coluna, "aplicad")
-        if pct is None and e_percentual and 0 < v <= 100 and (
-                _casa(texto, "mde") or _casa(texto, "manuten")
-                or _casa(texto, "ensino") or _casa(texto, "educac")):
+        e_conta_mde = (_casa(rotulo, "mde")
+                       or _casa(rotulo, "manutencao e desenvolvimento"))
+        if pct is None and e_percentual and e_conta_mde and 0 < v <= 100:
             pct = v
         if valor is None and not e_percentual and _casa(rotulo, "total") \
                 and _casa(rotulo, "despesa"):

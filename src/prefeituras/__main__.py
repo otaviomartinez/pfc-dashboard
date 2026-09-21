@@ -23,10 +23,15 @@ from src.prefeituras.config import carregar_municipios
 # items=[] — vazio SILENCIOSO. Testamos variações conhecidas e ficamos com a
 # que responder. O mesmo vale para o exercício (o RREO do 6º bimestre de um ano
 # só é publicado no começo do ano seguinte, e nem todo município homologa).
-# O log do Actions mostrou: "RREO-Anexo 08" devolve 0 e "RREO-Anexo 02" devolve
-# 489. Então varremos os anexos do RREO e ficamos com o primeiro que traga o
-# percentual de MDE — sem chutar qual é o nome certo.
-ANEXOS_MDE = [f"RREO-Anexo {n:02d}" for n in range(1, 11)]
+# SÓ o Anexo 08 traz o índice de MDE (Receitas e Despesas com Manutenção e
+# Desenvolvimento do Ensino). Varrer todos os anexos foi um erro caro: o Anexo
+# 02 (Despesas por Função) entrou como se fosse MDE e produziu percentuais
+# falsos. Se o 08 não responder, a resposta correta é "sem dado" — NUNCA um
+# número de outro demonstrativo.
+ANEXOS_MDE = ["RREO-Anexo 08", "RREO-Anexo 8"]
+# Estes são só para DIAGNÓSTICO no log (o que a API oferece), nunca usados
+# como fonte do percentual.
+ANEXOS_DIAGNOSTICO = ["RREO-Anexo 01", "RREO-Anexo 02", "RREO-Anexo 10"]
 
 BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DIR_DADOS = os.path.join(BASE, "data", "prefeituras")
@@ -41,7 +46,7 @@ def sondar(cod_ibge: str, exercicios: list[int]) -> tuple[str, int] | None:
     string de anexo errada de exercício não publicado. Roda só para o primeiro
     município — é uma sondagem, não uma varredura.
     """
-    print("  sondando o que o SICONFI responde…")
+    print("  sondando o Anexo 08 (o único que traz MDE)…")
     for exe in exercicios:
         for anexo in ANEXOS_MDE:
             # tentativas=1: são ~20 chamadas de sondagem; retry aqui só atrasa
@@ -82,8 +87,15 @@ def construir_mde(exercicio: int) -> list[dict]:
         anexo, exercicio = achado
         print(f"  usando {anexo!r} · exercício {exercicio}")
     else:
-        print("  nenhuma combinação respondeu — seguindo com o padrão "
-              f"({siconfi.ANEXO_MDE!r}, {exercicio})")
+        # Diagnóstico: mostra o que a API TEM, sem usar como MDE.
+        print("  o Anexo 08 não respondeu. O que existe (só informação):")
+        for anexo in ANEXOS_DIAGNOSTICO:
+            n = len(siconfi.buscar_rreo(muns[0]["cod_ibge"], exercicio, 6,
+                                        anexo, tentativas=1) or [])
+            print(f"    {anexo!r} -> {n} linha(s)")
+        print("  -> sem Anexo 08, o MDE fica SEM DADO. Não substituímos por "
+              "percentual de outro demonstrativo (foi o erro que inventou "
+              "9 municípios 'abaixo do mínimo').")
 
     linhas, sem_dado = [], []
     for m in muns:

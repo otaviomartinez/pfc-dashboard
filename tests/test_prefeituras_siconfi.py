@@ -49,9 +49,17 @@ def test_percentual_vem_da_coluna_nao_do_rotulo():
 
 
 def test_aceita_formato_antigo_conta_por_compatibilidade():
-    itens = [{"conta": "Aplicação em ensino", "coluna": "% Aplicado",
+    """A chave `conta` continua valendo — mas a conta tem de ser a de MDE.
+
+    (Este teste usava "Aplicação em ensino", que hoje é REJEITADO de propósito:
+    era o casamento frouxo que deixou a fatia de educação virar índice de MDE.)
+    """
+    itens = [{"conta": "Aplicação em MDE", "coluna": "% Aplicado",
               "valor": 26.0, "exercicio": 2025, "periodo": 6}]
     assert siconfi.extrair_mde(itens)["percentual"] == 26.0
+    frouxo = [{"conta": "Aplicação em ensino", "coluna": "% Aplicado",
+               "valor": 26.0, "exercicio": 2025, "periodo": 6}]
+    assert siconfi.extrair_mde(frouxo) is None
 
 
 def test_percentual_calculado_quando_nao_vem_pronto():
@@ -104,6 +112,33 @@ def test_fixture_real_se_existir():
     assert mde["exercicio"]
 
 
+def test_nao_confunde_fatia_de_educacao_com_indice_de_mde():
+    """O bug que inventou 9 municípios "abaixo do mínimo".
+
+    O RREO-Anexo 02 (Despesas por Função) traz a EDUCAÇÃO como fatia da despesa
+    total — um número que cai perto de 25% e passava por índice de MDE. Só vale
+    a conta que diz MDE ou "manutenção e desenvolvimento do ensino".
+    """
+    fatia = [_linha("Educação", 25.48, coluna="% (b/total b)")]
+    assert siconfi.extrair_mde(fatia) is None, "fatia de educação virou MDE"
+
+    subconta = [_linha("Ensino Fundamental", 18.2, coluna="% (c/a)")]
+    assert siconfi.extrair_mde(subconta) is None, "subconta de ensino virou MDE"
+
+    real = [_linha("APLICAÇÃO EM MDE SOBRE A RECEITA LÍQUIDA", 27.9,
+                   coluna="% Aplicado Até o Bimestre")]
+    assert siconfi.extrair_mde(real)["percentual"] == 27.9
+
+
+def test_casamento_ignora_acento():
+    """Sem strip de acento, "Manutenção..." nunca casava e o MDE passava batido."""
+    assert siconfi._casa("Manutenção e Desenvolvimento do Ensino",
+                         "manutencao e desenvolvimento")
+    por_extenso = [_linha("Manutenção e Desenvolvimento do Ensino", 26.1,
+                          coluna="% Mínimo Aplicado")]
+    assert siconfi.extrair_mde(por_extenso)["percentual"] == 26.1
+
+
 if __name__ == "__main__":
     test_numero_tolera_formato_brasileiro()
     test_percentual_vem_da_coluna_nao_do_rotulo()
@@ -113,5 +148,7 @@ if __name__ == "__main__":
     test_vazio_devolve_none_nao_zero()
     test_extrai_caixa()
     test_fallback_manual_ausente_nao_quebra()
+    test_nao_confunde_fatia_de_educacao_com_indice_de_mde()
+    test_casamento_ignora_acento()
     test_fixture_real_se_existir()
     print("OK — parsers do SICONFI (MDE, caixa, fallback manual) passaram.")
