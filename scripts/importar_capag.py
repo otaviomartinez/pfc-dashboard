@@ -61,42 +61,33 @@ def _linhas_da_planilha(conteudo: bytes, formato: str) -> list[dict]:
         import pandas as pd
         xls = pd.ExcelFile(io.BytesIO(conteudo))
         print("  abas:", xls.sheet_names)
-        # Prefere a aba OFICIAL "CAPAG Ano Base <ano>" mais recente; a "Prévia"
-        # é preliminar. Sem nenhuma, cai para a aba com mais linhas.
-        import re as _re
-        oficiais = []
-        for aba in xls.sheet_names:
-            achou = _re.search(r"ano\s*base\s*(\d{4})", str(aba), _re.I)
-            if achou:
-                oficiais.append((int(achou.group(1)), aba))
-        if oficiais:
-            melhor = max(oficiais)[1]
-            n_melhor = len(pd.read_excel(xls, sheet_name=melhor, header=None, nrows=6000))
-        else:
-            melhor, n_melhor = xls.sheet_names[0], -1
-            for aba in xls.sheet_names:
-                n = len(pd.read_excel(xls, sheet_name=aba, header=None, nrows=6000))
-                if n > n_melhor:
-                    melhor, n_melhor = aba, n
-        print(f"  usando a aba {melhor!r} ({n_melhor} linhas)")
-        bruto = pd.read_excel(xls, sheet_name=melhor, header=None)
-        # Acha a linha de cabeçalho: a primeira com um marcador reconhecível.
-        # (O log mostrou colunas 'Unnamed'/números -> o cabeçalho está abaixo.)
-        marcadores = ("ibge", "municipio", "município", "ente", "instituic")
-        cab = None
-        for i in range(min(30, len(bruto))):
-            celulas = [str(v).lower() for v in bruto.iloc[i].tolist()]
-            if any(any(m in cel for m in marcadores) for cel in celulas):
-                cab = i
-                break
-        if cab is None:
-            print("  ! não achei a linha de cabeçalho. Primeiras 6 linhas cruas:")
-            for i in range(min(6, len(bruto))):
-                print("   ", [str(v)[:22] for v in bruto.iloc[i].tolist()[:10]])
-            return []
-        print(f"  cabeçalho na linha {cab}")
-        df = pd.read_excel(xls, sheet_name=melhor, header=cab)
-        return df.to_dict("records")
+        # NÃO escolher a aba pelo NOME. A pasta tem várias abas "CAPAG *", e a
+        # "CAPAG Ano Base 2025" é a de INDICADORES (Dívida Consolidada, DPC-2…),
+        # sem lista de municípios — escolhê-la pelo nome quebrou a coleta. A aba
+        # certa é a que, ao ser lida, REALMENTE tem coluna de código de município
+        # E coluna de nota. Validamos antes de aceitar.
+        def _cab_valido(celulas):
+            tem_cod = any(("ibge" in x) or ("codigo" in x and "municipio" in x)
+                          for x in celulas)
+            tem_nota = any(("capag" in x) or x.startswith("nota") for x in celulas)
+            return tem_cod and tem_nota
+
+        candidatas = ([a for a in xls.sheet_names if "capag" in str(a).lower()]
+                      + [a for a in xls.sheet_names if "capag" not in str(a).lower()])
+        for aba in candidatas:
+            try:
+                bruto = pd.read_excel(xls, sheet_name=aba, header=None, nrows=40)
+            except Exception:
+                continue
+            for i in range(min(30, len(bruto))):
+                celulas = [normalizar_nome(v) for v in bruto.iloc[i].tolist()]
+                if _cab_valido(celulas):
+                    df = pd.read_excel(xls, sheet_name=aba, header=i)
+                    print(f"  aba {aba!r}, cabeçalho na linha {i} (validado: "
+                          "tem código de município e nota)")
+                    return df.to_dict("records")
+        print("  ! nenhuma aba tem código de município + nota. Abas vistas acima.")
+        return []
     texto = conteudo.decode("utf-8-sig", errors="replace")
     sep = ";" if texto.count(";") > texto.count(",") else ","
     return list(csv.DictReader(io.StringIO(texto), delimiter=sep))
