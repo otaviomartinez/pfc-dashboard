@@ -2649,6 +2649,35 @@ def dlg_expansao(viz: dict):
     if viz.get("mde_origem") == "tce-sp":
         st.caption("Índice **apurado pelo TCE-SP** (Audesp).")
 
+    # --- Contato oficial da prefeitura (cadastro de CNPJ) -------------------
+    # Vem PRONTO, sem o usuário clicar em nada. Quando não houver, a tela cai
+    # para os links de busca abaixo — melhor um link honesto que um e-mail
+    # inventado.
+    try:
+        from src.prefeituras import contatos as _contatos
+        ct = (_contatos.por_codigo(viz.get("cod_ibge"))
+              or _contatos.por_municipio(viz["municipio"]))
+    except Exception:
+        ct = None
+    if ct:
+        itens = []
+        if ct.get("email"):
+            itens.append(("E-mail", ct["email"]))
+        if ct.get("telefone"):
+            itens.append(("Telefone", ct["telefone"]))
+        if ct.get("endereco"):
+            itens.append(("Endereço", ct["endereco"]
+                          + (f' · CEP {ct["cep"]}' if ct.get("cep") else "")))
+        if ct.get("razao_social"):
+            itens.append(("Órgão", ct["razao_social"]))
+        st.markdown('<div class="pf-bloco"><h4>Contato oficial da prefeitura</h4>'
+                    + "".join(f'<div class="pf-linha"><span class="k">{esc(k)}</span>'
+                              f'<span class="v">{esc(v)}</span></div>'
+                              for k, v in itens)
+                    + '</div>', unsafe_allow_html=True)
+        st.caption("Cadastro nacional de CNPJ (Receita Federal) — contato "
+                   "**institucional** mantido pela própria prefeitura.")
+
     try:
         from src.prefeituras import escolas as _escolas
         lista = _escolas.por_municipio(viz["municipio"])
@@ -2779,6 +2808,35 @@ def dlg_prefeitura(pref: dict):
                     'levantamento</span><span class="v">—</span></div></div>',
                     unsafe_allow_html=True)
         st.caption("Veja **Territórios em Aberto** para os financiadores da região.")
+
+    # --- Contato oficial da prefeitura (cadastro de CNPJ) -------------------
+    # Vem PRONTO, sem o usuário clicar em nada. Quando não houver, a tela cai
+    # para os links de busca abaixo — melhor um link honesto que um e-mail
+    # inventado.
+    try:
+        from src.prefeituras import contatos as _contatos
+        ct = (_contatos.por_codigo(pref.get("cod_ibge"))
+              or _contatos.por_municipio(pref["municipio"]))
+    except Exception:
+        ct = None
+    if ct:
+        itens = []
+        if ct.get("email"):
+            itens.append(("E-mail", ct["email"]))
+        if ct.get("telefone"):
+            itens.append(("Telefone", ct["telefone"]))
+        if ct.get("endereco"):
+            itens.append(("Endereço", ct["endereco"]
+                          + (f' · CEP {ct["cep"]}' if ct.get("cep") else "")))
+        if ct.get("razao_social"):
+            itens.append(("Órgão", ct["razao_social"]))
+        st.markdown('<div class="pf-bloco"><h4>Contato oficial da prefeitura</h4>'
+                    + "".join(f'<div class="pf-linha"><span class="k">{esc(k)}</span>'
+                              f'<span class="v">{esc(v)}</span></div>'
+                              for k, v in itens)
+                    + '</div>', unsafe_allow_html=True)
+        st.caption("Cadastro nacional de CNPJ (Receita Federal) — contato "
+                   "**institucional** mantido pela própria prefeitura.")
 
     # --- Escolas públicas (o contato mais acionável: o PFC atua DENTRO delas) --
     try:
