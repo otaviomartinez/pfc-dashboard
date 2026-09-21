@@ -249,8 +249,19 @@ ponte_partidaria), tela + dossiê + PDF + "Puxar para Prospecção".
   inclusive via CKAN e com UA de navegador), mas funciona no navegador.
   `scripts/importar_eleitos_tse.py <zip>` recorta os 11 (159 eleitos).
 
+- **Contatos — dois cadastros, ambos INSTITUCIONAIS.** (1) **Prefeitura**:
+  e-mail, telefone e endereço do cadastro de CNPJ da Receita, descobertos via
+  SICONFI `/entes` (CNPJ) → BrasilAPI; `scripts/importar_contatos_prefeitura.py`
+  → `data/prefeituras/contatos_prefeitura.csv`, lido por
+  `src.prefeituras.contatos` (`por_codigo` primeiro, `por_municipio` de
+  reserva). (2) **Escolas**: telefone/endereço do Catálogo do INEP
+  (`src.prefeituras.escolas`). Os dois aparecem **prontos no dossiê**, sem
+  clique; sem dado, a tela cai para os links de busca de `canais_oficiais` —
+  **nunca** inventar domínio ou e-mail. O TSE não serve para isso: e-mail de
+  candidato vem mascarado (8.329 de 8.329 em SP).
+
 Coleta automática: **GitHub → Actions → "Dados do Painel Prefeituras" → Run
-workflow** (MDE/CAPAG; o TSE precisa do zip). Commita os CSVs sozinho.
+workflow** (MDE/CAPAG/contatos; o TSE precisa do zip). Commita os CSVs sozinho.
 
 **Passo 9 — FEITO.** Mapa de expansão: os **77 vizinhos** das nossas 6 Regiões
 Imediatas, ranqueados por temperatura e porte, num seletor na própria tela

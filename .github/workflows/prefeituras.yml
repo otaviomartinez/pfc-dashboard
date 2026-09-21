@@ -23,7 +23,7 @@ permissions:
 jobs:
   dados:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,6 +57,14 @@ jobs:
         continue-on-error: true
         run: python scripts/importar_eleitos_tse.py
 
+      # Contato institucional da prefeitura (e-mail/telefone/endereço) via
+      # CNPJ da Receita. É o que faz o dossiê mostrar contato SEM o usuário
+      # precisar clicar em link de busca.
+      - name: Contatos da prefeitura (CNPJ/Receita)
+        id: contatos
+        continue-on-error: true
+        run: python scripts/importar_contatos_prefeitura.py
+
       - name: Conferir o que foi gerado
         run: |
           echo "### Arquivos em data/prefeituras/" >> $GITHUB_STEP_SUMMARY
@@ -68,7 +76,7 @@ jobs:
             echo "- nenhum CSV gerado" >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "MDE: ${{ steps.mde.outcome }} · CAPAG: ${{ steps.capag.outcome }} · TSE: ${{ steps.tse.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "MDE: ${{ steps.mde.outcome }} · CAPAG: ${{ steps.capag.outcome }} · TSE: ${{ steps.tse.outcome }} · Contatos: ${{ steps.contatos.outcome }}" >> $GITHUB_STEP_SUMMARY
 
       - name: Commitar os CSVs
         run: |
@@ -78,7 +86,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "Nada mudou — nenhum commit."
           else
-            git commit -m "dados: atualiza CSVs do painel Prefeituras (MDE/CAPAG/TSE)"
+            git commit -m "dados: atualiza CSVs do painel Prefeituras (MDE/CAPAG/TSE/contatos)"
             git push origin HEAD:${{ github.ref_name }}
             echo "CSVs commitados na $(git rev-parse --abbrev-ref HEAD)."
           fi
