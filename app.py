@@ -2344,22 +2344,23 @@ def _dados_prefeituras() -> list:
     except Exception:
         return []
 
-    exercicio = None
+    # MDE e CAPAG vêm de FONTES DIFERENTES e chegam separados: o CAPAG já
+    # existia enquanto o MDE seguia indisponível. Amarrar o CAPAG ao exercício
+    # do MDE fazia o painel ignorar dado que estava no disco — cada um carrega
+    # pelo SEU próprio exercício disponível.
+    reg_mde, reg_capag = {}, {}
     try:
-        exercicio = _mde.exercicio_disponivel()
+        ex_mde = _mde.exercicio_disponivel()
+        if ex_mde:
+            reg_mde = _mde.carregar(ex_mde)
     except Exception:
-        pass
-    reg_mde = {}
-    reg_capag = {}
-    if exercicio:
-        try:
-            reg_mde = _mde.carregar(exercicio)
-        except Exception:
-            reg_mde = {}
-        try:
-            reg_capag = _capag.carregar(exercicio)
-        except Exception:
-            reg_capag = {}
+        reg_mde = {}
+    try:
+        ex_capag = _capag.exercicio_disponivel()
+        if ex_capag:
+            reg_capag = _capag.carregar(ex_capag)
+    except Exception:
+        reg_capag = {}
     try:
         lista_eleitos = _eleitos.carregar()
     except Exception:
@@ -2428,7 +2429,17 @@ def render_prefeituras():
         '<div class="r">sem dado de MDE</div></div>'
         '</div>', unsafe_allow_html=True)
 
-    if c["sem_dado"] == c["total"]:
+    # A mensagem precisa dizer o que REALMENTE falta: com o CAPAG já baixado e
+    # só o MDE ausente, avisar "nenhum dado baixado" é mentira.
+    n_capag = sum(1 for x in linhas if x["capag_rotulo"] != "não avaliado")
+    if c["sem_dado"] == c["total"] and n_capag:
+        st.info(f"**CAPAG carregado** ({n_capag} de {c['total']} municípios com "
+                "nota). Falta o **MDE** (a aplicação dos 25% em educação): o "
+                "Anexo 08 do SICONFI não publica esse dado para estes "
+                "municípios. Sem ele a *temperatura* fica em \"sem dado\" — de "
+                "propósito, porque a leitura estratégica precisa dos dois.",
+                icon=":material/info:")
+    elif c["sem_dado"] == c["total"]:
         st.info("Nenhum dado de MDE/CAPAG baixado ainda. Para preencher, abra o "
                 "**GitHub → aba Actions → \"Dados do Painel Prefeituras\" → Run "
                 "workflow** (funciona pelo celular; ele baixa tudo e salva sozinho). "

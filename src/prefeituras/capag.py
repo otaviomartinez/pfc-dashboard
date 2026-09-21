@@ -77,3 +77,24 @@ def nota_saudavel(nota) -> bool | None:
     if n in ("C", "D"):
         return False
     return None
+
+
+def exercicio_disponivel(preferido: int | None = None) -> int | None:
+    """Exercício mais recente com capag_<ano>.csv no disco, ou None.
+
+    Existe porque o CAPAG NÃO pode depender do MDE: os dois vêm de fontes
+    diferentes e um pode chegar sem o outro (foi o que aconteceu — CAPAG
+    baixado, MDE indisponível, e o painel ignorava o CAPAG).
+    """
+    if not os.path.isdir(DIR_DADOS):
+        return None
+    anos = []
+    for nome in os.listdir(DIR_DADOS):
+        if nome.startswith("capag_") and nome.endswith(".csv"):
+            try:
+                anos.append(int(nome[6:-4]))
+            except ValueError:
+                continue
+    if preferido and preferido in anos:
+        return preferido
+    return max(anos) if anos else None
