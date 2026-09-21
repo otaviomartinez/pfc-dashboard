@@ -38,9 +38,33 @@ URLS_TSE = [
 ]
 
 
+def urls_do_ckan() -> list[str]:
+    """URLs de recurso do dataset no CKAN do TSE (dadosabertos é CKAN, igual ao
+    Tesouro). Descobrir bate chutar CDN: o log mostrou 403 nas três URLs fixas."""
+    api = ("https://dadosabertos.tse.jus.br/api/3/action/"
+           "package_show?id=candidatos-2024")
+    try:
+        req = urllib.request.Request(api, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            import json as _json
+            pacote = _json.loads(r.read().decode("utf-8"))
+    except Exception as e:
+        print(f"  CKAN do TSE não respondeu: {type(e).__name__}: {str(e)[:90]}")
+        return []
+    achadas = []
+    for rec in (pacote.get("result") or {}).get("resources") or []:
+        url = str(rec.get("url") or "")
+        if url.lower().endswith(".zip") and "_sp" in url.lower():
+            achadas.insert(0, url)            # o de SP primeiro
+        elif url.lower().endswith(".zip"):
+            achadas.append(url)
+    print(f"  CKAN listou {len(achadas)} zip(s)")
+    return achadas[:4]
+
+
 def baixar_zip() -> str | None:
     """Baixa o zip do TSE para um arquivo temporário. Caminho, ou None."""
-    for url in URLS_TSE:
+    for url in urls_do_ckan() + URLS_TSE:
         try:
             print(f"  tentando {url[:88]}…")
             # O CDN do TSE devolve 403 para User-Agent de robô. Cabeçalhos de

@@ -23,7 +23,10 @@ from src.prefeituras.config import carregar_municipios
 # items=[] — vazio SILENCIOSO. Testamos variações conhecidas e ficamos com a
 # que responder. O mesmo vale para o exercício (o RREO do 6º bimestre de um ano
 # só é publicado no começo do ano seguinte, e nem todo município homologa).
-ANEXOS_MDE = ["RREO-Anexo 08", "RREO-Anexo 8", "RREO-Anexo 02"]
+# O log do Actions mostrou: "RREO-Anexo 08" devolve 0 e "RREO-Anexo 02" devolve
+# 489. Então varremos os anexos do RREO e ficamos com o primeiro que traga o
+# percentual de MDE — sem chutar qual é o nome certo.
+ANEXOS_MDE = [f"RREO-Anexo {n:02d}" for n in range(1, 11)]
 
 BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DIR_DADOS = os.path.join(BASE, "data", "prefeituras")
@@ -41,12 +44,22 @@ def sondar(cod_ibge: str, exercicios: list[int]) -> tuple[str, int] | None:
     print("  sondando o que o SICONFI responde…")
     for exe in exercicios:
         for anexo in ANEXOS_MDE:
-            itens = siconfi.buscar_rreo(cod_ibge, exe, 6, anexo)
+            # tentativas=1: são ~20 chamadas de sondagem; retry aqui só atrasa
+            itens = siconfi.buscar_rreo(cod_ibge, exe, 6, anexo, tentativas=1)
             n = len(itens or [])
-            print(f"    exercício {exe} · {anexo!r} -> {n} linha(s)")
-            if itens:
-                print(f"      colunas: {list(itens[0].keys())[:12]}")
+            if not n:
+                continue
+            mde = siconfi.extrair_mde(itens, exe, 6)
+            print(f"    exercício {exe} · {anexo!r} -> {n} linha(s) · "
+                  f"MDE={'SIM' if mde else 'não'}")
+            if mde:
                 return anexo, exe
+            # não achou o percentual: mostra os rótulos REAIS para eu ajustar
+            amostra = []
+            for it in itens[:6]:
+                r, c, v = siconfi._campos(it)
+                amostra.append(f"{r[:42]!r}/{c[:26]!r}={v}")
+            print("      amostra:", " | ".join(amostra))
     return None
 
 
@@ -54,7 +67,7 @@ def construir_mde(exercicio: int) -> list[dict]:
     """Uma linha por município COM dado. Quem não tem fica de fora (não vira 0)."""
     muns = carregar_municipios()
     anexo, exercicio = siconfi.ANEXO_MDE, exercicio
-    achado = sondar(muns[0]["cod_ibge"], [exercicio, exercicio - 1, exercicio + 1])
+    achado = sondar(muns[0]["cod_ibge"], [exercicio, exercicio - 1])
     if achado:
         anexo, exercicio = achado
         print(f"  usando {anexo!r} · exercício {exercicio}")

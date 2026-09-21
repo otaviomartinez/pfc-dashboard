@@ -54,7 +54,7 @@ def buscar_entes(uf: str = "SP") -> list[dict]:
 
 
 def buscar_rreo(cod_ibge: str, exercicio: int, periodo: int = 6,
-                anexo: str = ANEXO_MDE) -> list[dict] | None:
+                anexo: str = ANEXO_MDE, tentativas: int = 3) -> list[dict] | None:
     """Linhas do RREO de um município, ou None quando não veio nada.
 
     None (e não []) é proposital: `items` vazio costuma significar string de
@@ -64,7 +64,7 @@ def buscar_rreo(cod_ibge: str, exercicio: int, periodo: int = 6,
     dados = _get("rreo", {
         "an_exercicio": exercicio, "nr_periodo": periodo,
         "co_tipo_demonstrativo": "RREO", "no_anexo": anexo, "id_ente": cod_ibge,
-    })
+    }, tentativas=tentativas)
     if not dados:
         return None
     itens = dados.get("items") or []
@@ -110,6 +110,19 @@ def _casa(texto: str, *termos: str) -> bool:
     return all(x in t for x in termos)
 
 
+def _campos(it: dict) -> tuple[str, str, float | None]:
+    """(rotulo, coluna, valor) de uma linha do RREO.
+
+    A API responde com `rotulo` (a conta) + `coluna` (qual medida: "% Aplicado",
+    "Até o Bimestre"...) + `valor`. Os nomes `conta`/`vl_conta` são aceitos por
+    compatibilidade, mas NÃO são o que o SICONFI devolve — descobrimos isso pelo
+    log do Actions, depois de o parser antigo ler zero linha de 489.
+    """
+    rotulo = str(it.get("rotulo") or it.get("conta") or it.get("no_conta") or "")
+    coluna = str(it.get("coluna") or "")
+    return rotulo, coluna, _num(it.get("valor", it.get("vl_conta")))
+
+
 def extrair_mde(items, exercicio: int | None = None,
                 periodo: int | None = None) -> dict | None:
     """{percentual, valor_aplicado, receita_base, exercicio, periodo} ou None.
@@ -124,19 +137,23 @@ def extrair_mde(items, exercicio: int | None = None,
     pct = valor = receita = None
     exe, per = exercicio, periodo
     for it in items:
-        conta = str(it.get("conta") or it.get("no_conta") or "")
+        rotulo, coluna, v = _campos(it)
         exe = exe or it.get("exercicio") or it.get("an_exercicio")
         per = per or it.get("periodo") or it.get("nr_periodo")
-        v = _num(it.get("valor") or it.get("vl_conta"))
         if v is None:
             continue
-        if pct is None and (_casa(conta, "mde") or _casa(conta, "manuten")) \
-                and ("%" in conta or _casa(conta, "aplica")) and 0 < v <= 100:
+        texto = f"{rotulo} {coluna}"
+        # percentual: a medida vem na COLUNA ("% Aplicado ..."), não no rótulo
+        e_percentual = "%" in coluna or _casa(coluna, "aplicad")
+        if pct is None and e_percentual and 0 < v <= 100 and (
+                _casa(texto, "mde") or _casa(texto, "manuten")
+                or _casa(texto, "ensino") or _casa(texto, "educac")):
             pct = v
-        if valor is None and _casa(conta, "total") and _casa(conta, "despesa"):
+        if valor is None and not e_percentual and _casa(rotulo, "total") \
+                and _casa(rotulo, "despesa"):
             valor = v
-        if receita is None and _casa(conta, "receita") and \
-                (_casa(conta, "impostos") or _casa(conta, "result")):
+        if receita is None and not e_percentual and _casa(rotulo, "receita") and \
+                (_casa(rotulo, "impostos") or _casa(rotulo, "result")):
             receita = v
     if pct is None and valor and receita:
         pct = round(valor / receita * 100, 2)
@@ -158,9 +175,8 @@ def extrair_caixa(items) -> dict | None:
     if not items:
         return None
     for it in items:
-        conta = str(it.get("conta") or it.get("no_conta") or "")
-        v = _num(it.get("valor") or it.get("vl_conta"))
-        if v is not None and _casa(conta, "disponibilidade") and _casa(conta, "caixa"):
+        rotulo, _coluna, v = _campos(it)
+        if v is not None and _casa(rotulo, "disponibilidade") and _casa(rotulo, "caixa"):
             return {"disponibilidade": v}
     return None
 
