@@ -2429,11 +2429,12 @@ def render_prefeituras():
         '</div>', unsafe_allow_html=True)
 
     if c["sem_dado"] == c["total"]:
-        st.info("Nenhum dado de MDE/CAPAG baixado ainda. Rode "
-                "`python -m src.prefeituras` (e `scripts/importar_eleitos_tse.py`) "
-                "na sua máquina para preencher. Até lá, o painel mostra a estrutura "
-                "e rotula tudo como **sem dado** — de propósito, para não inventar "
-                "número.", icon=":material/info:")
+        st.info("Nenhum dado de MDE/CAPAG baixado ainda. Para preencher, abra o "
+                "**GitHub → aba Actions → \"Dados do Painel Prefeituras\" → Run "
+                "workflow** (funciona pelo celular; ele baixa tudo e salva sozinho). "
+                "Até lá, o painel mostra a estrutura e rotula tudo como **sem "
+                "dado** — de propósito, para não inventar número.",
+                icon=":material/info:")
 
     f1, f2, f3 = st.columns(3)
     f_temp = f1.multiselect("Temperatura", ["quente", "morno", "frio", "sem_dado"],
@@ -2466,21 +2467,24 @@ def render_prefeituras():
             (f"{len(l['deputados_emenda'])} parlamentar(es) com emenda aqui"
              if l.get("deputados_emenda") else ""),
         ) if x)
-        st.markdown(
-            '<div class="pf-cell">'
-            f'<div class="pf-nomecol"><div class="pf-nome">'
-            f'{_pf_selo(TEMPERATURA_PREF_ROTULO.get(l["temperatura"], ""), cor_t)}'
-            f'{esc(l["municipio"])}</div>'
-            f'<div class="pf-sub">{esc(sub)}</div></div>'
-            f'<div class="pf-mdecol"><div class="pf-mde" style="color:{cor_m}">'
-            f'{esc(l["mde_rotulo"])}</div>'
-            f'<div class="pf-sub">{esc(SITUACAO_MDE_ROTULO.get(l["situacao_mde"], ""))}</div></div>'
-            f'<div class="pf-capcol"><div class="pf-capag">{esc(l["capag_rotulo"])}</div>'
-            '<div class="pf-sub">CAPAG</div></div>'
-            '</div>', unsafe_allow_html=True)
-        if st.button(f"Abrir dossiê de {l['municipio']}", key=f"pf_{i}",
-                     use_container_width=True):
-            dlg_prefeitura(l)
+        # container com key: o CSS usa st-key-pfrow_<i> para sobrepor o botão ao
+        # card inteiro (senão fica uma caixa vazia embaixo de cada linha).
+        with st.container(key=f"pfrow_{i}"):
+            st.markdown(
+                '<div class="pf-cell">'
+                f'<div class="pf-nomecol"><div class="pf-nome">'
+                f'{_pf_selo(TEMPERATURA_PREF_ROTULO.get(l["temperatura"], ""), cor_t)}'
+                f'{esc(l["municipio"])}</div>'
+                f'<div class="pf-sub">{esc(sub)}</div></div>'
+                f'<div class="pf-mdecol"><div class="pf-mde" style="color:{cor_m}">'
+                f'{esc(l["mde_rotulo"])}</div>'
+                f'<div class="pf-sub">{esc(SITUACAO_MDE_ROTULO.get(l["situacao_mde"], ""))}</div></div>'
+                f'<div class="pf-capcol"><div class="pf-capag">{esc(l["capag_rotulo"])}</div>'
+                '<div class="pf-sub">CAPAG</div></div>'
+                '</div>', unsafe_allow_html=True)
+            if st.button(f"Abrir dossiê de {l['municipio']}", key=f"pf_{i}",
+                         use_container_width=True):
+                dlg_prefeitura(l)
 
 
 @st.dialog("Dossiê do município", width="large")
