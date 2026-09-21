@@ -44,7 +44,12 @@ def urls_do_ckan() -> list[str]:
     api = ("https://dadosabertos.tse.jus.br/api/3/action/"
            "package_show?id=candidatos-2024")
     try:
-        req = urllib.request.Request(api, headers={"Accept": "application/json"})
+        req = urllib.request.Request(api, headers={
+            "Accept": "application/json",
+            "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                           "AppleWebKit/537.36 (KHTML, like Gecko) "
+                           "Chrome/126.0 Safari/537.36"),
+        })
         with urllib.request.urlopen(req, timeout=60) as r:
             import json as _json
             pacote = _json.loads(r.read().decode("utf-8"))

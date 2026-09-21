@@ -61,12 +61,23 @@ def _linhas_da_planilha(conteudo: bytes, formato: str) -> list[dict]:
         import pandas as pd
         xls = pd.ExcelFile(io.BytesIO(conteudo))
         print("  abas:", xls.sheet_names)
-        # Escolhe a aba com MAIS linhas (a de dados; as outras são notas/capa).
-        melhor, n_melhor = xls.sheet_names[0], -1
+        # Prefere a aba OFICIAL "CAPAG Ano Base <ano>" mais recente; a "Prévia"
+        # é preliminar. Sem nenhuma, cai para a aba com mais linhas.
+        import re as _re
+        oficiais = []
         for aba in xls.sheet_names:
-            n = len(pd.read_excel(xls, sheet_name=aba, header=None, nrows=6000))
-            if n > n_melhor:
-                melhor, n_melhor = aba, n
+            achou = _re.search(r"ano\s*base\s*(\d{4})", str(aba), _re.I)
+            if achou:
+                oficiais.append((int(achou.group(1)), aba))
+        if oficiais:
+            melhor = max(oficiais)[1]
+            n_melhor = len(pd.read_excel(xls, sheet_name=melhor, header=None, nrows=6000))
+        else:
+            melhor, n_melhor = xls.sheet_names[0], -1
+            for aba in xls.sheet_names:
+                n = len(pd.read_excel(xls, sheet_name=aba, header=None, nrows=6000))
+                if n > n_melhor:
+                    melhor, n_melhor = aba, n
         print(f"  usando a aba {melhor!r} ({n_melhor} linhas)")
         bruto = pd.read_excel(xls, sheet_name=melhor, header=None)
         # Acha a linha de cabeçalho: a primeira com um marcador reconhecível.
@@ -96,6 +107,17 @@ def _campo(linha: dict, *termos: str):
     for k, v in linha.items():
         nome = normalizar_nome(k)
         if all(t in nome for t in termos):
+            return v
+    return None
+
+
+def _codigo(linha: dict):
+    """Código do município. A planilha do Tesouro chama de "Código Município
+    Completo" — SEM a palavra "IBGE", que era o único termo que procurávamos
+    antes (por isso 0 de 11 casavam). Descoberto no log do Actions."""
+    for termos in (("ibge",), ("codigo", "municipio"), ("cod", "mun"), ("codigo",)):
+        v = _campo(linha, *termos)
+        if v is not None:
             return v
     return None
 
@@ -135,7 +157,7 @@ def main() -> int:
     alvos6 = {cod[:6]: cod for cod in alvos}
     saida, ano_visto = [], exercicio
     for linha in linhas:
-        cod = _campo(linha, "ibge")
+        cod = _codigo(linha)
         if cod is None:
             continue
         cod = str(cod).split(".")[0].strip()          # 3510302.0 -> 3510302
@@ -155,9 +177,15 @@ def main() -> int:
             pass
         saida.append({
             "cod_ibge": cod, "municipio": alvos[cod], "nota": nota,
-            "endividamento": str(_campo(linha, "endivid") or "").strip(),
-            "poupanca": str(_campo(linha, "poupan") or "").strip(),
-            "liquidez": str(_campo(linha, "liquid") or "").strip(),
+            # Metodologia do Tesouro: Indicador 1 = endividamento,
+            # 2 = poupança corrente, 3 = liquidez. Na planilha as notas vêm como
+            # "Nota 1/2/3" (visto no log), não pelos nomes por extenso.
+            "endividamento": str(_campo(linha, "endivid")
+                                 or _campo(linha, "nota 1") or "").strip(),
+            "poupanca": str(_campo(linha, "poupan")
+                            or _campo(linha, "nota 2") or "").strip(),
+            "liquidez": str(_campo(linha, "liquid")
+                            or _campo(linha, "nota 3") or "").strip(),
         })
 
     if not ano_visto:

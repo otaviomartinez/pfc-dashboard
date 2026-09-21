@@ -118,7 +118,10 @@ def _campos(it: dict) -> tuple[str, str, float | None]:
     compatibilidade, mas NÃO são o que o SICONFI devolve — descobrimos isso pelo
     log do Actions, depois de o parser antigo ler zero linha de 489.
     """
-    rotulo = str(it.get("rotulo") or it.get("conta") or it.get("no_conta") or "")
+    # ORDEM IMPORTA: `conta` é o nome da conta ("Receita de impostos…").
+    # `rotulo` é uma dimensão de agrupamento e vem quase sempre como "Padrão" —
+    # o log do Actions mostrou isso, depois de eu trocar a ordem por engano.
+    rotulo = str(it.get("conta") or it.get("no_conta") or it.get("rotulo") or "")
     coluna = str(it.get("coluna") or "")
     return rotulo, coluna, _num(it.get("valor", it.get("vl_conta")))
 
