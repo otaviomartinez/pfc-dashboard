@@ -54,12 +54,22 @@ def sondar(cod_ibge: str, exercicios: list[int]) -> tuple[str, int] | None:
                   f"MDE={'SIM' if mde else 'não'}")
             if mde:
                 return anexo, exe
-            # não achou o percentual: mostra os rótulos REAIS para eu ajustar
-            amostra = []
-            for it in itens[:6]:
+            # não achou o percentual: mostra as CONTAS que interessam, para eu
+            # saber onde mora o MDE (nomes vistos no log, não supostos).
+            alvo = ("ensino", "educac", "mde", "manuten", "imposto")
+            achadas, outras = [], []
+            for it in itens:
                 r, c, v = siconfi._campos(it)
-                amostra.append(f"{r[:42]!r}/{c[:26]!r}={v}")
-            print("      amostra:", " | ".join(amostra))
+                linha = f"{r[:46]!r}/{c[:24]!r}={v}"
+                if any(t in r.lower() for t in alvo):
+                    if linha not in achadas:
+                        achadas.append(linha)
+                elif len(outras) < 3:
+                    outras.append(linha)
+            if achadas:
+                print("      CONTAS DE ENSINO/IMPOSTO:", " | ".join(achadas[:8]))
+            else:
+                print("      amostra:", " | ".join(outras))
     return None
 
 
