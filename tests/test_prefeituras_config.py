@@ -1,5 +1,9 @@
 """Config do painel Prefeituras — src/prefeituras/config.py.
 
+Formato do TOML: [[municipios]] plano (o que veio na main pelo Passo 1
+do resolver_ibge). O loader também aceita [[grupos]] aninhado, caso
+alguém volte a agrupar por peso.
+
 O plano proíbe chutar código IBGE. O risco real: código errado faz o SICONFI
 responder VAZIO em silêncio (o pior bug deste projeto). Por isso o carregamento
 reconfere cada código contra data/ibge_regioes_imediatas_sp.csv e falha nomeando
@@ -33,14 +37,12 @@ def test_todo_municipio_tem_codigo_de_7_digitos_e_regiao():
         assert m["cod_ibge"].isdigit() and len(m["cod_ibge"]) == 7, m
         assert m["cod_ibge"].startswith("35"), f"{m['nome']} não é de SP: {m['cod_ibge']}"
         assert m["regiao_imediata"], f"{m['nome']} sem região imediata"
-        assert m["grupo"], f"{m['nome']} sem grupo"
 
 
 def test_codigo_errado_derruba_com_o_nome_do_municipio(tmp=None):
     import tempfile
-    toml = ('[[grupos]]\nnome = "T"\n'
-            '[[grupos.municipios]]\nnome = "Iperó"\ncod_ibge = "3500000"\n'
-            'regiao_imediata = "Sorocaba"\n')
+    toml = ('[[municipios]]\nnome = "Iperó"\ncod_ibge = "3500000"\n'
+            'regiao_imediata_nome = "Sorocaba"\n')
     with tempfile.NamedTemporaryFile("w", suffix=".toml", delete=False,
                                      encoding="utf-8") as f:
         f.write(toml)
@@ -58,9 +60,8 @@ def test_codigo_errado_derruba_com_o_nome_do_municipio(tmp=None):
 
 def test_nome_inexistente_derruba():
     import tempfile
-    toml = ('[[grupos]]\nnome = "T"\n'
-            '[[grupos.municipios]]\nnome = "Cidade Que Nao Existe"\n'
-            'cod_ibge = "3510302"\nregiao_imediata = "X"\n')
+    toml = ('[[municipios]]\nnome = "Cidade Que Nao Existe"\n'
+            'cod_ibge = "3510302"\nregiao_imediata_nome = "X"\n')
     with tempfile.NamedTemporaryFile("w", suffix=".toml", delete=False,
                                      encoding="utf-8") as f:
         f.write(toml)
