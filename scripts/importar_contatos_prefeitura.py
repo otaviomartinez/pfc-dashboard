@@ -35,6 +35,7 @@ BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SAIDA = os.path.join(BASE, "data", "prefeituras", "contatos_prefeitura.csv")
 ENTES = "https://apidatalake.tesouro.gov.br/ords/siconfi/tt/entes"
 BRASILAPI = "https://brasilapi.com.br/api/cnpj/v1/"
+MINHARECEITA = "https://minhareceita.org/"   # 2ª fonte: traz correio_eletronico
 COLUNAS = ["cod_ibge", "municipio", "cnpj", "razao_social", "email", "telefone",
            "endereco", "cep", "fonte"]
 
@@ -78,6 +79,28 @@ def _campo_cnpj(ente: dict) -> str:
     return ""
 
 
+def extrair_email(dados: dict) -> str:
+    """E-mail venha de que campo vier ('email', 'correio_eletronico', ...).
+
+    Uma API renomear a coluna não pode virar 'nenhuma prefeitura tem e-mail'
+    em silêncio — foi exatamente o que aconteceu na 1ª rodada.
+    """
+    for chave, valor in (dados or {}).items():
+        if "mail" in str(chave).lower() or "correio" in str(chave).lower():
+            texto = str(valor or "").strip().lower()
+            if "@" in texto:
+                return texto
+    return ""
+
+
+def consultar_minhareceita(cnpj: str) -> dict | None:
+    """Fonte 2, só quando a 1ª não trouxe e-mail. Mesmo cadastro da Receita."""
+    try:
+        return _json(MINHARECEITA + cnpj, timeout=30)
+    except Exception:
+        return None
+
+
 def consultar_cnpj(cnpj: str, tentativas: int = 3) -> dict | None:
     """Contato do CNPJ na BrasilAPI. None quando não dá (nunca levanta).
 
@@ -117,18 +140,31 @@ def main() -> int:
         return 1
 
     linhas, sem = [], []
+    campos_vistos = campos_2 = False
     for i, (cod, cnpj) in enumerate(sorted(com_cnpj.items()), 1):
         dados = consultar_cnpj(cnpj)
         if not dados:
             sem.append(alvos[cod])
             continue
+        if not campos_vistos:
+            campos_vistos = True
+            print(f"  campos do cadastro: {sorted(dados.keys())}")
+        email = extrair_email(dados)
+        if not email:
+            outra = consultar_minhareceita(cnpj)
+            if outra:
+                if not campos_2:
+                    campos_2 = True
+                    print(f"  campos da 2ª fonte: {sorted(outra.keys())}")
+                email = extrair_email(outra)
+            time.sleep(0.4)
         endereco = " ".join(str(x) for x in (
             dados.get("logradouro"), dados.get("numero"), dados.get("bairro"),
             dados.get("municipio"), dados.get("uf")) if x)
         linhas.append({
             "cod_ibge": cod, "municipio": alvos[cod], "cnpj": cnpj,
             "razao_social": str(dados.get("razao_social") or "").strip(),
-            "email": str(dados.get("email") or "").strip().lower(),
+            "email": email,
             "telefone": str(dados.get("ddd_telefone_1") or "").strip(),
             "endereco": " ".join(endereco.split()),
             "cep": str(dados.get("cep") or "").strip(),
@@ -137,6 +173,24 @@ def main() -> int:
         if i % 20 == 0:
             print(f"    {i}/{len(com_cnpj)}…")
         time.sleep(0.4)          # educado com a API pública
+
+    # Nunca REGREDIR: se numa rodada a API deixar de devolver e-mail, mantemos
+    # o que já tínhamos. O contato bom não some porque a fonte oscilou.
+    try:
+        from src.prefeituras.contatos import carregar as _carregar_antigos
+        antigos = _carregar_antigos()
+    except Exception:
+        antigos = {}
+    mantidos = 0
+    for linha in linhas:
+        velho = antigos.get(linha["cod_ibge"]) or {}
+        for campo in ("email", "telefone", "endereco", "cep"):
+            if not linha.get(campo) and velho.get(campo):
+                linha[campo] = velho[campo]
+                if campo == "email":
+                    mantidos += 1
+    if mantidos:
+        print(f"  {mantidos} e-mail(s) preservado(s) da rodada anterior")
 
     if not linhas:
         print("  ! nenhuma prefeitura retornou contato. NÃO gravo CSV vazio "
