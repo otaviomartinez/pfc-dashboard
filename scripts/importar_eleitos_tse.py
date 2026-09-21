@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 """Importa prefeitos/vices/vereadores eleitos em 2024 (TSE) -> CSV versionado.
 
-RODE NA SUA MÁQUINA, UMA VEZ (aqui no dev o domínio do TSE está bloqueado por
-política da organização — gateway 403). Não roda em runtime do Streamlit.
+Roda no GitHub Actions (lá a internet é livre) ou na máquina do usuário. NÃO
+roda em runtime do Streamlit — é construção offline, igual ao molde de emendas.
 
-    # 1) baixe o zip (uma vez):
-    #    https://dadosabertos.tse.jus.br/dataset/candidatos-2024
-    #    arquivo: consulta_cand_2024_SP.zip
-    # 2) rode apontando para ele:
-    python scripts/importar_eleitos_tse.py ~/Downloads/consulta_cand_2024_SP.zip
+    python scripts/importar_eleitos_tse.py                    # baixa sozinho
+    python scripts/importar_eleitos_tse.py ~/Downloads/x.zip  # usa um zip local
 
 Gera data/prefeituras/eleitos_2024.csv só com os municípios do painel.
 CSV do TSE: latin-1, separado por ';'.
@@ -17,6 +14,8 @@ import csv
 import io
 import os
 import sys
+import tempfile
+import urllib.request
 import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -29,24 +28,65 @@ SAIDA = os.path.join(BASE, "data", "prefeituras", "eleitos_2024.csv")
 CARGOS = {"PREFEITO", "VICE-PREFEITO", "VEREADOR"}
 ELEITOS = {"ELEITO", "ELEITO POR MÉDIA", "ELEITO POR QP"}
 
+# O TSE serve os dados abertos pelo CDN. A URL muda de padrão de vez em quando,
+# então tentamos algumas e dizemos CLARAMENTE qual funcionou (ou que nenhuma
+# funcionou) — nunca falhamos em silêncio.
+URLS_TSE = [
+    "https://cdn.tse.jus.br/estatistica/sead/odsele/consulta_cand/consulta_cand_2024_SP.zip",
+    "https://cdn.tse.jus.br/estatistica/sead/odsele/consulta_cand/consulta_cand_2024.zip",
+    "https://dadosabertos.tse.jus.br/dataset/candidatos-2024/resource/download/consulta_cand_2024_SP.zip",
+]
+
+
+def baixar_zip() -> str | None:
+    """Baixa o zip do TSE para um arquivo temporário. Caminho, ou None."""
+    for url in URLS_TSE:
+        try:
+            print(f"  tentando {url[:88]}…")
+            req = urllib.request.Request(url, headers={"User-Agent": "pfc-dashboard/1.0"})
+            with urllib.request.urlopen(req, timeout=300) as r:
+                dados = r.read()
+            if len(dados) < 10_000:
+                print(f"    resposta pequena demais ({len(dados)} bytes) — ignorando")
+                continue
+            destino = os.path.join(tempfile.mkdtemp(), "consulta_cand.zip")
+            with open(destino, "wb") as f:
+                f.write(dados)
+            print(f"    OK · {len(dados)//1024//1024} MB")
+            return destino
+        except Exception as e:
+            print(f"    falhou: {type(e).__name__}: {str(e)[:100]}")
+    print("  ! nenhuma URL do TSE respondeu. Baixe à mão em "
+          "https://dadosabertos.tse.jus.br/dataset/candidatos-2024 e rode "
+          "passando o caminho do zip.")
+    return None
+
 
 def main() -> int:
-    if len(sys.argv) < 2:
-        print(__doc__)
-        return 2
-    caminho = sys.argv[1]
-    if not os.path.isfile(caminho):
-        print(f"arquivo não encontrado: {caminho}")
-        return 2
+    if len(sys.argv) >= 2:
+        caminho = sys.argv[1]
+        if not os.path.isfile(caminho):
+            print(f"arquivo não encontrado: {caminho}")
+            return 2
+    else:
+        print("== TSE · baixando os candidatos de 2024 ==")
+        caminho = baixar_zip()
+        if not caminho:
+            return 1
 
     alvos = {normalizar_nome(m["nome"]): m["nome"] for m in carregar_municipios()}
     linhas = []
     with zipfile.ZipFile(caminho) as z:
-        nome_csv = next((n for n in z.namelist()
-                         if n.lower().endswith(".csv") and "_SP" in n), None)
+        csvs = [n for n in z.namelist() if n.lower().endswith(".csv")]
+        # prefere o arquivo de SP; se o zip for o nacional, usa o maior CSV
+        # (o filtro por SG_UF == SP abaixo garante o recorte de qualquer jeito).
+        nome_csv = next((n for n in csvs if "_SP" in n.upper()), None)
         if not nome_csv:
-            print("CSV de SP não encontrado dentro do zip")
+            nome_csv = max(csvs, key=lambda n: z.getinfo(n).file_size) if csvs else None
+        if not nome_csv:
+            print("nenhum CSV encontrado dentro do zip")
             return 1
+        print(f"  lendo {nome_csv}")
         with z.open(nome_csv) as fh:
             texto = io.TextIOWrapper(fh, encoding="latin-1", newline="")
             for r in csv.DictReader(texto, delimiter=";"):
