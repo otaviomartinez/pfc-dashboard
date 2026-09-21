@@ -1,0 +1,85 @@
+# =============================================================================
+# Municípios do painel PREFEITURAS — Dashboard PFC
+# =============================================================================
+# ESTE É O ARQUIVO PARA EDITAR quando o PFC entrar/sair de um município.
+# Depois de editar, rode:  python -m src.prefeituras
+#
+# `cod_ibge` NÃO é digitado à mão: foi resolvido a partir de
+# data/ibge_regioes_imediatas_sp.csv (IBGE 2017, já versionado no projeto) e é
+# RECONFERIDO contra esse arquivo toda vez que a config é carregada
+# (src/prefeituras/config.py). Código que não bater derruba com erro explícito —
+# nunca é preenchido por aproximação.
+#
+# `regiao_imediata` vem do mesmo arquivo e serve para o mapa de expansão
+# (municípios vizinhos), igual ao que o painel de Emendas já faz.
+# =============================================================================
+
+[fonte]
+# De onde vieram os códigos. Trocar de fonte? Atualize aqui e no validador.
+arquivo_ibge = "data/ibge_regioes_imediatas_sp.csv"
+referencia = "IBGE — Regiões Imediatas 2017"
+
+[[grupos]]
+nome = "Operação ativa"
+# Municípios onde o PFC já opera.
+
+[[grupos.municipios]]
+nome = "Capela do Alto"
+cod_ibge = "3510302"
+regiao_imediata = "Sorocaba"
+
+[[grupos.municipios]]
+nome = "Cesário Lange"
+cod_ibge = "3511607"
+regiao_imediata = "Tatuí"
+
+[[grupos.municipios]]
+nome = "Corumbataí"
+cod_ibge = "3512704"
+regiao_imediata = "Rio Claro"
+
+[[grupos.municipios]]
+nome = "Guareí"
+cod_ibge = "3518503"
+regiao_imediata = "Itapetininga"
+
+[[grupos.municipios]]
+nome = "Iperó"
+cod_ibge = "3521002"
+regiao_imediata = "Sorocaba"
+
+[[grupos.municipios]]
+nome = "Juquiá"
+cod_ibge = "3526100"
+regiao_imediata = "Registro"
+
+[[grupos.municipios]]
+nome = "Mirassol"
+cod_ibge = "3530300"
+regiao_imediata = "São José do Rio Preto"
+
+[[grupos.municipios]]
+nome = "Rio Claro"
+cod_ibge = "3543907"
+regiao_imediata = "Rio Claro"
+
+[[grupos.municipios]]
+nome = "Salto"
+cod_ibge = "3545209"
+regiao_imediata = "Sorocaba"
+
+[[grupos.municipios]]
+nome = "São Roque"
+cod_ibge = "3550605"
+regiao_imediata = "Sorocaba"
+
+
+[[grupos]]
+nome = "Compromisso assinado, não iniciado"
+# Alvo de médio prazo: já há compromisso, a operação ainda não começou.
+
+[[grupos.municipios]]
+nome = "Tatuí"
+cod_ibge = "3554003"
+regiao_imediata = "Tatuí"
+
