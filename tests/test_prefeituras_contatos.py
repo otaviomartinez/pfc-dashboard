@@ -71,6 +71,37 @@ def test_busca_por_nome_ignora_acento_e_caixa():
     os.unlink(caminho)
 
 
+def _importador():
+    """O script mora em scripts/ (não é pacote) — carrego por caminho."""
+    import importlib.util
+    caminho = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                           "scripts", "importar_contatos_prefeitura.py")
+    spec = importlib.util.spec_from_file_location("_imp_contatos", caminho)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_email_vem_de_qualquer_nome_de_campo():
+    """Na 1ª rodada REAL vieram 88 prefeituras e ZERO e-mails: o campo tinha
+    outro nome. Ler só 'email' faz a ausência parecer dado."""
+    imp = _importador()
+    assert imp.extrair_email({"email": "GAB@Sorocaba.SP.GOV.BR"}) == "gab@sorocaba.sp.gov.br"
+    assert imp.extrair_email({"correio_eletronico": "p@ipero.sp.gov.br"}) == "p@ipero.sp.gov.br"
+    assert imp.extrair_email({"email": None}) == ""
+    assert imp.extrair_email({"email": "NAO CONSTA"}) == "", "sem @ não é e-mail"
+    assert imp.extrair_email({}) == ""
+
+
+def test_importador_preserva_o_que_ja_tinha():
+    """Se a API oscilar e parar de devolver e-mail, o contato bom não some."""
+    fonte = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                              "scripts", "importar_contatos_prefeitura.py"),
+                 encoding="utf-8").read()
+    assert "preservado(s) da rodada anterior" in fonte
+    assert fonte.index("antigos") < fonte.index("DictWriter")
+
+
 def test_importador_nunca_grava_csv_vazio():
     """CSV vazio apagaria o contato que já estava funcionando."""
     fonte = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
