@@ -1954,3 +1954,45 @@ def contagens_expansao(linhas: list) -> dict:
         "limite": sum(1 for x in linhas if x["faixa"] == "limite"),
         "regioes": len({x["regiao_imediata"] for x in linhas if x["regiao_imediata"]}),
     }
+
+
+
+def canais_oficiais(municipio: str) -> list[dict]:
+    """Links para chegar ao contato oficial de um município. [{rotulo, url, nota}]
+
+    Por que BUSCA e não URL direta: não existe padrão de endereço de site de
+    prefeitura em SP, e inventar um domínio seria publicar informação falsa —
+    o mesmo erro dos "9 municípios abaixo do mínimo". Busca pronta é honesta:
+    leva a pessoa ao lugar certo sem afirmar nada.
+
+    O e-SIC vem primeiro de propósito: é o canal da Lei de Acesso à Informação
+    (Lei 12.527/2011), que a prefeitura é OBRIGADA a responder. Para os 77
+    municípios da expansão, onde não há contato cadastrado, é o caminho que
+    funciona sempre.
+    """
+    import urllib.parse
+    mun = str(municipio or "").strip()
+    if not mun:
+        return []
+
+    def busca(termo: str) -> str:
+        return "https://www.google.com/search?q=" + urllib.parse.quote_plus(termo)
+
+    return [
+        {"rotulo": "e-SIC (Lei de Acesso à Informação)",
+         "url": busca(f"e-SIC prefeitura de {mun} SP acesso à informação"),
+         "nota": "A prefeitura é obrigada por lei a responder. Peça o contato "
+                 "do Secretário de Educação por aqui."},
+        {"rotulo": "Secretaria de Educação",
+         "url": busca(f"secretaria municipal de educação {mun} SP contato"),
+         "nota": "Quem decide programa pedagógico."},
+        {"rotulo": "Site da prefeitura",
+         "url": busca(f"prefeitura municipal de {mun} SP site oficial"),
+         "nota": ""},
+        {"rotulo": "Câmara Municipal",
+         "url": busca(f"câmara municipal de {mun} SP vereadores contato"),
+         "nota": "Contato dos vereadores."},
+        {"rotulo": "TCE-SP",
+         "url": "https://transparencia.tce.sp.gov.br/",
+         "nota": "Contas e responsáveis do município."},
+    ]
