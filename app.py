@@ -104,6 +104,8 @@ from ui.formato import (
     SITUACAO_MDE_ROTULO,
     TEMPERATURA_PREF_COR,
     TEMPERATURA_PREF_ROTULO,
+    candidatos_expansao,
+    contagens_expansao,
     contagens_prefeituras,
     normalizar_prefeituras,
     _op_de_novidade,
@@ -2391,6 +2393,63 @@ def _dados_prefeituras() -> list:
         return []
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def _dados_expansao() -> list:
+    """Vizinhos (mesma Região Imediata) onde o PFC ainda NÃO atua — Passo 9.
+
+    Reusa tudo que já existe: as regiões vêm do IBGE que o painel de Emendas já
+    usa, o MDE vem do TCE (644 municípios de SP, então a região inteira está
+    coberta) e o CAPAG do recorte ampliado. Blindado: qualquer falha -> [].
+    """
+    try:
+        from src.prefeituras import capag as _capag
+        from src.prefeituras import mde as _mde
+        from src.prefeituras import tce as _tce
+        from src.prefeituras.config import carregar_municipios, municipios_da_regiao
+        muns = carregar_municipios()
+    except Exception:
+        return []
+
+    nossos = {m["cod_ibge"] for m in muns}
+    ancoras: dict[str, list] = {}
+    for m in muns:
+        ancoras.setdefault(m["regiao_imediata"], []).append(m["nome"])
+
+    vizinhos = {}
+    for regiao in ancoras:
+        try:
+            for viz in municipios_da_regiao(regiao):
+                if viz["cod_ibge"] not in nossos:
+                    vizinhos[viz["cod_ibge"]] = viz
+        except Exception:
+            continue
+
+    reg_mde = {}
+    try:                                   # o TCE cobre SP inteiro
+        ano = (_tce.exercicios_disponiveis() or [None])[0]
+        if ano:
+            reg_mde = _tce.carregar(ano)
+    except Exception:
+        reg_mde = {}
+    if not reg_mde:                        # degrada para o CSV dos 11
+        try:
+            ano = _mde.exercicio_disponivel()
+            reg_mde = _mde.carregar(ano) if ano else {}
+        except Exception:
+            reg_mde = {}
+    try:
+        ano_cap = _capag.exercicio_disponivel()
+        reg_capag = _capag.carregar(ano_cap) if ano_cap else {}
+    except Exception:
+        reg_capag = {}
+
+    try:
+        return candidatos_expansao(list(vizinhos.values()), reg_mde, reg_capag,
+                                   ancoras)
+    except Exception:
+        return []
+
+
 def _pf_selo(texto: str, cor: str) -> str:
     return (f'<span class="pf-selo" style="background:{cor}1F;color:{cor}">'
             f'{esc(texto)}</span>')
@@ -2412,6 +2471,16 @@ def render_prefeituras():
             '<div class="pf-vazio">Nenhum município carregado.<br>'
             'Confira <code>config/pfc_prefeituras.toml</code>.</div>',
             unsafe_allow_html=True)
+        return
+
+    # Passo 9: "Nossos" (onde o PFC atua) x "Expansão" (vizinhos da mesma
+    # Região Imediata). Mesmo eixo do território/expansão das Emendas.
+    st.session_state.setdefault("pf_aba", "Nossos municípios")
+    aba = st.segmented_control(
+        "Recorte", options=["Nossos municípios", "Expansão (vizinhos)"],
+        key="pf_aba", label_visibility="collapsed") or "Nossos municípios"
+    if aba.startswith("Expansão"):
+        _render_expansao()
         return
 
     c = contagens_prefeituras(linhas)
@@ -2496,6 +2565,49 @@ def render_prefeituras():
             if st.button(f"Abrir dossiê de {l['municipio']}", key=f"pf_{i}",
                          use_container_width=True):
                 dlg_prefeitura(l)
+
+
+def _render_expansao():
+    """Mapa de expansão: vizinhos ranqueados por temperatura e porte."""
+    linhas = _dados_expansao()
+    if not linhas:
+        st.markdown('<div class="pf-vazio">Nenhum vizinho carregado.</div>',
+                    unsafe_allow_html=True)
+        return
+    c = contagens_expansao(linhas)
+    st.markdown(
+        '<div class="pf-placar">'
+        f'<div class="pf-kpi"><div class="n" style="color:#4FA8A0">{c["total"]}</div>'
+        f'<div class="r">vizinhos · {c["regioes"]} regiões</div></div>'
+        f'<div class="pf-kpi"><div class="n" style="color:#F0663F">{c["quentes"]}</div>'
+        '<div class="r">leads quentes</div></div>'
+        f'<div class="pf-kpi"><div class="n" style="color:#4ADE80">{c["com_caixa"]}</div>'
+        '<div class="r">com caixa (CAPAG A/B)</div></div>'
+        f'<div class="pf-kpi"><div class="n" style="color:#E8B54A">{c["limite"]}</div>'
+        '<div class="r">no limite (25–28%)</div></div>'
+        '</div>', unsafe_allow_html=True)
+    st.caption("Municípios da MESMA Região Imediata (IBGE) dos nossos, onde o PFC "
+               "ainda **não** atua. Ordenados por temperatura e depois por porte "
+               "(quanto empenham em ensino). O PFC não opera aqui — é mapa de "
+               "prospecção, não carteira.")
+
+    for i, l in enumerate(linhas[:40]):
+        cor_t = TEMPERATURA_PREF_COR.get(l["temperatura"], "#7C8698")
+        st.markdown(
+            '<div class="pf-cell">'
+            f'<div class="pf-nomecol"><div class="pf-nome">'
+            f'{_pf_selo(TEMPERATURA_PREF_ROTULO.get(l["temperatura"], ""), cor_t)}'
+            f'{esc(l["municipio"])}</div>'
+            f'<div class="pf-sub">Região {esc(l["regiao_imediata"])} · '
+            f'{esc(l["motivo"])}</div></div>'
+            f'<div class="pf-mdecol"><div class="pf-mde" style="color:#C6CEDA">'
+            f'{esc(l["mde_rotulo"])}</div>'
+            f'<div class="pf-sub">{esc(l["faixa_rotulo"])}</div></div>'
+            f'<div class="pf-capcol"><div class="pf-capag">{esc(l["capag_rotulo"])}</div>'
+            '<div class="pf-sub">CAPAG</div></div>'
+            '</div>', unsafe_allow_html=True)
+    if len(linhas) > 40:
+        st.caption(f"Mostrando 40 de {len(linhas)}.")
 
 
 @st.dialog("Dossiê do município", width="large")

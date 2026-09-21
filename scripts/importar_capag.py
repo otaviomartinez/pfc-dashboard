@@ -20,7 +20,9 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.prefeituras.config import carregar_municipios, normalizar_nome  # noqa: E402
+from src.prefeituras.config import (  # noqa: E402
+    carregar_municipios, municipios_da_regiao, normalizar_nome,
+)
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SAIDA_DIR = os.path.join(BASE, "data", "prefeituras")
@@ -142,7 +144,15 @@ def main() -> int:
         exemplo = {k: v for k, v in list(linhas[0].items())[:8]}
         print("  1ª linha (amostra):", exemplo)
 
-    alvos = {m["cod_ibge"]: m["nome"] for m in carregar_municipios()}
+    # Os 11 do PFC + os vizinhos da mesma Região Imediata. O plano já pedia
+    # "recortar para os 11 + a região imediata": sem os vizinhos, o Passo 9
+    # (mapa de expansão) não teria CAPAG para ranquear ninguém.
+    muns = carregar_municipios()
+    alvos = {m["cod_ibge"]: m["nome"] for m in muns}
+    for regiao in {m["regiao_imediata"] for m in muns}:
+        for viz in municipios_da_regiao(regiao):
+            alvos.setdefault(viz["cod_ibge"], viz["nome"])
+    print(f"  recorte: {len(muns)} municípios do PFC + vizinhos = {len(alvos)}")
     # Alguns arquivos do Tesouro usam o código IBGE de 6 dígitos (sem o dígito
     # verificador). Indexa pelos dois para casar nos dois formatos.
     alvos6 = {cod[:6]: cod for cod in alvos}
@@ -159,7 +169,9 @@ def main() -> int:
         from src.prefeituras.capag import normalizar_nota
         nota = normalizar_nota(_campo(linha, "capag") or _campo(linha, "nota"))
         if not nota:
-            print(f"  · {alvos[cod]}: sem nota válida ({nota!r}) — fica 'não avaliado'")
+            # só reporta os 11 do PFC; listar 80 vizinhos poluiria o log
+            if cod in {m["cod_ibge"] for m in muns}:
+                print(f"  · {alvos[cod]}: sem nota válida — fica 'não avaliado'")
             continue
         ano = _campo(linha, "exercicio") or _campo(linha, "ano")
         try:
