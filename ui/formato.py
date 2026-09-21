@@ -1145,6 +1145,7 @@ def aviso_contexto_territorios(escopo_sel: str) -> str:
 # ou 'Deputados', ambas aposentadas) cai em 'visao' — blinda a migração de estado.
 _MODO_EMENDA = {"Visão geral": "visao",
                 "Territórios em Aberto": "orfaos",
+                "Prefeituras": "prefeituras",
                 "Funil de negociação": "funil", "Relatório": "relatorio",
                 "Metodologia": "metodologia"}
 
