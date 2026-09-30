@@ -123,6 +123,54 @@ def evidencia_da_pagina(url: str) -> str:
     return limpar_texto(titulo.get_text())[:220] if titulo else ""
 
 
+# Caminhos comuns de canal. Só entram se a página RESPONDER e o texto dela
+# casar com os termos — não é chute de URL, é verificação: se não existir ou
+# não falar de canal, não vira achado.
+CAMINHOS_COMUNS = ("/sustentabilidade", "/responsabilidade-social", "/editais",
+                   "/parcerias", "/institucional", "/sobre/sustentabilidade",
+                   "/esg", "/projetos")
+
+
+def _variantes(site: str) -> list[str]:
+    """Mesmo site com e sem 'www'. O projeto já viu isso na prática: o apex da
+    capta.org.br falha no DNS e o www funciona."""
+    par = urllib.parse.urlparse(site)
+    if not par.netloc:
+        return [site]
+    outro = (par.netloc[4:] if par.netloc.startswith("www.")
+             else "www." + par.netloc)
+    return [site, par._replace(netloc=outro).geturl()]
+
+
+def _abrir_site(site: str):
+    """Soup da home, tentando as variantes. None se nenhuma responder."""
+    for url in _variantes(site):
+        soup = pegar_soup(url)
+        if soup is not None:
+            return soup, url
+    return None, site
+
+
+def _procurar_caminhos(site: str) -> dict | None:
+    """Última tentativa: caminhos comuns. Só aceita página que EXISTE e cujo
+    texto fala de canal — a URL sozinha não prova nada."""
+    for caminho in CAMINHOS_COMUNS:
+        url = urllib.parse.urljoin(site, caminho)
+        soup = pegar_soup(url)
+        if soup is None:
+            continue
+        titulo = soup.find("title")
+        texto = limpar_texto(titulo.get_text()) if titulo else ""
+        corpo = " ".join(limpar_texto(t.get_text())
+                         for t in soup.find_all(["h1", "h2"])[:6])
+        clas = _classificar(f"{texto} {corpo}")
+        if clas:
+            return {"tipo": clas[0], "direcao": clas[1], "termo": clas[2],
+                    "titulo": (texto or clas[2])[:90], "url": url}
+        time.sleep(0.5)
+    return None
+
+
 def verificar(p: dict) -> dict:
     nome, site = p.get("nome", ""), str(p.get("site", "")).strip()
     hoje = datetime.date.today().isoformat()
@@ -132,14 +180,14 @@ def verificar(p: dict) -> dict:
     if not site:
         linha["status"] = "sem site na base"
         return linha
-    soup = pegar_soup(site)
+    soup, site_ok = _abrir_site(site)
     if soup is None:
         linha["status"] = "site não respondeu"
         return linha
-    achados = candidatos(soup, site)
-    if not achados:
+    achados = candidatos(soup, site_ok)
+    melhor = achados[0] if achados else _procurar_caminhos(site_ok)
+    if not melhor:
         return linha                      # respondeu, mas nada encontrável
-    melhor = achados[0]
     linha.update({"status": "canal encontrado", "tipo_canal": melhor["tipo"],
                   "direcao": melhor["direcao"], "canal_url": melhor["url"],
                   "canal_titulo": melhor["titulo"],
