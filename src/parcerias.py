@@ -175,6 +175,18 @@ def rotulo_verificacao(reg: dict | None) -> str:
         return mapa.get(status, "Canal não verificado ainda.")
     quando = reg.get("verificado_em", "")
     tipo = reg.get("tipo_canal", "canal")
-    return (f"Página de {tipo} encontrada no site oficial"
-            + (f" (visto em {quando})" if quando else "")
-            + ". Existir a página **não** significa programa aberto agora.")
+    direcao = reg.get("direcao", "")
+    visto = f" (visto em {quando})" if quando else ""
+    # A DIREÇÃO é o que decide se o achado serve. Página de "doe agora" é para
+    # o público doar PARA o parceiro — o contrário do que o PFC precisa. Dizer
+    # só "canal encontrado" nesse caso seria um achado falso.
+    if direcao == "direção inversa":
+        return (f"Encontrada página de **doação ao próprio parceiro**{visto} — "
+                "é o público doando para ELE, não canal para receber projeto "
+                "do PFC. Serve para conhecer a instituição, não para captar.")
+    if direcao == "indefinido":
+        return (f"Página institucional ({tipo}) encontrada{visto}. **Não é canal "
+                "de submissão**: serve para entender a linha de atuação e achar "
+                "por onde falar.")
+    return (f"Página de {tipo} encontrada no site oficial{visto}. "
+            "Existir a página **não** significa programa aberto agora.")
