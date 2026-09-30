@@ -113,6 +113,29 @@ def test_classificador_prioriza_edital_e_ignora_ruido():
     assert v._classificar("Home") is None
 
 
+def test_variante_www_e_tentada():
+    """Precedente do projeto: o apex da capta.org.br falha no DNS e o www
+    funciona. Cinco sites grandes não responderam na 1ª rodada."""
+    v = _verificador()
+    assert v._variantes("https://www.bic.com.br") == [
+        "https://www.bic.com.br", "https://bic.com.br"]
+    assert v._variantes("https://alana.org.br")[1].startswith("https://www.")
+
+
+def test_caminho_comum_so_vale_se_a_pagina_confirmar():
+    """Tentar /sustentabilidade não é chute de URL: a página tem de responder E
+    o texto dela tem de falar de canal. Senão não vira achado."""
+    fonte = open(os.path.join(RAIZ, "scripts", "verificar_parcerias.py"),
+                 encoding="utf-8").read()
+    assert "CAMINHOS_COMUNS" in fonte
+    assert "não é chute de URL, é verificação" in fonte
+    i = fonte.index("def _procurar_caminhos")
+    trecho = fonte[i:i + 1200]
+    assert "if soup is None:" in trecho and "continue" in trecho, \
+        "página que não responde tem de ser descartada"
+    assert "_classificar(" in trecho, "o texto da página tem de confirmar"
+
+
 def test_verificador_nunca_inventa_canal():
     fonte = open(os.path.join(RAIZ, "scripts", "verificar_parcerias.py"),
                  encoding="utf-8").read()
