@@ -13,6 +13,15 @@ inventado).
 Município cujo DCA não traz as duas linhas simplesmente não entra: o painel
 mostra "sem dado", que é resposta legítima (regra 5c).
 
+NÃO É BUG: municípios DIFERENTES aparecem com o MESMO valor de FPM. O FPM é
+distribuído por COEFICIENTE de faixa de população — quem está na mesma faixa
+recebe exatamente o mesmo. Conferido no dado real: as razões entre os valores
+distintos caem em múltiplos limpos (1,0 · 1,2 · 1,333 · 1,667 · 2,0 · 2,333 …)
+e o topo se repete porque o coeficiente do interior tem TETO. Na primeira
+leitura isto parece coleta quebrada e dá vontade de "consertar" — não conserte.
+O que VARIA por município é o denominador (a receita corrente), e é por isso
+que a dependência final difere: Sorocaba 2,9%, municípios pequenos ~37%.
+
     python scripts/importar_fpm.py [exercicio]
 """
 import csv

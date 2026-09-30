@@ -78,6 +78,28 @@ def test_fpm_loader_gracioso_e_descarta_linha_sem_percentual():
     assert fpm.exercicios_disponiveis(d) == [2024]
 
 
+def test_fpm_repetido_entre_municipios_e_esperado():
+    """ARMADILHA DE LEITURA: ver o mesmo FPM em municípios diferentes parece
+    coleta quebrada — eu mesmo achei que era, e quase apaguei o CSV bom. O FPM
+    é distribuído por COEFICIENTE de faixa de população: mesma faixa, mesmo
+    valor. O que varia é o denominador. Este teste existe para que ninguém
+    "conserte" o coletor por causa disso."""
+    caminho = os.path.join(RAIZ, "data", "prefeituras")
+    anos = fpm.exercicios_disponiveis(caminho)
+    if not anos:
+        return                      # antes da 1ª coleta não há o que checar
+    reg = fpm.carregar(anos[0], caminho)
+    if len(reg) < 20:
+        return
+    valores = [r["fpm"] for r in reg.values()]
+    assert len(set(valores)) < len(valores), \
+        "esperado: valores de FPM repetidos entre municípios da mesma faixa"
+    pcts = [r["dependencia_pct"] for r in reg.values()]
+    assert len(set(pcts)) > len(pcts) * 0.8, \
+        "a dependência final tem de variar — o denominador é próprio de cada um"
+    assert 0 < min(pcts) and max(pcts) < 100, f"fora de escala: {min(pcts)}–{max(pcts)}"
+
+
 def test_importador_fpm_usa_a_coluna_bruta():
     """A resposta do DCA tem duas colunas; 'Deduções - FUNDEB' daria percentual
     inventado."""
