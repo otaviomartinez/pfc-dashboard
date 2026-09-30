@@ -1637,16 +1637,71 @@ def render_prospeccao():
 
 _PARCERIAS_CSS = """
 <style>
-.parc-card{border:1px solid var(--linha,#e6e3dd);border-radius:12px;padding:14px 16px;margin-bottom:10px;background:var(--card,#fff)}
-.parc-nome{font-size:16px;font-weight:700;color:var(--ink,#1a1a1a)}
-.parc-sub{font-family:var(--mono,monospace);font-size:12px;color:var(--dim,#6b6b6b);margin-top:2px}
-.parc-mods{margin-top:6px}
-.parc-mods span{display:inline-block;font-size:11px;padding:1px 7px;border-radius:20px;margin-right:5px;
-  background:rgba(79,168,160,.12);color:#2f7d75;border:1px solid rgba(79,168,160,.35)}
-.parc-selo{display:inline-block;font-size:11px;padding:1px 8px;border-radius:20px;
-  background:rgba(232,135,58,.12);color:#b5651d;border:1px solid rgba(232,135,58,.35)}
+/* BUG QUE ISTO CORRIGE: a 1ª versão usava var(--card,#fff) e var(--linha,…),
+   tokens que NÃO EXISTEM neste design system (os reais são --bg/--surface/
+   --surface2/--ink/--muted/--dim). Sem o token, o fallback #fff pintava o card
+   de BRANCO, e o texto usava --ink, que é quase branco: branco no branco,
+   ilegível. Aqui os tokens são os de verdade, com fallback escuro. */
+.parc-card{position:relative;border:1px solid rgba(255,255,255,.08);border-radius:14px;
+  padding:14px 16px;background:linear-gradient(165deg,var(--surface,#161A21),var(--bg,#0E1116));
+  transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease}
+.parc-card:hover{transform:translateY(-2px);border-color:rgba(79,168,160,.5);
+  box-shadow:0 16px 36px -20px rgba(79,168,160,.55)}
+.parc-topo{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.parc-nome{font-size:15.5px;font-weight:650;color:var(--ink,#F5F7FA);letter-spacing:-.2px}
+.parc-sub{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--dim,#6B7688);
+  margin-top:4px;text-transform:uppercase;letter-spacing:.4px}
+.parc-mods{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.parc-mods span{display:inline-block;font-size:10.5px;font-family:'JetBrains Mono',monospace;
+  padding:2px 8px;border-radius:20px;background:rgba(79,168,160,.13);color:#7fd3ca;
+  border:1px solid rgba(79,168,160,.3)}
+.parc-selo{display:inline-block;font-size:10.5px;font-family:'JetBrains Mono',monospace;
+  padding:2px 9px;border-radius:20px;background:rgba(124,134,152,.14);color:#A4AEBF;
+  border:1px solid rgba(124,134,152,.3)}
+/* Selo do canal verificado: a cor DIZ se aquele canal serve ao PFC.
+   verde = recebe projeto · âmbar = institucional/indefinido · cinza = não serve
+   ou não verificado. Cor é semântica, e a legenda no topo da tela explica. */
+.parc-canal{display:inline-block;font-size:10.5px;font-family:'JetBrains Mono',monospace;
+  padding:2px 9px;border-radius:20px;border:1px solid}
+.parc-canal.ok{background:rgba(74,222,128,.13);color:#4ADE80;border-color:rgba(74,222,128,.32)}
+.parc-canal.meio{background:rgba(232,181,74,.13);color:#E8B54A;border-color:rgba(232,181,74,.32)}
+.parc-canal.nao{background:rgba(124,134,152,.1);color:#7C8698;border-color:rgba(124,134,152,.26)}
+.parc-legenda{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--dim,#6B7688);
+  margin:2px 0 14px;display:flex;gap:16px;flex-wrap:wrap}
+.parc-legenda i{font-style:normal}
+.parc-legenda b{font-weight:400}
+/* CARD INTEIRO CLICÁVEL — mesmo truque do Descobrir (.dd-cell): o container do
+   botão (chave pc_) cobre o card, invisível, e captura o clique. Sem isso o
+   usuário teria de mirar num botãozinho, contra a regra do projeto de que
+   quase tudo deve ser clicável e levar a algo real. */
+[class*="st-key-pc_"]{position:relative;margin-bottom:12px}
+[class*="st-key-pc_"] .stButton{position:absolute;inset:0;z-index:4;margin:0}
+[class*="st-key-pc_"] .stButton button{height:100%;width:100%;min-height:0;opacity:0;
+  border:none;background:transparent;box-shadow:none;cursor:pointer}
 </style>
 """
+
+
+# Mapa: direção do canal -> (classe do selo, texto curto). Uma só fonte de
+# verdade para a lista e para o dossiê não divergirem.
+_CANAL_SELO = {
+    "recebe projetos": ("ok", "recebe projeto"),
+    "indefinido": ("meio", "só institucional"),
+    "direção inversa": ("nao", "só recebe doação"),
+}
+
+
+def _selo_canal(p: dict) -> str:
+    """Selo do canal verificado. Sem verificação -> diz que não verificou, em
+    vez de omitir: omitir faria a curadoria parecer confirmada."""
+    try:
+        reg = parcerias.verificacao_de(p)
+    except Exception:
+        reg = None
+    if not reg or reg.get("status") != parcerias.STATUS_VERIFICACAO_OK:
+        return '<span class="parc-canal nao">sem canal</span>'
+    classe, texto = _CANAL_SELO.get(reg.get("direcao", ""), ("meio", "canal"))
+    return f'<span class="parc-canal {classe}">{esc(texto)}</span>'
 
 
 def _mods_txt(p: dict) -> str:
@@ -1779,19 +1834,38 @@ def render_parcerias():
 
     filtrados = parcerias.filtrar_parcerias(rows, modulo=modulo, tipo=tipo,
                                             status=status, busca=busca)
-    st.caption(f"{len(filtrados)} parceiro(s) · de {len(rows)} na base")
 
+    # Legenda ANTES da lista: cor é semântica neste projeto, então ela precisa
+    # ser explicada — e aqui a cor responde à pergunta que importa ("dá para
+    # submeter projeto a este?"), não a uma classificação decorativa.
+    st.markdown(
+        f'<div class="parc-legenda">'
+        f'<i><span class="parc-canal ok">recebe projeto</span> canal de edital/apoio</i>'
+        f'<i><span class="parc-canal meio">só institucional</span> página sem submissão</i>'
+        f'<i><span class="parc-canal nao">só recebe doação</span> ou não verificado</i>'
+        f'<b>· {len(filtrados)} de {len(rows)} na base</b></div>',
+        unsafe_allow_html=True)
+
+    # DUAS COLUNAS: 16 cards numa coluna só viravam uma fita infinita. O card
+    # inteiro é clicável (padrão do projeto: "quase tudo clicável leva a algo
+    # real") — o botão ocupa o card todo, com o HTML por cima via CSS.
+    esquerda, direita = st.columns(2, gap="small")
     for i, p in enumerate(filtrados):
-        col_info, col_btn = st.columns([5, 1])
-        col_info.markdown(
-            f'<div class="parc-card"><div class="parc-nome">{esc(p.get("nome",""))}</div>'
-            f'<div class="parc-sub">{esc(p.get("tipo",""))} · {esc(p.get("foco",""))} · '
-            f'{esc(p.get("abrangencia",""))}</div>'
-            f'<div class="parc-mods">{_mods_txt(p)}'
-            f'<span class="parc-selo">{esc(p.get("status",""))}</span></div></div>',
-            unsafe_allow_html=True)
-        if col_btn.button("Ver", key=f"parc_ver_{i}", use_container_width=True):
-            dlg_parceiro(p)
+        col = esquerda if i % 2 == 0 else direita
+        with col:
+            with st.container(key=f"pc_{i}"):
+                st.markdown(
+                    f'<div class="parc-card">'
+                    f'<div class="parc-topo"><div class="parc-nome">{esc(p.get("nome",""))}</div>'
+                    f'{_selo_canal(p)}</div>'
+                    f'<div class="parc-sub">{esc(p.get("tipo",""))} · '
+                    f'{esc(p.get("foco",""))}</div>'
+                    f'<div class="parc-mods">{_mods_txt(p)}'
+                    f'<span class="parc-selo">{esc(p.get("status",""))}</span></div></div>',
+                    unsafe_allow_html=True)
+                if st.button("Ver dossiê", key=f"parc_ver_{i}",
+                             use_container_width=True):
+                    dlg_parceiro(p)
 
 
 # --------------------------------------------------------------------------- #

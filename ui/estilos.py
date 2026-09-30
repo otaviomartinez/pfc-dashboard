@@ -562,14 +562,14 @@ _HUB_CSS = """
 
 .hub-stage{position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;
   align-items:center;justify-content:center;padding-left:74px}
-.hub-title{text-align:center;margin-bottom:46px;opacity:0;animation:hub-up .8s var(--ease) .2s forwards}
+.hub-title{text-align:center;margin-bottom:26px;opacity:0;animation:hub-up .8s var(--ease) .2s forwards}
 .hub-title .eye{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:4px;
   text-transform:uppercase;color:#5A6278;margin-bottom:14px}
-.hub-title h1{font-size:42px;font-weight:700;letter-spacing:-1.6px;color:#EEF1F8}
+.hub-title h1{font-size:34px;font-weight:700;letter-spacing:-1.6px;color:#EEF1F8}
 @keyframes hub-up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 
-.hub-arena{display:flex;align-items:stretch;gap:38px;perspective:2200px}
-.hub-card{position:relative;width:440px;border-radius:30px;cursor:pointer;overflow:hidden;
+.hub-arena{display:flex;align-items:stretch;gap:26px;perspective:2200px}
+.hub-card{position:relative;width:372px;border-radius:24px;cursor:pointer;overflow:hidden;
   background:linear-gradient(165deg,rgba(24,30,48,.82),rgba(9,12,22,.8));
   border:1px solid rgba(255,255,255,.1);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
   box-shadow:0 44px 90px -34px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.09);
@@ -584,8 +584,8 @@ _HUB_CSS = """
   box-shadow:0 56px 110px -34px rgba(242,145,30,.42),0 0 0 1px rgba(242,145,30,.5),inset 0 1px 0 rgba(255,255,255,.14)}
 .hub-card.c2:hover{border-color:transparent;
   box-shadow:0 56px 110px -34px rgba(123,107,240,.5),0 0 0 1px rgba(123,107,240,.55),inset 0 1px 0 rgba(255,255,255,.14)}
-.hub-radarbox{padding:44px 0 40px;display:grid;place-items:center;z-index:2}
-.hub-radO{width:270px;height:270px;position:relative;transform:translateZ(30px);transition:transform .5s var(--ease)}
+.hub-radarbox{padding:26px 0 22px;display:grid;place-items:center;z-index:2}
+.hub-radO{width:196px;height:196px;position:relative;transform:translateZ(30px);transition:transform .5s var(--ease)}
 .hub-card:hover .hub-radO{transform:translateZ(60px) scale(1.06)}
 .hub-radO svg{position:absolute;inset:0;width:100%;height:100%}
 .hub-grid{stroke:rgba(255,255,255,.09);fill:none}
@@ -594,60 +594,63 @@ _HUB_CSS = """
 @keyframes hub-rsw{to{transform:rotate(360deg)}}
 .hub-blip{opacity:0;animation:hub-bl 4s ease-out infinite}
 @keyframes hub-bl{0%,100%{opacity:0}35%{opacity:1}}
-.hub-plate{position:relative;z-index:2;padding:26px 30px 34px;border-top:1px solid rgba(255,255,255,.07);
+.hub-plate{position:relative;z-index:2;padding:18px 24px 22px;border-top:1px solid rgba(255,255,255,.07);
   background:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,.045))}
 .hub-htag{font-family:'JetBrains Mono',monospace;font-size:11.5px;letter-spacing:2px;
   text-transform:uppercase;margin-bottom:10px}
 .hub-card.c1 .hub-htag{color:#ffc061} .hub-card.c2 .hub-htag{color:#b7abff}
-.hub-plate h2{font-size:30px;font-weight:700;letter-spacing:-.8px;margin-bottom:20px}
-.hub-stats{display:flex;gap:26px;margin-bottom:24px}
-.hub-stats .n{font-weight:700;font-size:28px;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+.hub-plate h2{font-size:24px;font-weight:700;letter-spacing:-.8px;margin-bottom:14px}
+.hub-stats{display:flex;gap:22px;margin-bottom:16px}
+.hub-stats .n{font-weight:700;font-size:23px;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
 .hub-card.c1 .hub-stats .n{color:#F2911E} .hub-card.c2 .hub-stats .n{color:#b7abff}
 .hub-stats .l{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#5A6278;
   text-transform:uppercase;margin-top:4px}
-.hub-enter{display:flex;align-items:center;justify-content:center;gap:10px;font-weight:600;font-size:16.5px;
-  padding:16px;border-radius:15px;border:1px solid rgba(255,255,255,.15);transition:.35s var(--ease)}
+.hub-enter{display:flex;align-items:center;justify-content:center;gap:10px;font-weight:600;font-size:14.5px;
+  padding:12px;border-radius:13px;border:1px solid rgba(255,255,255,.15);transition:.35s var(--ease)}
 .hub-card.c1 .hub-enter{color:#ffc061} .hub-card.c2 .hub-enter{color:#b7abff}
 .hub-card.c1:hover .hub-enter{background:#F2911E;color:#04060F;border-color:#F2911E}
 .hub-card.c2:hover .hub-enter{background:#8B7BF5;color:#fff;border-color:#8B7BF5}
 .hub-enter svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.3;transition:.35s}
 .hub-card:hover .hub-enter svg{transform:translateX(5px)}
-/* Card Prospecção (c3): menor, canto inferior direito, ESTÁTICO — sem animação de
-   entrada (a base .hub-card é opacity:0, então c3 força opacity:1) e fora do tilt.
-   Acento teal #2DD4BF. */
-.hub-card.c3{position:absolute;right:30px;bottom:30px;width:290px;opacity:1;z-index:12;
-  box-shadow:0 30px 60px -30px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.08)}
-.hub-card.c3:hover{border-color:transparent;
-  box-shadow:0 40px 80px -30px rgba(45,212,191,.4),0 0 0 1px rgba(45,212,191,.5),inset 0 1px 0 rgba(255,255,255,.12)}
-.hub-card.c3 .hub-radarbox{padding:22px 0 16px}
-.hub-card.c3 .hub-radO{width:148px;height:148px}
-.hub-card.c3 .hub-sweep{stroke:#2DD4BF}
-.hub-card.c3 .hub-htag{color:#5eead4}
-.hub-card.c3 .hub-plate{padding:16px 22px 20px}
-.hub-card.c3 .hub-plate h2{font-size:21px;margin-bottom:12px}
-.hub-card.c3 .hub-stats{gap:18px;margin-bottom:14px}
-.hub-card.c3 .hub-stats .n{color:#2DD4BF;font-size:21px}
-.hub-card.c3 .hub-enter{color:#5eead4;padding:11px;font-size:14px}
-.hub-card.c3:hover .hub-enter{background:#2DD4BF;color:#04120F;border-color:#2DD4BF}
-/* Card Parcerias (c4): gêmeo do c3, canto inferior ESQUERDO (após a rail), acento aqua #4FA8A0. */
-.hub-card.c4{position:absolute;left:104px;bottom:30px;width:290px;opacity:1;z-index:12;
-  box-shadow:0 30px 60px -30px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.08)}
-.hub-card.c4:hover{border-color:transparent;
-  box-shadow:0 40px 80px -30px rgba(79,168,160,.4),0 0 0 1px rgba(79,168,160,.5),inset 0 1px 0 rgba(255,255,255,.12)}
-.hub-card.c4 .hub-radarbox{padding:22px 0 16px}
-.hub-card.c4 .hub-radO{width:148px;height:148px}
-.hub-card.c4 .hub-sweep{stroke:#4FA8A0}
-.hub-card.c4 .hub-htag{color:#7fd3ca}
-.hub-card.c4 .hub-plate{padding:16px 22px 20px}
-.hub-card.c4 .hub-plate h2{font-size:21px;margin-bottom:12px}
-.hub-card.c4 .hub-stats{gap:18px;margin-bottom:14px}
-.hub-card.c4 .hub-stats .n{color:#4FA8A0;font-size:21px}
-.hub-card.c4 .hub-enter{color:#7fd3ca;padding:11px;font-size:14px}
-.hub-card.c4:hover .hub-enter{background:#4FA8A0;color:#04120F;border-color:#4FA8A0}
+/* Prospecção e Parcerias: BOTÕES, não cards.
+   Antes eram dois mini-cards em position:absolute nos cantos — eles se
+   sobrepunham aos cards-herói e estouravam a tela. Agora são uma linha
+   compacta no FLUXO NORMAL, abaixo dos dois radares: nada se sobrepõe, tudo
+   cabe, e a hierarquia fica honesta (dois radares principais + dois atalhos).
+   Acentos: teal #2DD4BF (Prospecção) / aqua #4FA8A0 (Parcerias). */
+.hub-mini{display:flex;gap:14px;margin-top:24px;opacity:0;
+  animation:hub-up .8s var(--ease) .75s forwards}
+.hub-minibtn{display:flex;align-items:center;gap:13px;cursor:pointer;
+  padding:11px 16px;border-radius:14px;min-width:232px;
+  background:linear-gradient(165deg,rgba(24,30,48,.72),rgba(9,12,22,.7));
+  border:1px solid rgba(255,255,255,.1);
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  transition:transform .3s var(--ease),border-color .3s,box-shadow .3s}
+.hub-minibtn:hover{transform:translateY(-3px)}
+.hub-mico{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex:none}
+.hub-mico svg{width:16px;height:16px;fill:none;stroke-width:2}
+.hub-mtxt{flex:1;min-width:0}
+.hub-mnome{font-size:14px;font-weight:650;color:#EEF1F8;line-height:1.2}
+.hub-mstat{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#5A6278;
+  text-transform:uppercase;margin-top:3px;letter-spacing:.5px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.hub-mseta{width:15px;height:15px;fill:none;stroke-width:2.3;flex:none;
+  transition:transform .3s var(--ease)}
+.hub-minibtn:hover .hub-mseta{transform:translateX(4px)}
+.hub-minibtn.m3 .hub-mico{background:rgba(45,212,191,.14);border:1px solid rgba(45,212,191,.32)}
+.hub-minibtn.m3 .hub-mico svg,.hub-minibtn.m3 .hub-mseta{stroke:#2DD4BF}
+.hub-minibtn.m3 .hub-mstat b{color:#2DD4BF}
+.hub-minibtn.m3:hover{border-color:rgba(45,212,191,.55);
+  box-shadow:0 16px 36px -18px rgba(45,212,191,.5)}
+.hub-minibtn.m4 .hub-mico{background:rgba(79,168,160,.14);border:1px solid rgba(79,168,160,.32)}
+.hub-minibtn.m4 .hub-mico svg,.hub-minibtn.m4 .hub-mseta{stroke:#4FA8A0}
+.hub-minibtn.m4 .hub-mstat b{color:#4FA8A0}
+.hub-minibtn.m4:hover{border-color:rgba(79,168,160,.55);
+  box-shadow:0 16px 36px -18px rgba(79,168,160,.5)}
 @media(max-width:980px){.hub-arena{flex-direction:column;gap:20px;overflow:auto;max-height:80vh}
   .hub-card{width:340px}.hub-title h1{font-size:32px}
-  .hub-card.c3{position:static;width:340px}
-  .hub-card.c4{position:static;width:340px}}
+  .hub-mini{flex-direction:column;width:340px}
+  .hub-minibtn{min-width:0;width:100%}}
 """
 
 
@@ -663,12 +666,8 @@ export default function(component){
   function radarSVG(cls){
     const blips = cls === 'c1'
       ? [[172,78,0],[80,168,1.3],[176,158,2.5]]
-      : cls === 'c3'
-      ? [[120,70,0],[168,150,1.5],[86,160,2.7]]
-      : cls === 'c4'
-      ? [[110,80,0],[160,150,1.4],[80,160,2.6]]
       : [[92,78,0],[170,138,1.6],[98,170,2.8]];
-    const cor = cls === 'c1' ? '#F2911E' : cls === 'c3' ? '#2DD4BF' : cls === 'c4' ? '#4FA8A0' : '#b7abff';
+    const cor = cls === 'c1' ? '#F2911E' : '#b7abff';
     let b = '';
     blips.forEach(function(p){ b += '<circle class="hub-blip" cx="'+p[0]+'" cy="'+p[1]+
       '" r="4" fill="'+cor+'" style="animation-delay:'+p[2]+'s"/>'; });
@@ -692,6 +691,16 @@ export default function(component){
       '<div class="hub-plate"><div class="hub-htag">'+esc(tag)+'</div>' +
       '<h2>'+esc(titulo)+'</h2><div class="hub-stats">'+statCells(stats)+'</div>' +
       '<div class="hub-enter">Entrar neste radar '+arrow+'</div></div></div>';
+  }
+
+  // Botão compacto (Prospecção/Parcerias): ícone + nome + um número que
+  // importa + seta. Sem radar, sem tag de setor — é atalho, não protagonista.
+  function mini(cls, radar, icone, nome, numero, rotulo){
+    return '<div class="hub-minibtn '+cls+'" data-radar="'+radar+'">' +
+      '<div class="hub-mico"><svg viewBox="0 0 24 24">'+icone+'</svg></div>' +
+      '<div class="hub-mtxt"><div class="hub-mnome">'+esc(nome)+'</div>' +
+      '<div class="hub-mstat"><b>'+esc(numero)+'</b> '+esc(rotulo)+'</div></div>' +
+      '<svg class="hub-mseta" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>';
   }
 
   const root = document.createElement('div'); root.className = 'hub';
@@ -719,11 +728,12 @@ export default function(component){
          [[emd.deputados, plural(emd.deputados, 'deputado', 'deputados')],
           [emd.reunioes, plural(emd.reunioes, 'reunião', 'reuniões')],
           [emd.aprovadas, plural(emd.aprovadas, 'aprovada', 'aprovadas')]]) +
-    '</div></div>' +
-    card('c3', 'prospeccao', pro.tag || 'Setor 03 · Verba em captação', 'Prospecção',
-         [[pro.total, plural(pro.total, 'verba', 'verbas')], [pro.conquistadas, 'conquistadas']]) +
-    card('c4', 'parcerias', par.tag || 'Setor 04 · Parcerias e doações', 'Parcerias',
-         [[par.total, plural(par.total, 'parceiro', 'parceiros')], [par.abordar, 'a abordar']]);
+    '</div><div class="hub-mini">' +
+    mini('m3', 'prospeccao', '<path d="M3 3v18h18M7 14l4-4 3 3 5-6"/>', 'Prospecção',
+         pro.total, plural(pro.total, 'verba em captação', 'verbas em captação')) +
+    mini('m4', 'parcerias', '<path d="M20 12v9H4v-9M2 7h20v5H2zM12 22V7"/>', 'Parcerias',
+         par.abordar, 'parceiros a abordar') +
+    '</div></div>';
   parentElement.appendChild(root);
 
   // cliques -> Python (card inteiro ou item da rail)
