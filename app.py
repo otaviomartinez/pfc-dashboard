@@ -1673,6 +1673,27 @@ def dlg_parceiro(p: dict):
     site = str(p.get("site", "")).strip()
     if site.startswith("http"):
         st.markdown(f"[Abrir site ↗]({site})")
+
+    # ---- Canal verificado no site oficial ----------------------------------
+    # A base-semente é curadoria "a confirmar"; este bloco é a parte CONFERÍVEL.
+    # Aparece SEMPRE — inclusive quando não se achou nada. Calar quando não
+    # encontramos deixaria a curadoria parecer confirmada, que é o oposto do
+    # que a tela deve dizer.
+    try:
+        reg = parcerias.verificacao_de(p)
+    except Exception:
+        reg = None
+    st.divider()
+    st.markdown("**Canal de doação/patrocínio**")
+    if reg and reg.get("status") == parcerias.STATUS_VERIFICACAO_OK:
+        titulo = reg.get("canal_titulo") or reg.get("tipo_canal") or "página do canal"
+        st.markdown(f"[{esc(titulo)} ↗]({reg.get('canal_url','')})")
+        if reg.get("evidencia"):
+            st.caption(f"No site: “{esc(reg['evidencia'])}”")
+    else:
+        st.markdown("—")
+    st.caption(parcerias.rotulo_verificacao(reg))
+
     st.caption(f"Fonte: {esc(p.get('fonte','') or '—')} · candidato a abordar, "
                "não é parceria confirmada.")
 

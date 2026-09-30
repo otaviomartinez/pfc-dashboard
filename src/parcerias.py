@@ -17,6 +17,7 @@ import unicodedata
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SEED_CSV = os.path.join(BASE, "data", "parcerias_seed.csv")
+VERIFICACAO_CSV = os.path.join(BASE, "data", "parcerias_verificacao.csv")
 
 CAMPOS = ["nome", "tipo", "foco", "modulos", "abrangencia", "site",
           "como_abordar", "status", "obs", "fonte"]
@@ -120,3 +121,60 @@ def gancho_parceria(row: dict) -> str:
     if foco and tipo:
         return f"Candidato a abordar — {tipo} com foco em {foco} (a confirmar canal)."
     return "Candidato a abordar (a confirmar foco e canal)."
+
+
+# --------------------------------------------------------------------------- #
+# Verificação do canal (gerada por scripts/verificar_parcerias.py)
+# --------------------------------------------------------------------------- #
+# A base-semente é curadoria "a confirmar". Isto aqui é a parte CONFERÍVEL:
+# a URL real da página de doação/patrocínio/edital no site do parceiro, com o
+# trecho que a identifica e a data em que foi vista.
+#
+# O QUE ISTO SIGNIFICA (e o que não significa): "canal encontrado" diz que
+# existe página institucional — NÃO diz que há programa aberto agora, nem que
+# aceita o tipo de projeto do PFC. Indício não vira afirmação: é o mesmo
+# cuidado da regra 3 com data de edital.
+
+STATUS_VERIFICACAO_OK = "canal encontrado"
+
+
+def carregar_verificacao(caminho: str | None = None) -> dict[str, dict]:
+    """{nome_normalizado: registro}. Arquivo ausente -> {} (a tela só não mostra
+    o bloco). PURA no sentido do projeto: lê arquivo, não fala com rede."""
+    caminho = caminho or VERIFICACAO_CSV
+    try:
+        with open(caminho, encoding="utf-8-sig", newline="") as f:
+            linhas = list(csv.DictReader(f))
+    except (FileNotFoundError, OSError):
+        return {}
+    saida = {}
+    for linha in linhas:
+        nome = str(linha.get("nome", "")).strip()
+        if nome:
+            saida[_norm(nome)] = {k: str(v or "").strip() for k, v in linha.items()}
+    return saida
+
+
+def verificacao_de(row: dict, verificacoes: dict | None = None) -> dict | None:
+    """Registro de verificação de um parceiro, ou None. Casa por nome normalizado."""
+    verificacoes = carregar_verificacao() if verificacoes is None else verificacoes
+    return verificacoes.get(_norm(row.get("nome"))) or None
+
+
+def rotulo_verificacao(reg: dict | None) -> str:
+    """Frase curta e HONESTA para a tela. Sem registro -> diz que não foi
+    verificado, em vez de calar (calar deixa a curadoria parecer confirmada)."""
+    if not reg:
+        return "Canal não verificado ainda."
+    status = reg.get("status", "")
+    if status != STATUS_VERIFICACAO_OK:
+        mapa = {"site não respondeu": "O site não respondeu na verificação.",
+                "sem site na base": "Sem site cadastrado na base.",
+                "não encontrado": "Nenhum canal de doação/patrocínio encontrado "
+                                  "no site — procurar à mão."}
+        return mapa.get(status, "Canal não verificado ainda.")
+    quando = reg.get("verificado_em", "")
+    tipo = reg.get("tipo_canal", "canal")
+    return (f"Página de {tipo} encontrada no site oficial"
+            + (f" (visto em {quando})" if quando else "")
+            + ". Existir a página **não** significa programa aberto agora.")

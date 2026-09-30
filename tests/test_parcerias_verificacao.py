@@ -1,0 +1,106 @@
+"""Verificação do canal de doação/patrocínio dos parceiros.
+
+O PROBLEMA QUE ISTO RESOLVE: os 16 da base-semente vieram com
+`fonte = "curadoria inicial (a confirmar)"` — são hipóteses montadas de
+conhecimento geral, não levantamento. Diferente dos outros três radares, cujo
+dado vem de fonte oficial rastreável (TCE, Tesouro, TSE, ALESP).
+
+O QUE ESTES TESTES TRAVAM: que a verificação nunca vire afirmação maior do que
+é. "Canal encontrado" = existe a página. Nunca "tem programa aberto".
+
+    python tests/test_parcerias_verificacao.py
+"""
+import os
+import sys
+import tempfile
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from src import parcerias  # noqa: E402
+
+RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CABECALHO = ("nome,site,status,tipo_canal,canal_url,canal_titulo,evidencia,"
+             "verificado_em\n")
+
+
+def _csv(corpo: str) -> str:
+    f = tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False,
+                                    encoding="utf-8", newline="")
+    f.write(CABECALHO + corpo)
+    f.close()
+    return f.name
+
+
+def _verificador():
+    import importlib.util
+    caminho = os.path.join(RAIZ, "scripts", "verificar_parcerias.py")
+    spec = importlib.util.spec_from_file_location("_verif", caminho)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_sem_arquivo_a_tela_diz_que_nao_verificou():
+    """Calar seria pior: deixaria a curadoria parecer confirmada."""
+    assert parcerias.carregar_verificacao("/nao/existe.csv") == {}
+    assert parcerias.rotulo_verificacao(None) == "Canal não verificado ainda."
+
+
+def test_canal_encontrado_nao_vira_programa_aberto():
+    """A frase da tela é obrigada a ressalvar. Uma página institucional não
+    prova que há chamada aberta — é o mesmo cuidado da regra 3."""
+    frase = parcerias.rotulo_verificacao(
+        {"status": "canal encontrado", "tipo_canal": "edital",
+         "verificado_em": "2026-09-30"})
+    assert "não** significa programa aberto" in frase
+    assert "2026-09-30" in frase, "a tela precisa dizer QUANDO foi visto"
+
+
+def test_cada_falha_tem_frase_propria():
+    """Site fora do ar, sem site e nada encontrado são três coisas diferentes
+    (regra 5c: sem dado ≠ dado ruim, e cada ausência tem seu rótulo)."""
+    frases = {parcerias.rotulo_verificacao({"status": s})
+              for s in ("não encontrado", "site não respondeu", "sem site na base")}
+    assert len(frases) == 3, f"rótulos colididos: {frases}"
+
+
+def test_casa_por_nome_normalizado():
+    caminho = _csv("Faber-Castell,https://x.com,canal encontrado,doação,"
+                   "https://x.com/doar,Como doar,Trecho,2026-09-30\n")
+    regs = parcerias.carregar_verificacao(caminho)
+    assert parcerias.verificacao_de({"nome": "FABER-CASTELL"}, regs)
+    assert parcerias.verificacao_de({"nome": "Outra"}, regs) is None
+    os.unlink(caminho)
+
+
+def test_classificador_prioriza_edital_e_ignora_ruido():
+    v = _verificador()
+    assert v._classificar("Editais abertos")[0] == "edital"
+    assert v._classificar("Como doar")[0] == "doação"
+    assert v._classificar("Seja um patrocinador")[0] == "patrocínio"
+    assert v._classificar("Sustentabilidade")[0] == "institucional"
+    for ruido in ("Trabalhe conosco", "Carrinho de compras", "Política de privacidade"):
+        assert v._classificar(ruido) is None, ruido
+    assert v._classificar("Home") is None
+
+
+def test_verificador_nunca_inventa_canal():
+    fonte = open(os.path.join(RAIZ, "scripts", "verificar_parcerias.py"),
+                 encoding="utf-8").read()
+    assert '"status": "não encontrado"' in fonte, "o padrão tem de ser ausência"
+    assert "site não respondeu" in fonte
+    assert "NÃO PODE" in fonte, "o script precisa dizer o que não pode afirmar"
+
+
+def test_dossie_mostra_o_bloco_inclusive_quando_nao_achou():
+    app = open(os.path.join(RAIZ, "app.py"), encoding="utf-8").read()
+    assert "Canal de doação/patrocínio" in app
+    assert "rotulo_verificacao(reg)" in app, "a ressalva tem de aparecer sempre"
+
+
+if __name__ == "__main__":
+    for nome, fn in sorted(globals().items()):
+        if nome.startswith("test_"):
+            fn()
+            print(f"ok  {nome}")
+    print("verificação de parcerias: todos os testes passaram")
