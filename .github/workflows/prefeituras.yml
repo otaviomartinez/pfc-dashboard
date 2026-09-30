@@ -56,17 +56,13 @@ jobs:
         continue-on-error: true
         run: python scripts/importar_capag.py ${{ github.event.inputs.exercicio }}
 
-      - name: Eleitos 2024 (TSE)
-        id: tse
-        continue-on-error: true
-        run: python scripts/importar_eleitos_tse.py
-
       # Contato institucional da prefeitura (e-mail/telefone/endereço) via
       # CNPJ da Receita. É o que faz o dossiê mostrar contato SEM o usuário
       # precisar clicar em link de busca.
       - name: Contatos da prefeitura (CNPJ/Receita)
         id: contatos
         continue-on-error: true
+        timeout-minutes: 12
         run: python scripts/importar_contatos_prefeitura.py
 
       # FPM: dependência de repasse, do DCA do SICONFI (o RGF não existe para
@@ -74,7 +70,18 @@ jobs:
       - name: FPM (SICONFI / DCA)
         id: fpm
         continue-on-error: true
+        timeout-minutes: 12
         run: python scripts/importar_fpm.py ${{ github.event.inputs.exercicio_fpm }}
+
+      # POR ÚLTIMO e COM TETO DE TEMPO: o CDN do TSE recusa o runner (403) e numa
+      # rodada ficou 7+ min pendurado, ameaçando estourar o job antes de o FPM
+      # rodar. Fonte instável e pouco urgente (eleitos de 2024 valem até 2028)
+      # não pode bloquear as que funcionam.
+      - name: Eleitos 2024 (TSE)
+        id: tse
+        continue-on-error: true
+        timeout-minutes: 8
+        run: python scripts/importar_eleitos_tse.py
 
       - name: Conferir o que foi gerado
         run: |
