@@ -189,6 +189,14 @@ do direito da criança → módulos 2/3/4), nunca parceria confirmada: todo item
 - **Camada pura** em `src/parcerias.py` (sem `st`, sem rede): filtros, agrupamento
   por módulo e `gancho_parceria`, que prioriza o `como_abordar` curado e, sem ele,
   compõe do foco/tipo sem inventar canal.
+- **Verificação dos canais** (`scripts/verificar_parcerias.py`, workflow mensal):
+  abre o site de cada parceiro e guarda a URL da página de edital/apoio/doação,
+  com trecho e **data**. O campo `direcao` é o que decide se serve: "recebe
+  projetos" (útil) x "direção inversa" (é o público doando PARA o parceiro) x
+  "indefinido". Na 1ª checagem real, dos 16: **só 2 têm canal que recebe
+  projeto** (Roberto Marinho, Ayrton Senna), 5 sites grandes bloqueiam o robô e
+  o resto é institucional ou inverso. **"Canal encontrado" ≠ programa aberto.**
+  Detalhes e as três lições em `PLANO_PARCERIAS.md`.
 - **PENDENTE:** o card no hub e a entrada no menu **nunca foram vistos rodando**
   (os commits dizem "[verificar no app publicado]"). A base tem `site`, não tem
   e-mail nem telefone — preencher é curadoria manual.
