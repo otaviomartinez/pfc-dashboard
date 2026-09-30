@@ -48,15 +48,45 @@ def test_card_nao_usa_token_de_cor_inexistente():
     assert "--surface" in css and "--ink" in css
 
 
-def test_hub_tem_botoes_no_lugar_dos_cards_flutuantes():
+def test_hub_tem_botoes_ladeando_os_radares():
     """Os mini-cards de Prospecção/Parcerias eram position:absolute nos cantos e
     se SOBREPUNHAM aos cards-herói (o print do usuário mostrou a pilha). Viraram
-    botões compactos no fluxo normal."""
+    botões no fluxo normal, um de cada LADO dos radares:
+    atalho · radar · radar · atalho."""
     from ui import estilos
-    assert "hub-minibtn" in estilos._HUB_CSS and "hub-mini{" in estilos._HUB_CSS
-    assert "card('c3'" not in estilos._HUB_JS and "card('c4'" not in estilos._HUB_JS
+    assert "hub-minibtn" in estilos._HUB_CSS
     assert ".hub-card.c3{position:absolute" not in estilos._HUB_CSS
     assert ".hub-card.c4{position:absolute" not in estilos._HUB_CSS
+    js = estilos._HUB_JS
+    assert "card('c3'" not in js and "card('c4'" not in js
+    ordem = [js.index("mini('m3'"), js.index("card('c1'"),
+             js.index("card('c2'"), js.index("mini('m4'")]
+    assert ordem == sorted(ordem), "ordem esperada: atalho · radar · radar · atalho"
+
+
+def test_clique_cobre_o_card_inteiro():
+    """BUG REAL: eu posicionava o `.stButton` com inset:0, mas o pai dele
+    (stElementContainer, que o Streamlit posiciona) virava a referência — então
+    o clique só pegava a faixa do botão, embaixo do card. O certo é posicionar o
+    CONTAINER do botão (st-key-<chave>), como faz o .dd-cell do Descobrir.
+    Verificado em Chromium: nos 5 pontos do card, elementFromPoint devolve o
+    botão."""
+    import ast as _ast
+    fonte = open(APP, encoding="utf-8").read()
+    css = next(n.value.value for n in _ast.parse(fonte).body
+               if isinstance(n, _ast.Assign)
+               and getattr(n.targets[0], "id", "") == "_PARCERIAS_CSS")
+    assert '[class*="st-key-pc_"] [class*="st-key-parc_ver_"]{position:absolute' in css
+    assert '[class*="st-key-pc_"] .stButton{position:absolute' not in css, \
+        "posicionar o .stButton é o bug — o pai dele vira a referência"
+    assert 'pointer-events:none' in css, "o card não pode comer o clique"
+
+
+def test_modulos_saem_da_tela():
+    """O Fábio não precisa distinguir M1/M2/M3/M4 para decidir quem abordar."""
+    fonte = open(APP, encoding="utf-8").read()
+    assert "_mods_txt" not in fonte
+    assert "MODULOS_PFC" not in fonte, "nem no filtro, nem no dossiê"
 
 
 def test_selo_de_canal_reflete_a_direcao():
@@ -81,7 +111,9 @@ def test_destino_parcerias_valido():
 if __name__ == "__main__":
     test_destino_parcerias_valido()
     test_card_nao_usa_token_de_cor_inexistente()
-    test_hub_tem_botoes_no_lugar_dos_cards_flutuantes()
+    test_hub_tem_botoes_ladeando_os_radares()
+    test_clique_cobre_o_card_inteiro()
+    test_modulos_saem_da_tela()
     test_selo_de_canal_reflete_a_direcao()
     test_tela_parcerias_renderiza()
     print("OK — Radar de Parcerias: roteamento + tela renderizam.")

@@ -612,45 +612,45 @@ _HUB_CSS = """
 .hub-card.c2:hover .hub-enter{background:#8B7BF5;color:#fff;border-color:#8B7BF5}
 .hub-enter svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2.3;transition:.35s}
 .hub-card:hover .hub-enter svg{transform:translateX(5px)}
-/* Prospecção e Parcerias: BOTÕES, não cards.
-   Antes eram dois mini-cards em position:absolute nos cantos — eles se
-   sobrepunham aos cards-herói e estouravam a tela. Agora são uma linha
-   compacta no FLUXO NORMAL, abaixo dos dois radares: nada se sobrepõe, tudo
-   cabe, e a hierarquia fica honesta (dois radares principais + dois atalhos).
+/* Prospecção e Parcerias: BOTÕES, um de cada LADO dos radares.
+   Primeiro eram mini-cards em position:absolute nos cantos (se sobrepunham aos
+   radares); depois viraram uma linha embaixo; agora ladeiam os dois radares,
+   dentro da própria .hub-arena. Ficam no fluxo normal — nada se sobrepõe — e a
+   leitura fica simétrica: atalho · radar · radar · atalho.
    Acentos: teal #2DD4BF (Prospecção) / aqua #4FA8A0 (Parcerias). */
-.hub-mini{display:flex;gap:14px;margin-top:24px;opacity:0;
-  animation:hub-up .8s var(--ease) .75s forwards}
-.hub-minibtn{display:flex;align-items:center;gap:13px;cursor:pointer;
-  padding:11px 16px;border-radius:14px;min-width:232px;
+.hub-minibtn{display:flex;flex-direction:column;align-items:center;gap:9px;
+  align-self:center;cursor:pointer;width:118px;padding:18px 12px 15px;border-radius:18px;
   background:linear-gradient(165deg,rgba(24,30,48,.72),rgba(9,12,22,.7));
-  border:1px solid rgba(255,255,255,.1);
+  border:1px solid rgba(255,255,255,.1);opacity:0;
   -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  animation:hub-up .8s var(--ease) .7s forwards;
   transition:transform .3s var(--ease),border-color .3s,box-shadow .3s}
-.hub-minibtn:hover{transform:translateY(-3px)}
-.hub-mico{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex:none}
-.hub-mico svg{width:16px;height:16px;fill:none;stroke-width:2}
-.hub-mtxt{flex:1;min-width:0}
-.hub-mnome{font-size:14px;font-weight:650;color:#EEF1F8;line-height:1.2}
-.hub-mstat{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#5A6278;
-  text-transform:uppercase;margin-top:3px;letter-spacing:.5px;white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis}
-.hub-mseta{width:15px;height:15px;fill:none;stroke-width:2.3;flex:none;
+.hub-minibtn:hover{transform:translateY(-4px)}
+.hub-mico{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;flex:none}
+.hub-mico svg{width:19px;height:19px;fill:none;stroke-width:2}
+.hub-mtxt{text-align:center;min-width:0;width:100%}
+.hub-mnome{font-size:13px;font-weight:650;color:#EEF1F8;line-height:1.25}
+.hub-mnum{font-weight:700;font-size:20px;letter-spacing:-.4px;margin-top:6px;
+  font-variant-numeric:tabular-nums;line-height:1}
+.hub-mstat{font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#5A6278;
+  text-transform:uppercase;margin-top:5px;letter-spacing:.5px;line-height:1.3}
+.hub-mseta{width:14px;height:14px;fill:none;stroke-width:2.3;flex:none;opacity:.75;
   transition:transform .3s var(--ease)}
 .hub-minibtn:hover .hub-mseta{transform:translateX(4px)}
 .hub-minibtn.m3 .hub-mico{background:rgba(45,212,191,.14);border:1px solid rgba(45,212,191,.32)}
 .hub-minibtn.m3 .hub-mico svg,.hub-minibtn.m3 .hub-mseta{stroke:#2DD4BF}
-.hub-minibtn.m3 .hub-mstat b{color:#2DD4BF}
+.hub-minibtn.m3 .hub-mnum{color:#2DD4BF}
 .hub-minibtn.m3:hover{border-color:rgba(45,212,191,.55);
-  box-shadow:0 16px 36px -18px rgba(45,212,191,.5)}
+  box-shadow:0 18px 40px -20px rgba(45,212,191,.5)}
 .hub-minibtn.m4 .hub-mico{background:rgba(79,168,160,.14);border:1px solid rgba(79,168,160,.32)}
 .hub-minibtn.m4 .hub-mico svg,.hub-minibtn.m4 .hub-mseta{stroke:#4FA8A0}
-.hub-minibtn.m4 .hub-mstat b{color:#4FA8A0}
+.hub-minibtn.m4 .hub-mnum{color:#4FA8A0}
 .hub-minibtn.m4:hover{border-color:rgba(79,168,160,.55);
-  box-shadow:0 16px 36px -18px rgba(79,168,160,.5)}
+  box-shadow:0 18px 40px -20px rgba(79,168,160,.5)}
 @media(max-width:980px){.hub-arena{flex-direction:column;gap:20px;overflow:auto;max-height:80vh}
   .hub-card{width:340px}.hub-title h1{font-size:32px}
-  .hub-mini{flex-direction:column;width:340px}
-  .hub-minibtn{min-width:0;width:100%}}
+  .hub-minibtn{flex-direction:row;width:340px;justify-content:center;gap:14px}
+  .hub-minibtn .hub-mnum{margin-top:0}}
 """
 
 
@@ -699,7 +699,8 @@ export default function(component){
     return '<div class="hub-minibtn '+cls+'" data-radar="'+radar+'">' +
       '<div class="hub-mico"><svg viewBox="0 0 24 24">'+icone+'</svg></div>' +
       '<div class="hub-mtxt"><div class="hub-mnome">'+esc(nome)+'</div>' +
-      '<div class="hub-mstat"><b>'+esc(numero)+'</b> '+esc(rotulo)+'</div></div>' +
+      '<div class="hub-mnum">'+esc(numero)+'</div>' +
+      '<div class="hub-mstat">'+esc(rotulo)+'</div></div>' +
       '<svg class="hub-mseta" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>';
   }
 
@@ -722,17 +723,16 @@ export default function(component){
     '<div class="hub-rfoot"><div class="hub-rstat"><span class="d"></span>' + esc(d.status || '') + '</div></div></aside>' +
     '<div class="hub-stage"><div class="hub-title"><div class="eye">Central de Captação</div>' +
     '<h1>Escolha seu radar</h1></div><div class="hub-arena">' +
+    mini('m3', 'prospeccao', '<path d="M3 3v18h18M7 14l4-4 3 3 5-6"/>', 'Prospecção',
+         pro.total, plural(pro.total, 'verba', 'verbas')) +
     card('c1', 'captacao', cap.tag || 'Setor 01 · Recursos privados', 'Captação Privada',
          [[cap.orgs, 'orgs'], [cap.novas, 'novas'], [cap.fontes, 'fontes']]) +
     card('c2', 'emendas', emd.tag || 'Setor 02 · Recursos públicos', 'Emendas Parlamentares',
          [[emd.deputados, plural(emd.deputados, 'deputado', 'deputados')],
           [emd.reunioes, plural(emd.reunioes, 'reunião', 'reuniões')],
           [emd.aprovadas, plural(emd.aprovadas, 'aprovada', 'aprovadas')]]) +
-    '</div><div class="hub-mini">' +
-    mini('m3', 'prospeccao', '<path d="M3 3v18h18M7 14l4-4 3 3 5-6"/>', 'Prospecção',
-         pro.total, plural(pro.total, 'verba em captação', 'verbas em captação')) +
     mini('m4', 'parcerias', '<path d="M20 12v9H4v-9M2 7h20v5H2zM12 22V7"/>', 'Parcerias',
-         par.abordar, 'parceiros a abordar') +
+         par.abordar, 'a abordar') +
     '</div></div>';
   parentElement.appendChild(root);
 
