@@ -19,8 +19,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src import parcerias  # noqa: E402
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CABECALHO = ("nome,site,status,tipo_canal,canal_url,canal_titulo,evidencia,"
-             "verificado_em\n")
+CABECALHO = ("nome,site,status,tipo_canal,direcao,canal_url,canal_titulo,"
+             "evidencia,verificado_em\n")
 
 
 def _csv(corpo: str) -> str:
@@ -51,9 +51,38 @@ def test_canal_encontrado_nao_vira_programa_aberto():
     prova que há chamada aberta — é o mesmo cuidado da regra 3."""
     frase = parcerias.rotulo_verificacao(
         {"status": "canal encontrado", "tipo_canal": "edital",
-         "verificado_em": "2026-09-30"})
+         "direcao": "recebe projetos", "verificado_em": "2026-09-30"})
     assert "não** significa programa aberto" in frase
     assert "2026-09-30" in frase, "a tela precisa dizer QUANDO foi visto"
+
+
+def test_doacao_ao_parceiro_nao_e_apresentada_como_achado_bom():
+    """ERRO DA 1ª VERSÃO: "Como doar" foi classificado como canal encontrado.
+    Mas é o público doando PARA o parceiro — direção oposta à do PFC, que quer
+    RECEBER. A tela é obrigada a dizer isso, senão vira achado falso."""
+    frase = parcerias.rotulo_verificacao(
+        {"status": "canal encontrado", "tipo_canal": "capta doação",
+         "direcao": "direção inversa", "verificado_em": "2026-09-30"})
+    assert "não canal para receber projeto" in frase
+    assert "doação ao próprio parceiro" in frase
+
+
+def test_pagina_institucional_nao_vira_canal_de_submissao():
+    frase = parcerias.rotulo_verificacao(
+        {"status": "canal encontrado", "tipo_canal": "institucional",
+         "direcao": "indefinido", "verificado_em": "2026-09-30"})
+    assert "Não é canal" in frase
+
+
+def test_rede_social_nunca_e_canal():
+    """O verificador apontou o Instituto Alana para o Facebook, porque o nome
+    dele contém "instituto". Perfil não é canal de captação."""
+    v = _verificador()
+    for url in ("https://pt-br.facebook.com/institutoalana/",
+                "https://instagram.com/fundacaox", "https://linkedin.com/company/y"):
+        assert v._classificar(url) is None, url
+    assert v._classificar("Instituto Alana") is None, \
+        "o próprio nome do parceiro não pode virar indício de canal"
 
 
 def test_cada_falha_tem_frase_propria():
@@ -65,8 +94,8 @@ def test_cada_falha_tem_frase_propria():
 
 
 def test_casa_por_nome_normalizado():
-    caminho = _csv("Faber-Castell,https://x.com,canal encontrado,doação,"
-                   "https://x.com/doar,Como doar,Trecho,2026-09-30\n")
+    caminho = _csv("Faber-Castell,https://s.com,canal encontrado,edital,"
+                   "recebe projetos,https://s.com/e,Editais,Trecho,2026-09-30\n")
     regs = parcerias.carregar_verificacao(caminho)
     assert parcerias.verificacao_de({"nome": "FABER-CASTELL"}, regs)
     assert parcerias.verificacao_de({"nome": "Outra"}, regs) is None
@@ -75,9 +104,9 @@ def test_casa_por_nome_normalizado():
 
 def test_classificador_prioriza_edital_e_ignora_ruido():
     v = _verificador()
-    assert v._classificar("Editais abertos")[0] == "edital"
-    assert v._classificar("Como doar")[0] == "doação"
-    assert v._classificar("Seja um patrocinador")[0] == "patrocínio"
+    assert v._classificar("Editais abertos")[:2] == ("edital", "recebe projetos")
+    assert v._classificar("Apoio a projetos")[1] == "recebe projetos"
+    assert v._classificar("Como doar")[1] == "direção inversa"
     assert v._classificar("Sustentabilidade")[0] == "institucional"
     for ruido in ("Trabalhe conosco", "Carrinho de compras", "Política de privacidade"):
         assert v._classificar(ruido) is None, ruido

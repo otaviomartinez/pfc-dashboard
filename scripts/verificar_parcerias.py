@@ -35,26 +35,37 @@ from src import parcerias  # noqa: E402
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SAIDA = os.path.join(BASE, "data", "parcerias_verificacao.csv")
-COLUNAS = ["nome", "site", "status", "tipo_canal", "canal_url", "canal_titulo",
-           "evidencia", "verificado_em"]
+COLUNAS = ["nome", "site", "status", "tipo_canal", "direcao", "canal_url",
+           "canal_titulo", "evidencia", "verificado_em"]
 
-# Termos que identificam um canal, em ordem de FORÇA: um "edital aberto" vale
-# mais que uma página genérica de sustentabilidade.
+# Termos que identificam um canal, em ordem de FORÇA **para o PFC**.
+#
+# A PRIMEIRA VERSÃO ERRAVA A DIREÇÃO: classificava "Como doar" como canal bom.
+# Mas página de "doe agora" de uma fundação é para o PÚBLICO doar PARA ELA —
+# o contrário do que queremos. O PFC quer RECEBER. Por isso a ordem é:
+# edital > apoio a projetos > institucional, e "capta doação" entra por último,
+# marcado como direção inversa, para não parecer achado bom.
 CANAIS = [
-    ("edital", ("edital", "editais", "chamada publica", "chamada de projetos",
-                "inscricoes abertas", "submissao de projetos")),
-    ("doação", ("doacao", "doacoes", "doe ", "como doar", "quero doar",
-                "faca uma doacao")),
-    ("patrocínio", ("patrocinio", "patrocinios", "seja um patrocinador",
-                    "apoio a projetos", "apoie um projeto", "parceria",
-                    "seja um parceiro", "proponha seu projeto")),
-    ("institucional", ("responsabilidade social", "sustentabilidade",
-                       "investimento social", "impacto social", "instituto",
-                       "fundacao", "esg")),
+    ("edital", "recebe projetos",
+     ("edital", "editais", "chamada publica", "chamada de projetos",
+      "inscricoes abertas", "submissao de projetos", "submeta seu projeto")),
+    ("apoio a projetos", "recebe projetos",
+     ("apoio a projetos", "apoie um projeto", "projetos apoiados",
+      "seja um parceiro", "proponha seu projeto", "patrocinio",
+      "como apoiamos", "parcerias", "quero ser parceiro")),
+    ("institucional", "indefinido",
+     ("responsabilidade social", "sustentabilidade", "investimento social",
+      "impacto social", "esg")),
+    ("capta doação", "direção inversa",
+     ("como doar", "faca uma doacao", "quero doar", "doe agora", "doacoes")),
 ]
-# Nunca confundir com canal: são páginas de venda/atendimento.
+# Nunca confundir com canal: páginas de venda/atendimento e REDE SOCIAL.
+# A rede social entrou depois de o verificador apontar o Instituto Alana para
+# uma página do Facebook — perfil não é canal de captação.
 RUIDO = ("carrinho", "produto", "loja", "comprar", "trabalhe conosco", "vagas",
          "politica de privacidade", "fale conosco", "sac")
+REDES = ("facebook.", "instagram.", "twitter.", "x.com", "linkedin.",
+         "youtube.", "tiktok.", "whatsapp.", "wa.me")
 
 
 def _norm(s: str) -> str:
@@ -64,21 +75,25 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s.lower()).strip()
 
 
-def _classificar(texto: str) -> tuple[str, str] | None:
-    """(tipo_canal, termo) do termo mais FORTE presente. None se nenhum."""
+def _classificar(texto: str) -> tuple[str, str, str] | None:
+    """(tipo_canal, direcao, termo) do termo mais FORTE presente. None se nenhum.
+
+    `direcao` é o que evita o erro da 1ª versão: diz se aquele canal RECEBE
+    projeto (serve ao PFC) ou se apenas CAPTA doação do público (não serve).
+    """
     t = _norm(texto)
-    if any(r in t for r in RUIDO):
+    if any(r in t for r in RUIDO) or any(r in t for r in REDES):
         return None
-    for tipo, termos in CANAIS:
+    for tipo, direcao, termos in CANAIS:
         for termo in termos:
             if termo in t:
-                return tipo, termo.strip()
+                return tipo, direcao, termo.strip()
     return None
 
 
 def candidatos(soup, site: str) -> list[dict]:
     """Links da home que parecem canal, do mais forte para o mais fraco."""
-    forca = {tipo: i for i, (tipo, _) in enumerate(CANAIS)}
+    forca = {tipo: i for i, (tipo, _d, _t) in enumerate(CANAIS)}
     achados = {}
     for a in soup.find_all("a", href=True):
         rotulo = limpar_texto(a.get_text())
@@ -90,8 +105,8 @@ def candidatos(soup, site: str) -> list[dict]:
             continue
         url = urllib.parse.urljoin(site, href)
         if url not in achados:
-            achados[url] = {"tipo": clas[0], "termo": clas[1],
-                            "titulo": rotulo[:90] or clas[1], "url": url}
+            achados[url] = {"tipo": clas[0], "direcao": clas[1], "termo": clas[2],
+                            "titulo": rotulo[:90] or clas[2], "url": url}
     return sorted(achados.values(), key=lambda x: forca.get(x["tipo"], 9))
 
 
@@ -112,7 +127,7 @@ def verificar(p: dict) -> dict:
     nome, site = p.get("nome", ""), str(p.get("site", "")).strip()
     hoje = datetime.date.today().isoformat()
     linha = {"nome": nome, "site": site, "status": "não encontrado",
-             "tipo_canal": "", "canal_url": "", "canal_titulo": "",
+             "tipo_canal": "", "direcao": "", "canal_url": "", "canal_titulo": "",
              "evidencia": "", "verificado_em": hoje}
     if not site:
         linha["status"] = "sem site na base"
@@ -126,7 +141,8 @@ def verificar(p: dict) -> dict:
         return linha                      # respondeu, mas nada encontrável
     melhor = achados[0]
     linha.update({"status": "canal encontrado", "tipo_canal": melhor["tipo"],
-                  "canal_url": melhor["url"], "canal_titulo": melhor["titulo"],
+                  "direcao": melhor["direcao"], "canal_url": melhor["url"],
+                  "canal_titulo": melhor["titulo"],
                   "evidencia": evidencia_da_pagina(melhor["url"])})
     return linha
 
@@ -158,8 +174,10 @@ def main() -> int:
         w.writerows(linhas)
 
     achou = sum(1 for l in linhas if l["status"] == "canal encontrado")
+    uteis = sum(1 for l in linhas if l["direcao"] == "recebe projetos")
     print(f"\n{len(linhas)} verificados -> {SAIDA}")
     print(f"  canal encontrado: {achou} · sem canal encontrável: {len(linhas)-achou}")
+    print(f"  DESSES, os que RECEBEM PROJETO (servem ao PFC): {uteis}")
     por_tipo = {}
     for l in linhas:
         if l["tipo_canal"]:
