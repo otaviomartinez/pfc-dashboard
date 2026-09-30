@@ -688,6 +688,10 @@ export default function(component){
     '<span>Captação Privada</span></div>' +
     '<div class="hub-ritem" data-radar="emendas"><svg viewBox="0 0 24 24"><path d="M6 3h12l3 6-9 12L3 9z"/></svg>' +
     '<span>Emendas</span></div>' +
+    '<div class="hub-ritem" data-radar="prospeccao"><svg viewBox="0 0 24 24"><path d="M3 3v18h18M7 14l4-4 3 3 5-6"/></svg>' +
+    '<span>Prospecção</span></div>' +
+    '<div class="hub-ritem" data-radar="parcerias"><svg viewBox="0 0 24 24"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 22V7"/></svg>' +
+    '<span>Parcerias</span></div>' +
     '<div class="hub-rfoot"><div class="hub-rstat"><span class="d"></span>' + esc(d.status || '') + '</div></div></aside>' +
     '<div class="hub-stage"><div class="hub-title"><div class="eye">Central de Captação</div>' +
     '<h1>Escolha seu radar</h1></div><div class="hub-arena">' +
@@ -1348,6 +1352,7 @@ _TOPNAV_CSS = """
 .tn-item .rdot.amber{background:#E8873A;box-shadow:0 0 7px rgba(232,135,58,.7)}
 .tn-item .rdot.violet{background:#8B7BF0;box-shadow:0 0 7px rgba(139,123,240,.7)}
 .tn-item .rdot.teal{background:#2DD4BF;box-shadow:0 0 7px rgba(45,212,191,.7)}
+.tn-item .rdot.aqua{background:#4FA8A0;box-shadow:0 0 7px rgba(79,168,160,.7)}
 .tn-item .nm{flex:1}
 .tn-item .ck{width:15px;height:15px;flex:none;fill:none;stroke:var(--acc);stroke-width:2.4}
 .tn-item svg.ic{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8}
@@ -1371,7 +1376,8 @@ export default function(component){
   const RMETA = {
     captacao:  {acc:'#E8873A', soft:'rgba(232,135,58,.14)', nome:'Captação Privada'},
     emendas:   {acc:'#8B7BF0', soft:'rgba(139,123,240,.14)', nome:'Emendas Parlamentares'},
-    prospeccao:{acc:'#2DD4BF', soft:'rgba(45,212,191,.14)',  nome:'Prospecção'}
+    prospeccao:{acc:'#2DD4BF', soft:'rgba(45,212,191,.14)',  nome:'Prospecção'},
+    parcerias: {acc:'#4FA8A0', soft:'rgba(79,168,160,.14)',  nome:'Parcerias'}
   };
   const rm = RMETA[radar] || RMETA.captacao;
   const acc = rm.acc, accSoft = rm.soft, nomeAtual = rm.nome;
@@ -1406,6 +1412,7 @@ export default function(component){
     item('captacao', 'Captação Privada', 'amber') +
     item('emendas', 'Emendas Parlamentares', 'violet') +
     item('prospeccao', 'Prospecção', 'teal') +
+    item('parcerias', 'Parcerias', 'aqua') +
     '<div class="tn-sep"></div>' +
     '<button class="tn-item" data-act="hub">' + iHub + '<span class="nm">Voltar à Central</span></button>' +
     '<button class="tn-item danger" data-act="sair">' + iOut + '<span class="nm">Sair</span></button>' +
