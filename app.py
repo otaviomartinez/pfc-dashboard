@@ -1652,9 +1652,6 @@ _PARCERIAS_CSS = """
 .parc-sub{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--dim,#6B7688);
   margin-top:4px;text-transform:uppercase;letter-spacing:.4px}
 .parc-mods{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-.parc-mods span{display:inline-block;font-size:10.5px;font-family:'JetBrains Mono',monospace;
-  padding:2px 8px;border-radius:20px;background:rgba(79,168,160,.13);color:#7fd3ca;
-  border:1px solid rgba(79,168,160,.3)}
 .parc-selo{display:inline-block;font-size:10.5px;font-family:'JetBrains Mono',monospace;
   padding:2px 9px;border-radius:20px;background:rgba(124,134,152,.14);color:#A4AEBF;
   border:1px solid rgba(124,134,152,.3)}
@@ -1670,14 +1667,22 @@ _PARCERIAS_CSS = """
   margin:2px 0 14px;display:flex;gap:16px;flex-wrap:wrap}
 .parc-legenda i{font-style:normal}
 .parc-legenda b{font-weight:400}
-/* CARD INTEIRO CLICÁVEL — mesmo truque do Descobrir (.dd-cell): o container do
-   botão (chave pc_) cobre o card, invisível, e captura o clique. Sem isso o
-   usuário teria de mirar num botãozinho, contra a regra do projeto de que
-   quase tudo deve ser clicável e levar a algo real. */
+/* CARD INTEIRO CLICÁVEL — mesmo truque do Descobrir (.dd-cell).
+   ERRO QUE ISTO CORRIGE: eu posicionava o `.stButton` com inset:0, mas o pai
+   dele (o stElementContainer que o Streamlit cria) também é posicionado — então
+   o "inset:0" era relativo àquela FAIXA do botão, embaixo do card, e não ao
+   card. Resultado: só a tirinha de baixo clicava, e o card não. O certo é
+   posicionar o CONTAINER DO BOTÃO (classe st-key-<chave-do-botão>), que é
+   exatamente o que o .dd-cell faz. */
 [class*="st-key-pc_"]{position:relative;margin-bottom:12px}
-[class*="st-key-pc_"] .stButton{position:absolute;inset:0;z-index:4;margin:0}
-[class*="st-key-pc_"] .stButton button{height:100%;width:100%;min-height:0;opacity:0;
-  border:none;background:transparent;box-shadow:none;cursor:pointer}
+[class*="st-key-pc_"] [class*="st-key-parc_ver_"]{position:absolute;inset:0;z-index:4;
+  margin:0;padding:0}
+[class*="st-key-pc_"] [class*="st-key-parc_ver_"] .stButton,
+[class*="st-key-pc_"] [class*="st-key-parc_ver_"] button{height:100%;width:100%;
+  min-height:0;border:none;background:transparent;box-shadow:none}
+[class*="st-key-pc_"] [class*="st-key-parc_ver_"] button{opacity:0;cursor:pointer}
+/* o card não pode comer o clique nem mostrar cursor de texto */
+[class*="st-key-pc_"] .parc-card{pointer-events:none;user-select:none}
 </style>
 """
 
@@ -1704,11 +1709,6 @@ def _selo_canal(p: dict) -> str:
     return f'<span class="parc-canal {classe}">{esc(texto)}</span>'
 
 
-def _mods_txt(p: dict) -> str:
-    """Chips 'M1 M2 …' a partir da lista de módulos do parceiro."""
-    return "".join(f'<span>M{m}</span>' for m in p.get("modulos_lista", []))
-
-
 @st.dialog("Parceiro", width="large")
 def dlg_parceiro(p: dict):
     """Dossiê do parceiro: foco, módulos-alvo, como abordar (honesto)."""
@@ -1717,8 +1717,6 @@ def dlg_parceiro(p: dict):
         f'<div style="font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:6px">'
         f'{esc(p.get("tipo",""))} · {esc(p.get("foco",""))}</div>',
         unsafe_allow_html=True)
-    modulos = ", ".join(parcerias.MODULOS_PFC.get(m, f"Módulo {m}") for m in p.get("modulos_lista", []))
-    st.markdown(f"**Módulos-alvo:** {modulos or '—'}")
     st.markdown(f"**Abrangência:** {esc(p.get('abrangencia','—') or '—')}")
     st.markdown(f"**Status:** {esc(p.get('status','—') or '—')}")
     st.markdown("**Como abordar (a confirmar):**")
@@ -1802,8 +1800,8 @@ def render_parcerias():
     render_topnav("parcerias")
     st.markdown(
         '<div class="phead"><h1 style="color:var(--ink)">Radar de Parcerias</h1>'
-        '<p>Empresas que podem doar material/cesta (módulo 1) e fundações do direito da '
-        'criança (módulos 2/3/4). Candidatos a abordar — não parcerias confirmadas.</p></div>',
+        '<p>Empresas que podem doar material e cesta, e fundações do direito da criança. '
+        'Candidatos a abordar — não parcerias confirmadas.</p></div>',
         unsafe_allow_html=True)
     st.markdown(_PARCERIAS_CSS, unsafe_allow_html=True)
 
@@ -1824,16 +1822,14 @@ def render_parcerias():
         st.warning("Base de parcerias vazia (data/parcerias_seed.csv não encontrado).")
         return
 
-    c1, c2, c3, c4 = st.columns([1, 1, 1, 2])
-    modulo = c1.selectbox("Módulo", ["Todos", 1, 2, 3, 4],
-                          format_func=lambda x: "Todos" if x == "Todos"
-                          else parcerias.MODULOS_PFC.get(x, f"Módulo {x}"))
-    tipo = c2.selectbox("Tipo", ["Todos"] + parcerias.tipos_disponiveis(rows))
-    status = c3.selectbox("Status", ["Todos"] + parcerias.status_disponiveis(rows))
-    busca = c4.text_input("Buscar", placeholder="nome, foco…")
+    # Sem filtro de módulo: distinguir M1/M2/M3/M4 não ajuda a decidir quem
+    # abordar — o que decide é o tipo, o status e se há canal.
+    c1, c2, c3 = st.columns([1, 1, 2])
+    tipo = c1.selectbox("Tipo", ["Todos"] + parcerias.tipos_disponiveis(rows))
+    status = c2.selectbox("Status", ["Todos"] + parcerias.status_disponiveis(rows))
+    busca = c3.text_input("Buscar", placeholder="nome, foco…")
 
-    filtrados = parcerias.filtrar_parcerias(rows, modulo=modulo, tipo=tipo,
-                                            status=status, busca=busca)
+    filtrados = parcerias.filtrar_parcerias(rows, tipo=tipo, status=status, busca=busca)
 
     # Legenda ANTES da lista: cor é semântica neste projeto, então ela precisa
     # ser explicada — e aqui a cor responde à pergunta que importa ("dá para
@@ -1860,7 +1856,7 @@ def render_parcerias():
                     f'{_selo_canal(p)}</div>'
                     f'<div class="parc-sub">{esc(p.get("tipo",""))} · '
                     f'{esc(p.get("foco",""))}</div>'
-                    f'<div class="parc-mods">{_mods_txt(p)}'
+                    f'<div class="parc-mods">'
                     f'<span class="parc-selo">{esc(p.get("status",""))}</span></div></div>',
                     unsafe_allow_html=True)
                 if st.button("Ver dossiê", key=f"parc_ver_{i}",
