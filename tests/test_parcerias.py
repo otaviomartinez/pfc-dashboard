@@ -72,6 +72,25 @@ def test_filtros_listam_valores():
     assert any("abordar" in s.lower() for s in status_disponiveis(rows))
 
 
+def test_preparar_normaliza_linhas_do_sheets():
+    from src.parcerias import preparar
+    out = preparar([{"nome": "X", "modulos": "2;3"}, {"nome": "Y", "modulos": ""}])
+    assert out[0]["modulos_lista"] == [2, 3]
+    assert out[1]["modulos_lista"] == []
+
+
+def test_dados_parcerias_constantes_e_validacao():
+    # P4: constantes + rejeições que acontecem ANTES de qualquer conexão/escrita.
+    # NÃO chama caminho que grava (este ambiente pode estar conectado ao Sheets
+    # de produção — teste jamais deve escrever lá).
+    from src import dados
+    assert dados.PARCERIA_STATUS[0] == "a abordar"
+    assert dados.HEADERS_PARCERIAS[0] == "ID"
+    assert dados.atualizar_status_parceria("", "em contato")["sucesso"] is False   # id vazio
+    r = dados.atualizar_status_parceria("1", "banana")                              # status inválido
+    assert r["sucesso"] is False and "inválido" in r["mensagem"].lower()
+
+
 def test_gancho_honesto():
     # usa o campo curado quando existe
     r = {"como_abordar": "Buscar doação de cadernos", "foco": "material escolar", "tipo": "empresa"}
@@ -91,5 +110,7 @@ if __name__ == "__main__":
     test_filtra_por_tipo_status_e_busca()
     test_por_modulo_agrupa()
     test_filtros_listam_valores()
+    test_preparar_normaliza_linhas_do_sheets()
+    test_dados_parcerias_constantes_e_validacao()
     test_gancho_honesto()
     print("OK — Radar de Parcerias PASSO 1: base curada + camada pura passou.")

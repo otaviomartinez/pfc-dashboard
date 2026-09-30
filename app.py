@@ -1676,6 +1676,21 @@ def dlg_parceiro(p: dict):
     st.caption(f"Fonte: {esc(p.get('fonte','') or '—')} · candidato a abordar, "
                "não é parceria confirmada.")
 
+    # ---- P4 · Status da parceria (persistido na aba Parcerias; só conectado) ----
+    if modo_conectado and str(p.get("ID", "")).strip():
+        st.divider()
+        atual = str(p.get("status", "")).strip()
+        opcoes = dados.PARCERIA_STATUS
+        idx = opcoes.index(atual) if atual in opcoes else 0
+        novo = st.selectbox("Status da parceria", opcoes, index=idx,
+                            key=f"parc_status_{p['ID']}")
+        if novo != atual and st.button("Salvar status", key=f"parc_savest_{p['ID']}",
+                                       use_container_width=True):
+            res = dados.atualizar_status_parceria(p["ID"], novo)
+            (st.success if res["sucesso"] else st.error)(res["mensagem"])
+            if res["sucesso"]:
+                st.rerun()
+
     # ---- P5 · Ponte para a Prospecção (feature acionada pelo Fábio) ----------
     # Vira um item da Prospecção tipo 'Patrocínio' (o tipo já existe). Usa a porta
     # de escrita que já existe (adicionar_prospeccao): desabilitada offline, com
@@ -1716,7 +1731,19 @@ def render_parcerias():
         unsafe_allow_html=True)
     st.markdown(_PARCERIAS_CSS, unsafe_allow_html=True)
 
-    rows = parcerias.carregar_parcerias()
+    # Fonte: aba 'Parcerias' do Sheets quando conectado (semeada do CSV na 1ª vez,
+    # e onde o status é editável); CSV-semente offline (só leitura).
+    if modo_conectado:
+        dfp = dados.carregar_parcerias_sheets()
+        if dfp.empty:
+            dados.criar_aba_parcerias()          # cria + semeia (idempotente)
+            dados.carregar_parcerias_sheets.clear()
+            dfp = dados.carregar_parcerias_sheets()
+        rows = parcerias.preparar(dfp.to_dict("records")) if not dfp.empty \
+            else parcerias.carregar_parcerias()
+    else:
+        rows = parcerias.carregar_parcerias()
+        st.caption(HINT_ESCRITA + " — conectado, dá para mudar o status das parcerias.")
     if not rows:
         st.warning("Base de parcerias vazia (data/parcerias_seed.csv não encontrado).")
         return

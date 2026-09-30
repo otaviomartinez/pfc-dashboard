@@ -73,6 +73,12 @@ HEADERS_INSCRITOS = ["Email", "Data inscrição", "Ativo"]
 ABA_PROSPECCAO = "Prospecção"
 HEADERS_PROSPECCAO = ["ID", "Nome", "Tipo", "Valor", "Financiador", "Previsão",
                       "Status", "Observações", "Registrado em"]
+# Radar de Parcerias: a aba é SEMEADA a partir de data/parcerias_seed.csv na 1ª
+# criação. Colunas iguais às do CSV (+ ID como chave do status). Status é o funil.
+ABA_PARCERIAS = "Parcerias"
+HEADERS_PARCERIAS = ["ID", "nome", "tipo", "foco", "modulos", "abrangencia",
+                     "site", "como_abordar", "status", "obs", "fonte"]
+PARCERIA_STATUS = ["a abordar", "em contato", "ativa", "recusou"]
 # Cabeçalho EXATO da aba de novidades.
 HEADERS_NOVIDADES = [
     "Data", "Fonte", "Título", "Descrição", "Score Aderência",
@@ -948,6 +954,79 @@ def atualizar_status_prospeccao(id_item, novo_status: str) -> dict:
         return {"sucesso": True, "mensagem": f"Etapa → {novo_status}."}
     except Exception as e:  # noqa: BLE001
         return {"sucesso": False, "mensagem": f"Erro ao gravar no Google Sheets: {e}"}
+
+
+def criar_aba_parcerias() -> bool:
+    """Garante a aba 'Parcerias' e, na CRIAÇÃO, semeia com a base curada
+    (data/parcerias_seed.csv), dando um ID sequencial a cada linha. True se criada
+    agora. Idempotente: se a aba já existe, não mexe (não re-semeia)."""
+    sh = _conectar()
+    if sh is None:
+        return False
+    try:
+        if ABA_PARCERIAS in [w.title for w in sh.worksheets()]:
+            return False
+        ws = sh.add_worksheet(title=ABA_PARCERIAS, rows=500, cols=len(HEADERS_PARCERIAS))
+        ws.append_row(HEADERS_PARCERIAS)
+        from src import parcerias as _p  # lazy: evita ciclo de import
+        seed = _p.carregar_parcerias()
+        linhas = [[str(i)] + [str(r.get(c, "")) for c in HEADERS_PARCERIAS[1:]]
+                  for i, r in enumerate(seed, start=1)]
+        if linhas:
+            ws.append_rows(linhas, value_input_option="RAW")
+        return True
+    except Exception:
+        return False
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def carregar_parcerias_sheets() -> pd.DataFrame:
+    """Base de parcerias da aba 'Parcerias'. Vazio se não existir/sem conexão
+    (a tela cai no CSV-semente). Leitura POR NOME de coluna."""
+    sh = _conectar()
+    if sh is None:
+        return pd.DataFrame()
+    try:
+        if ABA_PARCERIAS not in [w.title for w in sh.worksheets()]:
+            return pd.DataFrame()
+        registros = sh.worksheet(ABA_PARCERIAS).get_all_records()
+        return pd.DataFrame(registros).astype(str).replace({"None": "", "nan": ""}) if registros \
+            else pd.DataFrame(columns=HEADERS_PARCERIAS)
+    except Exception:
+        return pd.DataFrame()
+
+
+def atualizar_status_parceria(id_item, novo_status: str) -> dict:
+    """Grava SÓ a célula de status do parceiro (casa por ID) na aba Parcerias.
+    Não toca nos outros campos. Valida o status contra PARCERIA_STATUS. Só grava
+    conectado ao Sheets. Retorna {sucesso, mensagem}."""
+    id_item = str(id_item or "").strip()
+    novo_status = str(novo_status or "").strip()
+    if not id_item or not novo_status:
+        return {"sucesso": False, "mensagem": "Parceiro ou status em branco."}
+    if novo_status not in PARCERIA_STATUS:
+        return {"sucesso": False, "mensagem": f"Status inválido: {novo_status}."}
+    sh = _conectar()
+    if sh is None:
+        return {"sucesso": False, "mensagem": "Sem conexão com o Google Sheets — o status "
+                "não foi gravado (modo local)."}
+    try:
+        criar_aba_parcerias()  # idempotente (garante que a aba existe)
+        ws = sh.worksheet(ABA_PARCERIAS)
+        cab = [str(c).strip() for c in ws.row_values(1)]
+        if "ID" not in cab or "status" not in cab:
+            return {"sucesso": False, "mensagem": "Aba Parcerias sem coluna ID/status."}
+        col_id = cab.index("ID") + 1
+        ids = ws.col_values(col_id)  # ids[0] é o cabeçalho
+        linha = next((i for i, v in enumerate(ids[1:], start=2)
+                      if str(v).strip() == id_item), None)
+        if linha is None:
+            return {"sucesso": False, "mensagem": f"Parceiro ID {id_item} não encontrado."}
+        ws.update_cell(linha, cab.index("status") + 1, novo_status)
+        carregar_parcerias_sheets.clear()
+        return {"sucesso": True, "mensagem": f"Status → {novo_status}."}
+    except Exception as e:  # noqa: BLE001
+        return {"sucesso": False, "mensagem": f"Erro ao gravar na aba Parcerias: {e}"}
 
 
 def atualizar_deputado(nome: str, campos: dict) -> dict:

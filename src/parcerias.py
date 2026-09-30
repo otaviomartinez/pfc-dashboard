@@ -49,6 +49,14 @@ def parse_modulos(campo) -> list[int]:
     return sorted(nums)
 
 
+def preparar(rows: list[dict]) -> list[dict]:
+    """Normaliza linhas de parceria (venham do CSV-semente OU da aba do Sheets):
+    acrescenta `modulos_lista` (ints) derivado de `modulos`. Idempotente. PURA."""
+    for r in rows:
+        r["modulos_lista"] = parse_modulos(r.get("modulos"))
+    return rows
+
+
 def carregar_parcerias(caminho: str = SEED_CSV) -> list[dict]:
     """Lê a base-semente (CSV utf-8). Arquivo ausente → [] (nunca quebra a tela).
     Acrescenta `modulos_lista` (ints) a cada linha, derivado de `modulos`."""
@@ -57,9 +65,7 @@ def carregar_parcerias(caminho: str = SEED_CSV) -> list[dict]:
             linhas = list(csv.DictReader(f))
     except FileNotFoundError:
         return []
-    for r in linhas:
-        r["modulos_lista"] = parse_modulos(r.get("modulos"))
-    return linhas
+    return preparar(linhas)
 
 
 def filtrar_parcerias(rows: list[dict], modulo=None, tipo: str = "",
