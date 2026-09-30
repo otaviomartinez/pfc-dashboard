@@ -14,6 +14,10 @@ on:
         description: "Exercício do MDE/CAPAG (vazio = ano passado)"
         required: false
         default: ""
+      exercicio_fpm:
+        description: "Exercício do FPM (vazio = 2 anos atrás; o DCA fecha com atraso)"
+        required: false
+        default: ""
   schedule:
     - cron: "0 8 1 1,4,7,10 *"   # 05:00 Brasília, dia 1 de jan/abr/jul/out
 
@@ -65,6 +69,13 @@ jobs:
         continue-on-error: true
         run: python scripts/importar_contatos_prefeitura.py
 
+      # FPM: dependência de repasse, do DCA do SICONFI (o RGF não existe para
+      # SP — a sonda provou). Fecha com atraso, por isso o exercício-2 por padrão.
+      - name: FPM (SICONFI / DCA)
+        id: fpm
+        continue-on-error: true
+        run: python scripts/importar_fpm.py ${{ github.event.inputs.exercicio_fpm }}
+
       - name: Conferir o que foi gerado
         run: |
           echo "### Arquivos em data/prefeituras/" >> $GITHUB_STEP_SUMMARY
@@ -76,7 +87,7 @@ jobs:
             echo "- nenhum CSV gerado" >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "MDE: ${{ steps.mde.outcome }} · CAPAG: ${{ steps.capag.outcome }} · TSE: ${{ steps.tse.outcome }} · Contatos: ${{ steps.contatos.outcome }}" >> $GITHUB_STEP_SUMMARY
+          echo "MDE: ${{ steps.mde.outcome }} · CAPAG: ${{ steps.capag.outcome }} · TSE: ${{ steps.tse.outcome }} · Contatos: ${{ steps.contatos.outcome }} · FPM: ${{ steps.fpm.outcome }}" >> $GITHUB_STEP_SUMMARY
 
       - name: Commitar os CSVs
         run: |
@@ -86,7 +97,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "Nada mudou — nenhum commit."
           else
-            git commit -m "dados: atualiza CSVs do painel Prefeituras (MDE/CAPAG/TSE/contatos)"
+            git commit -m "dados: atualiza CSVs do painel Prefeituras (MDE/CAPAG/TSE/contatos/FPM)"
             git push origin HEAD:${{ github.ref_name }}
             echo "CSVs commitados na $(git rev-parse --abbrev-ref HEAD)."
           fi

@@ -26,6 +26,9 @@ LRF_PESSOAL_ALERTA = 48.6       # 90% de 54
 LRF_PESSOAL_PRUDENCIAL = 51.3   # 95% de 54
 # Acima disto, a prefeitura depende demais do FPM (frágil a repasse) — heurística.
 FPM_DEPENDENCIA_ALTA = 60.0
+# Resultado da Execução Orçamentária (TCE-SP): déficit abaixo disto é alerta.
+# É % da receita — não é caixa; ver sinal_resultado.
+RESULTADO_DEFICIT_ALERTA = -2.0
 
 _DOWNGRADE = {"quente": "morno", "morno": "morno", "frio": "frio", "sem_dado": "sem_dado"}
 
@@ -87,6 +90,29 @@ def sinal_fpm(dependencia_fpm) -> dict:
     return {"fator": "fpm", "nivel": "bom", "texto": f"dependência de FPM em {v:.0f}% — diversificada"}
 
 
+def sinal_resultado(resultado_pct) -> dict:
+    """Sinal do Resultado da Execução Orçamentária (TCE-SP), em % da receita.
+
+    **NÃO é disponibilidade de caixa** — aquela é o RGF-Anexo 05, que o SICONFI
+    não publica para os municípios de SP (sonda varreu e não há nada). Este é o
+    resultado do exercício: sobrou ou faltou no orçamento. Por isso é sinal
+    INFORMATIVO: sozinho não rebaixa a temperatura, porque um déficit pontual
+    não diz que a prefeitura não banca o programa.
+    """
+    v = _num(resultado_pct)
+    if v is None:
+        return {"fator": "resultado", "nivel": "sem_dado",
+                "texto": "resultado orçamentário: sem dado"}
+    if v <= RESULTADO_DEFICIT_ALERTA:
+        return {"fator": "resultado", "nivel": "alerta",
+                "texto": f"fechou o exercício com déficit de {abs(v):.1f}% da receita"}
+    if v < 0:
+        return {"fator": "resultado", "nivel": "bom",
+                "texto": f"déficit pequeno, de {abs(v):.1f}% da receita"}
+    return {"fator": "resultado", "nivel": "bom",
+            "texto": f"fechou o exercício com superávit de {v:.1f}% da receita"}
+
+
 def sinal_cauc(cauc) -> dict:
     """Sinal da regularidade (CAUC). Irregular = não pode assinar convênio."""
     irreg = _cauc_irregular(cauc)
@@ -99,18 +125,19 @@ def sinal_cauc(cauc) -> dict:
 
 
 def capacidade_fiscal(base_temperatura: str, caixa=None, pessoal_pct=None,
-                      dependencia_fpm=None, cauc=None) -> dict:
+                      dependencia_fpm=None, cauc=None, resultado_pct=None) -> dict:
     """Enriquece a temperatura-base (MDE+CAPAG) com os fatores novos.
 
     `base_temperatura` vem de ui.formato.temperatura_prefeitura (não recalculado
     aqui). Devolve {temperatura, base, bloqueio, sinais, resumo}:
       - CAUC irregular → temperatura 'bloqueado' (override): nem assina convênio;
       - caixa apertado OU pessoal no prudencial → rebaixa 'quente'→'morno';
-      - FPM alto é informativo (não muda a temperatura sozinho);
+      - FPM alto e déficit orçamentário são informativos (não mudam sozinhos);
       - fator ausente = 'sem dado', nunca penaliza.
     """
     base = str(base_temperatura or "sem_dado")
     sinais = [sinal_caixa(caixa), sinal_pessoal(pessoal_pct),
+              sinal_resultado(resultado_pct),
               sinal_fpm(dependencia_fpm), sinal_cauc(cauc)]
 
     # CAUC irregular é bloqueio duro — decisivo, independe de MDE/CAPAG.
@@ -125,11 +152,14 @@ def capacidade_fiscal(base_temperatura: str, caixa=None, pessoal_pct=None,
         temperatura = _DOWNGRADE.get(base, base)
 
     fpm_alerta = any(s["fator"] == "fpm" and s["nivel"] == "alerta" for s in sinais)
+    res_alerta = any(s["fator"] == "resultado" and s["nivel"] == "alerta" for s in sinais)
     partes = []
     if temperatura != base:
         partes.append("capacidade rebaixada por caixa/pessoal")
     if fpm_alerta:
         partes.append("atenção à dependência de FPM")
+    if res_alerta:
+        partes.append("fechou o exercício no vermelho")
     resumo = "; ".join(partes) if partes else "sem ressalvas fiscais além da base MDE+CAPAG"
     return {"temperatura": temperatura, "base": base, "bloqueio": False,
             "sinais": sinais, "resumo": resumo}
