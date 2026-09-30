@@ -64,6 +64,38 @@ do foco/tipo **sem inventar canal**.
 
 Testes: `tests/test_parcerias.py` e `tests/test_parcerias_tela.py`.
 
+## Verificação dos canais — o que a checagem real mostrou
+
+`scripts/verificar_parcerias.py` (workflow mensal "Verificar canais de
+parceria") abre o site de cada parceiro e procura a página de
+edital/apoio a projetos/doação, guardando URL, trecho e a **data** em que viu.
+Resultado da 1ª checagem (set/2026), nos 16:
+
+| Situação | Nº |
+|---|---|
+| **Canal que RECEBE PROJETO** (serve ao PFC) | **2** |
+| Página institucional, sem canal de submissão | 5 |
+| Doação ao próprio parceiro (direção inversa) | 2 |
+| Site não respondeu ao robô | 5 |
+| Nada encontrável / sem site na base | 2 |
+
+Os dois que servem: **Fundação Roberto Marinho** (edital) e **Instituto Ayrton
+Senna** (apoio a projetos).
+
+**Três lições que viraram código:**
+1. **Direção importa mais que existência.** A 1ª versão contou "Como doar" como
+   achado bom — mas é o público doando PARA o parceiro, o contrário do que o
+   PFC precisa. Cada canal carrega agora uma `direcao`.
+2. **O nome do parceiro não é indício.** "instituto"/"fundação" estão no nome de
+   metade deles; isso fez o Instituto Alana apontar para uma página do Facebook.
+   Esses termos saíram, e rede social entrou no ruído.
+3. **Site grande bloqueia robô.** BIC, Nestlé, Instituto Coca-Cola, Instituto
+   Carrefour e Fundação Telefônica não responderam nem pela variante `www`.
+   Para eles, o caminho é manual — e o painel diz isso, em vez de fingir.
+
+**O que "canal encontrado" significa:** existe a página. **Não** significa
+programa aberto agora, nem que aceita o tipo de projeto do PFC.
+
 ## Em aberto
 
 - **Nunca foi visto rodando.** Dois commits dizem literalmente "[verificar layout
