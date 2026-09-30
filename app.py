@@ -1676,6 +1676,35 @@ def dlg_parceiro(p: dict):
     st.caption(f"Fonte: {esc(p.get('fonte','') or '—')} · candidato a abordar, "
                "não é parceria confirmada.")
 
+    # ---- P5 · Ponte para a Prospecção (feature acionada pelo Fábio) ----------
+    # Vira um item da Prospecção tipo 'Patrocínio' (o tipo já existe). Usa a porta
+    # de escrita que já existe (adicionar_prospeccao): desabilitada offline, com
+    # dedup por nome para não duplicar. NÃO cria porta nova de escrita.
+    st.divider()
+    nome_parc = str(p.get("nome", "")).strip()
+    ja_na_prosp = False
+    try:
+        _dfp = dados.carregar_prospeccao()
+        if not _dfp.empty and "Nome" in _dfp.columns:
+            ja_na_prosp = (_dfp["Nome"].astype(str).str.strip().str.lower()
+                           == nome_parc.lower()).any()
+    except Exception:
+        ja_na_prosp = False
+    if ja_na_prosp:
+        st.success("Já está na Prospecção (não dupliquei).")
+    elif st.button("➕ Puxar pra Prospecção", key=f"parc_puxar_{nome_parc}",
+                   type="primary", use_container_width=True, disabled=not modo_conectado):
+        res = dados.adicionar_prospeccao({
+            "Nome": nome_parc, "Tipo": "Patrocínio", "Valor": "", "Financiador": "",
+            "Previsão": "", "Status": PROSPECCAO_ETAPAS[0],
+            "Observações": f"Parceria ({p.get('foco','')}) — {parcerias.gancho_parceria(p)} "
+                           "[via Radar de Parcerias]"})
+        (st.success if res["sucesso"] else st.error)(res["mensagem"])
+        if res["sucesso"]:
+            st.rerun()
+    if not modo_conectado:
+        st.caption(HINT_ESCRITA + " — puxar grava na aba Prospecção.")
+
 
 def render_parcerias():
     """Radar 4 · Parcerias — lista curada de candidatos, filtrável por módulo/tipo/status."""
