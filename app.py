@@ -23,6 +23,7 @@ import streamlit.components.v1 as components
 import streamlit.components.v2 as components_v2
 
 from src import dados
+from src import parcerias
 from src import relatorios
 from src.dados import (
     COL_CANAL, COL_CHANCE, COL_EDITAL, COL_EMPRESA, COL_ENCAIXE, COL_ID,
@@ -380,17 +381,25 @@ def render_hub():
         pros = {"total": len(_itens_p), "conquistadas": len(_ganhos_p)}
     except Exception:
         pros = {"total": 0, "conquistadas": 0}
+    # Parcerias: contagem read-only da base curada (a abordar) para o card do hub.
+    try:
+        _parc = parcerias.carregar_parcerias()
+        parc = {"total": len(_parc),
+                "abordar": sum(1 for r in _parc if "abordar" in str(r.get("status", "")).lower())}
+    except Exception:
+        parc = {"total": 0, "abordar": 0}
     payload = {
         "status": "SHEETS AO VIVO · 06:00" if modo_conectado else "MODO LOCAL · CSV",
         "captacao": {"orgs": TOTAL, "novas": novas, "fontes": n_fontes,
                      "tag": "Setor 01 · Recursos privados"},
         "emendas": {**em, "tag": "Setor 02 · Recursos públicos"},
         "prospeccao": {**pros, "tag": "Setor 03 · Verba em captação"},
+        "parcerias": {**parc, "tag": "Setor 04 · Parcerias e doações"},
     }
     _render_aviso_conexao()  # o hub não tem topnav: avisa aqui também
     res = _hub_component(data=payload, key="hub", on_escolha_change=lambda: None)
     esc = getattr(res, "escolha", None)
-    if isinstance(esc, dict) and esc.get("radar") in ("captacao", "emendas", "prospeccao"):
+    if isinstance(esc, dict) and esc.get("radar") in ("captacao", "emendas", "prospeccao", "parcerias"):
         st.session_state["radar_escolhido"] = esc["radar"]
         st.rerun()
 
@@ -1615,6 +1624,97 @@ def render_prospeccao():
                 st.session_state["kanban_prosp_msg"] = {
                     "sucesso": False, "mensagem": "Movimento inválido (etapa fora do funil)."}
             st.rerun()  # sucesso confirma a coluna; falha faz o card voltar à origem
+
+
+# =========================================================================== #
+# RADAR 4 · PARCERIAS (base curada; ver PLANO_PARCERIAS.md)
+# ---------------------------------------------------------------------------
+# Lista CANDIDATOS a abordar (empresas → material/cesta, módulo 1; fundações do
+# direito da criança → módulos 2/3/4). Regra de ouro: nada aqui é parceria
+# confirmada — status nasce "a abordar", curadoria é manual. Lê a base-semente
+# (data/parcerias_seed.csv); NÃO escreve no Sheets (P4/P5 dependem de OK).
+# =========================================================================== #
+
+_PARCERIAS_CSS = """
+<style>
+.parc-card{border:1px solid var(--linha,#e6e3dd);border-radius:12px;padding:14px 16px;margin-bottom:10px;background:var(--card,#fff)}
+.parc-nome{font-size:16px;font-weight:700;color:var(--ink,#1a1a1a)}
+.parc-sub{font-family:var(--mono,monospace);font-size:12px;color:var(--dim,#6b6b6b);margin-top:2px}
+.parc-mods{margin-top:6px}
+.parc-mods span{display:inline-block;font-size:11px;padding:1px 7px;border-radius:20px;margin-right:5px;
+  background:rgba(79,168,160,.12);color:#2f7d75;border:1px solid rgba(79,168,160,.35)}
+.parc-selo{display:inline-block;font-size:11px;padding:1px 8px;border-radius:20px;
+  background:rgba(232,135,58,.12);color:#b5651d;border:1px solid rgba(232,135,58,.35)}
+</style>
+"""
+
+
+def _mods_txt(p: dict) -> str:
+    """Chips 'M1 M2 …' a partir da lista de módulos do parceiro."""
+    return "".join(f'<span>M{m}</span>' for m in p.get("modulos_lista", []))
+
+
+@st.dialog("Parceiro", width="large")
+def dlg_parceiro(p: dict):
+    """Dossiê do parceiro: foco, módulos-alvo, como abordar (honesto)."""
+    st.markdown(
+        f'<div style="font-size:20px;font-weight:700;color:var(--ink)">{esc(p.get("nome",""))}</div>'
+        f'<div style="font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:6px">'
+        f'{esc(p.get("tipo",""))} · {esc(p.get("foco",""))}</div>',
+        unsafe_allow_html=True)
+    modulos = ", ".join(parcerias.MODULOS_PFC.get(m, f"Módulo {m}") for m in p.get("modulos_lista", []))
+    st.markdown(f"**Módulos-alvo:** {modulos or '—'}")
+    st.markdown(f"**Abrangência:** {esc(p.get('abrangencia','—') or '—')}")
+    st.markdown(f"**Status:** {esc(p.get('status','—') or '—')}")
+    st.markdown("**Como abordar (a confirmar):**")
+    st.info(parcerias.gancho_parceria(p))
+    if str(p.get("obs", "")).strip():
+        st.markdown(f"**Observações:** {esc(p['obs'])}")
+    site = str(p.get("site", "")).strip()
+    if site.startswith("http"):
+        st.markdown(f"[Abrir site ↗]({site})")
+    st.caption(f"Fonte: {esc(p.get('fonte','') or '—')} · candidato a abordar, "
+               "não é parceria confirmada.")
+
+
+def render_parcerias():
+    """Radar 4 · Parcerias — lista curada de candidatos, filtrável por módulo/tipo/status."""
+    render_topnav("parcerias")
+    st.markdown(
+        '<div class="phead"><h1 style="color:var(--ink)">Radar de Parcerias</h1>'
+        '<p>Empresas que podem doar material/cesta (módulo 1) e fundações do direito da '
+        'criança (módulos 2/3/4). Candidatos a abordar — não parcerias confirmadas.</p></div>',
+        unsafe_allow_html=True)
+    st.markdown(_PARCERIAS_CSS, unsafe_allow_html=True)
+
+    rows = parcerias.carregar_parcerias()
+    if not rows:
+        st.warning("Base de parcerias vazia (data/parcerias_seed.csv não encontrado).")
+        return
+
+    c1, c2, c3, c4 = st.columns([1, 1, 1, 2])
+    modulo = c1.selectbox("Módulo", ["Todos", 1, 2, 3, 4],
+                          format_func=lambda x: "Todos" if x == "Todos"
+                          else parcerias.MODULOS_PFC.get(x, f"Módulo {x}"))
+    tipo = c2.selectbox("Tipo", ["Todos"] + parcerias.tipos_disponiveis(rows))
+    status = c3.selectbox("Status", ["Todos"] + parcerias.status_disponiveis(rows))
+    busca = c4.text_input("Buscar", placeholder="nome, foco…")
+
+    filtrados = parcerias.filtrar_parcerias(rows, modulo=modulo, tipo=tipo,
+                                            status=status, busca=busca)
+    st.caption(f"{len(filtrados)} parceiro(s) · de {len(rows)} na base")
+
+    for i, p in enumerate(filtrados):
+        col_info, col_btn = st.columns([5, 1])
+        col_info.markdown(
+            f'<div class="parc-card"><div class="parc-nome">{esc(p.get("nome",""))}</div>'
+            f'<div class="parc-sub">{esc(p.get("tipo",""))} · {esc(p.get("foco",""))} · '
+            f'{esc(p.get("abrangencia",""))}</div>'
+            f'<div class="parc-mods">{_mods_txt(p)}'
+            f'<span class="parc-selo">{esc(p.get("status",""))}</span></div></div>',
+            unsafe_allow_html=True)
+        if col_btn.button("Ver", key=f"parc_ver_{i}", use_container_width=True):
+            dlg_parceiro(p)
 
 
 # --------------------------------------------------------------------------- #
@@ -2954,7 +3054,7 @@ def render_topnav(radar_atual: str, crumb: str = ""):
         return  # já processado (evita reprocessar no rerun seguinte)
     st.session_state["_topnav_nonce"] = ac.get("n")
     t = ac.get("t")
-    if t == "radar" and ac.get("v") in ("captacao", "emendas", "prospeccao") and ac["v"] != radar_atual:
+    if t == "radar" and ac.get("v") in ("captacao", "emendas", "prospeccao", "parcerias") and ac["v"] != radar_atual:
         st.session_state["radar_escolhido"] = ac["v"]
         st.rerun()
     elif t == "hub":
@@ -3016,6 +3116,9 @@ if _destino == "emendas":
     st.stop()
 if _destino == "prospeccao":
     render_prospeccao()
+    st.stop()
+if _destino == "parcerias":
+    render_parcerias()
     st.stop()
 # _destino == "captacao": cai no painel de Captação abaixo (fall-through).
 

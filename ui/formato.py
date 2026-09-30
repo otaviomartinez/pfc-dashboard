@@ -1245,7 +1245,7 @@ def _destino_radar(radar_escolhido) -> str:
     Função PURA, testável. None → 'hub' (Central); 'captacao'/'emendas'/'prospeccao'
     → si mesmos; qualquer outro valor (legado/corrompido) → 'hub' (fallback são: o
     usuário re-escolhe na Central, em vez de cair numa tela errada)."""
-    if radar_escolhido in ("captacao", "emendas", "prospeccao"):
+    if radar_escolhido in ("captacao", "emendas", "prospeccao", "parcerias"):
         return radar_escolhido
     return "hub"
 
