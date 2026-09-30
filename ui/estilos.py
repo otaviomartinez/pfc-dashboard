@@ -629,9 +629,25 @@ _HUB_CSS = """
 .hub-card.c3 .hub-stats .n{color:#2DD4BF;font-size:21px}
 .hub-card.c3 .hub-enter{color:#5eead4;padding:11px;font-size:14px}
 .hub-card.c3:hover .hub-enter{background:#2DD4BF;color:#04120F;border-color:#2DD4BF}
+/* Card Parcerias (c4): gêmeo do c3, canto inferior ESQUERDO (após a rail), acento aqua #4FA8A0. */
+.hub-card.c4{position:absolute;left:104px;bottom:30px;width:290px;opacity:1;z-index:12;
+  box-shadow:0 30px 60px -30px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.08)}
+.hub-card.c4:hover{border-color:transparent;
+  box-shadow:0 40px 80px -30px rgba(79,168,160,.4),0 0 0 1px rgba(79,168,160,.5),inset 0 1px 0 rgba(255,255,255,.12)}
+.hub-card.c4 .hub-radarbox{padding:22px 0 16px}
+.hub-card.c4 .hub-radO{width:148px;height:148px}
+.hub-card.c4 .hub-sweep{stroke:#4FA8A0}
+.hub-card.c4 .hub-htag{color:#7fd3ca}
+.hub-card.c4 .hub-plate{padding:16px 22px 20px}
+.hub-card.c4 .hub-plate h2{font-size:21px;margin-bottom:12px}
+.hub-card.c4 .hub-stats{gap:18px;margin-bottom:14px}
+.hub-card.c4 .hub-stats .n{color:#4FA8A0;font-size:21px}
+.hub-card.c4 .hub-enter{color:#7fd3ca;padding:11px;font-size:14px}
+.hub-card.c4:hover .hub-enter{background:#4FA8A0;color:#04120F;border-color:#4FA8A0}
 @media(max-width:980px){.hub-arena{flex-direction:column;gap:20px;overflow:auto;max-height:80vh}
   .hub-card{width:340px}.hub-title h1{font-size:32px}
-  .hub-card.c3{position:static;width:340px}}
+  .hub-card.c3{position:static;width:340px}
+  .hub-card.c4{position:static;width:340px}}
 """
 
 
@@ -639,7 +655,7 @@ _HUB_JS = r"""
 export default function(component){
   const {data, parentElement, setTriggerValue} = component;
   const old = parentElement.querySelector('.hub'); if (old) old.remove();
-  const d = data || {}, cap = d.captacao || {}, emd = d.emendas || {}, pro = d.prospeccao || {};
+  const d = data || {}, cap = d.captacao || {}, emd = d.emendas || {}, pro = d.prospeccao || {}, par = d.parcerias || {};
   const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const plural = (n, um, varios) => (Number(n) === 1 ? um : varios);
   const arrow = '<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
@@ -649,8 +665,10 @@ export default function(component){
       ? [[172,78,0],[80,168,1.3],[176,158,2.5]]
       : cls === 'c3'
       ? [[120,70,0],[168,150,1.5],[86,160,2.7]]
+      : cls === 'c4'
+      ? [[110,80,0],[160,150,1.4],[80,160,2.6]]
       : [[92,78,0],[170,138,1.6],[98,170,2.8]];
-    const cor = cls === 'c1' ? '#F2911E' : cls === 'c3' ? '#2DD4BF' : '#b7abff';
+    const cor = cls === 'c1' ? '#F2911E' : cls === 'c3' ? '#2DD4BF' : cls === 'c4' ? '#4FA8A0' : '#b7abff';
     let b = '';
     blips.forEach(function(p){ b += '<circle class="hub-blip" cx="'+p[0]+'" cy="'+p[1]+
       '" r="4" fill="'+cor+'" style="animation-delay:'+p[2]+'s"/>'; });
@@ -703,7 +721,9 @@ export default function(component){
           [emd.aprovadas, plural(emd.aprovadas, 'aprovada', 'aprovadas')]]) +
     '</div></div>' +
     card('c3', 'prospeccao', pro.tag || 'Setor 03 · Verba em captação', 'Prospecção',
-         [[pro.total, plural(pro.total, 'verba', 'verbas')], [pro.conquistadas, 'conquistadas']]);
+         [[pro.total, plural(pro.total, 'verba', 'verbas')], [pro.conquistadas, 'conquistadas']]) +
+    card('c4', 'parcerias', par.tag || 'Setor 04 · Parcerias e doações', 'Parcerias',
+         [[par.total, plural(par.total, 'parceiro', 'parceiros')], [par.abordar, 'a abordar']]);
   parentElement.appendChild(root);
 
   // cliques -> Python (card inteiro ou item da rail)
