@@ -1,0 +1,20 @@
+name: Sonda Fiscal (só diagnóstico)
+
+# Por que um workflow SÓ para sondar: antes de escrever coletor, a gente
+# pergunta à fonte e LÊ a resposta. Foi assim que se descobriu que o SICONFI
+# não publica o Anexo 08 (MDE) e que o cadastro de CNPJ não tem e-mail de
+# prefeitura. Esta sonda NÃO grava nada e NÃO commita nada.
+on:
+  workflow_dispatch:
+
+jobs:
+  sondar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Sondar RGF / FPM / CAUC
+        run: python scripts/sondar_fiscal.py
