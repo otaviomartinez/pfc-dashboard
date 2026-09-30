@@ -2551,6 +2551,94 @@ def _dados_prefeituras() -> list:
 
 
 @st.cache_data(ttl=300, show_spinner=False)
+def _fatores_fiscais() -> dict:
+    """{cod_ibge: fatores} do método fiscal revisado (src/prefeituras/fiscal.py).
+
+    De onde vem cada fator, e por quê (a sonda `scripts/sondar_fiscal.py`
+    decidiu isso, não o chute):
+      - pessoal %RCL e resultado orçamentário: CSV do TCE-SP, apurados pelo
+        Tribunal. O RGF do SICONFI não existe para SP — varrido e vazio.
+      - dependência de FPM: CSV gerado do DCA do SICONFI.
+      - caixa (RGF-Anexo 05) e CAUC: **não há fonte automática**. Ficam ausentes,
+        e ausência aqui é "sem dado", nunca "ruim" (regra 5c).
+    Blindado: qualquer falha -> {} e o dossiê simplesmente não mostra o bloco.
+    """
+    try:
+        from src.prefeituras import fpm as _fpm
+        from src.prefeituras import tce as _tce
+    except Exception:
+        return {}
+    fatores = {}
+    try:
+        ano_tce = _tce.exercicio_com_pessoal()
+        if ano_tce:
+            for cod, reg in _tce.carregar_fiscal(ano_tce).items():
+                fatores[cod] = {"pessoal_pct": reg.get("pessoal_pct"),
+                                "resultado_pct": reg.get("resultado_pct"),
+                                "exercicio_tce": reg.get("exercicio")}
+    except Exception:
+        pass
+    try:
+        for cod, reg in _fpm.carregar().items():
+            fatores.setdefault(cod, {})
+            fatores[cod]["fpm_pct"] = reg.get("dependencia_pct")
+            fatores[cod]["exercicio_fpm"] = reg.get("exercicio")
+    except Exception:
+        pass
+    return fatores
+
+
+_CORES_NIVEL = {"bom": "#4ADE80", "alerta": "#E8B54A",
+                "ruim": "#F0663F", "sem_dado": "#7C8698"}
+
+
+def _render_capacidade_fiscal(cod_ibge, temperatura_base: str):
+    """Bloco "a cidade banca?" — o método fiscal revisado, no dossiê.
+
+    ADITIVO: não altera a temperatura que o resto do painel já mostra; exibe a
+    leitura enriquecida ao lado dela. Todo fator carrega o EXERCÍCIO de onde
+    saiu (regra 5b/5e: percentual sem exercício não existe, e o ano anterior
+    nunca é apresentado como se fosse o atual).
+    """
+    fatores = _fatores_fiscais().get(str(cod_ibge or "").strip())
+    if not fatores:
+        return
+    try:
+        from src.prefeituras import fiscal as _fiscal
+    except Exception:
+        return
+    cap = _fiscal.capacidade_fiscal(
+        temperatura_base,
+        pessoal_pct=fatores.get("pessoal_pct"),
+        resultado_pct=fatores.get("resultado_pct"),
+        dependencia_fpm=fatores.get("fpm_pct"),
+        caixa=None, cauc=None)          # sem fonte automática — ver docstring
+
+    ex_tce, ex_fpm = fatores.get("exercicio_tce"), fatores.get("exercicio_fpm")
+    ano_do_fator = {"pessoal": ex_tce, "resultado": ex_tce, "fpm": ex_fpm}
+    linhas = []
+    for sinal in cap["sinais"]:
+        cor = _CORES_NIVEL.get(sinal["nivel"], "#7C8698")
+        ano = ano_do_fator.get(sinal["fator"])
+        sufixo = f" (exercício {ano})" if ano and sinal["nivel"] != "sem_dado" else ""
+        linhas.append(
+            f'<div class="pf-linha"><span class="k">'
+            f'<span style="color:{cor}">&#9679;</span> {esc(sinal["fator"].upper())}</span>'
+            f'<span class="v">{esc(sinal["texto"] + sufixo)}</span></div>')
+    rotulo = ("BLOQUEADO" if cap["bloqueio"] else cap["temperatura"].upper())
+    st.markdown('<div class="pf-bloco"><h4>Capacidade fiscal — a cidade banca?</h4>'
+                + "".join(linhas)
+                + f'<div class="pf-linha"><span class="k">LEITURA</span>'
+                  f'<span class="v">{esc(rotulo)} · {esc(cap["resumo"])}</span></div>'
+                + '</div>', unsafe_allow_html=True)
+    st.caption("Pessoal e resultado orçamentário são **apurados pelo TCE-SP**; "
+               "FPM vem do DCA do Tesouro. **Disponibilidade de caixa e CAUC "
+               "aparecem como sem dado porque não há fonte pública automática** "
+               "— o CAUC precisa ser consultado à mão no site do Tesouro. "
+               "Nada aqui é \"verba disponível\": é capacidade e prioridade.")
+
+
+@st.cache_data(ttl=300, show_spinner=False)
 def _dados_expansao() -> list:
     """Vizinhos (mesma Região Imediata) onde o PFC ainda NÃO atua — Passo 9.
 
@@ -2805,6 +2893,10 @@ def dlg_expansao(viz: dict):
     if viz.get("mde_origem") == "tce-sp":
         st.caption("Índice **apurado pelo TCE-SP** (Audesp).")
 
+    # Mesma leitura fiscal dos nossos municípios: na expansão ela vale ainda
+    # mais, porque é o primeiro filtro de quem vale a visita.
+    _render_capacidade_fiscal(viz.get("cod_ibge"), viz.get("temperatura", "sem_dado"))
+
     # --- Contato oficial da prefeitura (cadastro de CNPJ) -------------------
     # Vem PRONTO, sem o usuário clicar em nada. Quando não houver, a tela cai
     # para os links de busca abaixo — melhor um link honesto que um e-mail
@@ -2921,6 +3013,8 @@ def dlg_prefeitura(pref: dict):
     if pref["capag_rotulo"] == "não avaliado":
         st.caption("**Não avaliado** não é nota ruim: o município pode não ter "
                    "homologado a DCA no exercício.")
+
+    _render_capacidade_fiscal(pref.get("cod_ibge"), pref.get("temperatura", "sem_dado"))
 
     # --- Político (TSE, campo factual — zero editorial) ---------------------
     eleitos_mun = pref.get("eleitos") or []
