@@ -43,45 +43,39 @@ def _get(url: str, timeout: int = 40):
         return getattr(e, "code", 0) or 0, f"{type(e).__name__}: {str(e)[:150]}"
 
 
-def amostra_rgf(cod, nome, anexo, rotulos_procurados):
-    """Imprime QUAIS linhas o anexo devolve — o nome da conta é o que quebra.
-
-    Faz a requisição AQUI (não via siconfi.buscar_rgf) de propósito: aquele
-    cliente engole o erro e devolve None, então 'rede bloqueada' e 'API
-    respondeu vazio' ficam idênticos. Numa sonda, isso é inaceitável.
-    """
-    print(f"\n-- {nome} · {anexo} · {ANO} --")
+def varrer_rgf(cod, nome):
+    """RGF com 2025 veio 'items=[] de verdade'. Isso pode ser: ano ainda não
+    publicado, grafia do anexo, ou o co_poder. Varre as três hipóteses — é o
+    mesmo procedimento que provou que o Anexo 08 (MDE) não existe no SICONFI."""
+    print(f"\n-- {nome} · varredura RGF --")
     base = "https://apidatalake.tesouro.gov.br/ords/siconfi/tt"
-    for periodo in (3, 2, 1):          # 3º quadrimestre primeiro (ano fechado)
-        url = f"{base}/rgf?" + urllib.parse.urlencode({
-            "an_exercicio": ANO, "nr_periodo": periodo,
-            "co_tipo_demonstrativo": "RGF", "no_anexo": anexo,
-            "co_poder": "E", "id_ente": cod})
-        status, corpo = _get(url)
-        itens = (corpo or {}).get("items") if isinstance(corpo, dict) else None
-        if itens is None:
-            print(f"   período {periodo}: status {status} · {str(corpo)[:120]}")
-            continue
-        if not itens:
-            print(f"   período {periodo}: status {status} · items=[] (vazio de verdade)")
-            continue
-        print(f"   período {periodo}: status {status} · {len(itens)} linhas · "
-              f"campos: {sorted(itens[0].keys())}")
-        vistos = 0
-        for it in itens:
-            rotulo, coluna, valor = siconfi._campos(it)
-            if any(siconfi._casa(rotulo, t) for t in rotulos_procurados):
-                print(f"      · {rotulo[:62]!r} | {coluna[:28]!r} = {valor}")
-                vistos += 1
-                if vistos >= 6:
+    achou = []
+    for ano in (2024, 2023, 2025):
+        for anexo in ("RGF-Anexo 01", "RGF-Anexo 05", "RGF-Anexo 06"):
+            for periodo in (3, 2):
+                for poder in ("E", None):
+                    params = {"an_exercicio": ano, "nr_periodo": periodo,
+                              "co_tipo_demonstrativo": "RGF", "no_anexo": anexo,
+                              "id_ente": cod}
+                    if poder:
+                        params["co_poder"] = poder
+                    status, corpo = _get(f"{base}/rgf?" + urllib.parse.urlencode(params))
+                    itens = (corpo or {}).get("items") if isinstance(corpo, dict) else None
+                    if itens:
+                        achou.append((ano, anexo, periodo, poder, len(itens), itens))
+                        print(f"   ACHOU {ano} {anexo} per{periodo} "
+                              f"poder={poder or '(sem)'} -> {len(itens)} linhas")
+                        break
+                if achou and achou[-1][:3] == (ano, anexo, periodo):
                     break
-        if not vistos:
-            print("      (nenhuma linha com os termos procurados; primeiras 4:)")
-            for it in itens[:4]:
-                r, c, v = siconfi._campos(it)
-                print(f"      · {r[:62]!r} | {c[:28]!r} = {v}")
-        return                          # achou período com dado: basta
-    print("   NENHUM período trouxe linha.")
+    if not achou:
+        print("   NADA em 2023/2024/2025 x anexos 01/05/06 x períodos 2/3 x com e sem co_poder.")
+        return
+    for (_a, anexo, _p, _pd, _n, itens) in achou[:2]:
+        print(f"   amostra de {anexo} · campos: {sorted(itens[0].keys())}")
+        for it in itens[:8]:
+            r, c, v = siconfi._campos(it)
+            print(f"      · {r[:58]!r} | {c[:30]!r} = {v}")
 
 
 def sondar_fpm(cod, nome):
@@ -95,12 +89,18 @@ def sondar_fpm(cod, nome):
     print(f"   DCA-Anexo I-C (receitas) {ANO-1}: status {status} · "
           f"{len(itens) if itens is not None else '—'} linhas")
     if itens:
-        print(f"   campos: {sorted(itens[0].keys())}")
+        colunas = sorted({str(i.get("coluna") or "") for i in itens})
+        print(f"   colunas disponíveis: {colunas}")
         for it in itens:
             rotulo = str(it.get("conta") or "")
-            if "fpm" in rotulo.lower() or "fundo de participacao" in rotulo.lower() \
-               or "participação dos munic" in rotulo.lower():
-                print(f"      · {rotulo[:70]!r} = {it.get('valor')}")
+            baixo = rotulo.lower()
+            interessa = ("participação dos munic" in baixo or "fpm" in baixo
+                         or baixo.strip().startswith("1.0.0.0.00.0.0")
+                         or "receitas correntes" in baixo
+                         or "receita corrente" in baixo)
+            if interessa:
+                print(f"      · {rotulo[:58]!r} | {str(it.get('coluna'))[:26]!r} "
+                      f"= {it.get('valor')}")
 
 
 def sondar_cauc():
@@ -111,6 +111,13 @@ def sondar_cauc():
         "https://apidatalake.tesouro.gov.br/ords/siconfi/tt/cauc",
         "https://consultas.tesouro.gov.br/transferencias/cauc/api/situacao",
         "https://apidatalake.tesouro.gov.br/ords/custeio/tt/cauc",
+        # Transferegov (sucessor do SICONV) publica API aberta de convênios;
+        # se houver adimplência/CAUC em algum lugar, é o candidato mais forte.
+        "https://api.transferegov.gestao.gov.br/cauc",
+        "https://api.transferegov.gestao.gov.br/convenios",
+        "https://api.transferegov.gestao.gov.br/cadastro/proponentes?limit=1",
+        "https://api.transferegov.gestao.gov.br/convenios/convenio?limit=1",
+        "https://apidatalake.tesouro.gov.br/ords/siconfi/tt/",
     ]
     for url in candidatos:
         status, corpo = _get(url, timeout=25)
@@ -134,10 +141,7 @@ def main() -> int:
 
     print(f"\n{SEPARADOR}\nRGF — caixa e pessoal\n{SEPARADOR}")
     for m in amostra:
-        amostra_rgf(m["cod_ibge"], m["nome"], "RGF-Anexo 05",
-                    ["disponibilidade", "caixa", "obrigac"])
-        amostra_rgf(m["cod_ibge"], m["nome"], "RGF-Anexo 01",
-                    ["pessoal", "receita corrente liquida", "percentual"])
+        varrer_rgf(m["cod_ibge"], m["nome"])
 
     print(f"\n{SEPARADOR}\nFPM — dependência de repasse\n{SEPARADOR}")
     for m in amostra:

@@ -3,9 +3,15 @@
 Sistema de captação de recursos do **Programa Futuro Cientista** (UFSCar Sorocaba).
 Streamlit + Google Sheets + GitHub Actions. Coordenador do projeto: Prof. Fábio Leite.
 
-Duas frentes, escolhidas num **hub** de entrada:
+**Quatro** frentes, escolhidas num **hub** de entrada:
 - **Captação Privada** — radar automático que varre dezenas de fontes/dia atrás de **captação** (editais, chamadas, prêmios institucionais, patrocínio — só dinheiro que o PFC pode captar, com filtro de elegibilidade); identidade âmbar
 - **Emendas Parlamentares** — CRM de relacionamento com deputados (manual) **+** levantamento automático de "quem abordar" a partir da execução de emendas e dos contatos oficiais da ALESP (identidade violeta)
+- **Prefeituras** — quem recebe a emenda e assina o convênio: MDE apurado pelo TCE-SP, CAPAG do Tesouro, eleitos do TSE, contatos institucionais e mapa de expansão (identidade teal)
+- **Parcerias** — quem doa material e serviço: base curada de empresas e fundações, por módulo do PFC (identidade aqua). Ver `PLANO_PARCERIAS.md`
+
+Os quatro respondem a perguntas diferentes do mesmo funil: *de onde vem o dinheiro*
+(Captação), *quem indica a emenda* (Emendas), *quem assina o convênio* (Prefeituras)
+e *quem doa em espécie* (Parcerias).
 
 ## Como trabalhar comigo
 
@@ -161,6 +167,32 @@ antigo fica até ser triado no app (rodar o radar não "substitui" a fila).
   regra 3). Emendas = quem abordar (território + expansão), autorizado/pago
   separados, contato oficial.
 
+## Parcerias — o 4º radar (ver `PLANO_PARCERIAS.md`)
+
+Lista **candidatos a abordar** (empresas de material escolar → módulo 1; fundações
+do direito da criança → módulos 2/3/4), nunca parceria confirmada: todo item nasce
+`a abordar` e a curadoria é manual. **Nunca inventar contato, valor ou vínculo** —
+é o análogo do "prazo a confirmar" do radar de editais.
+
+- **Módulos do PFC:** 1 escolas · 2 desenvolvimento social · 3 Fundação Casa ·
+  4 situação de rua. O campo `modulos` é texto (`"2;3;4"`), virado em lista por
+  `parcerias.parse_modulos` (tolera vírgula e lixo).
+- **Duas fontes, uma rede de segurança:** base-semente `data/parcerias_seed.csv`
+  (16 candidatos) e a aba **`Parcerias`** do Sheets. `dados.criar_aba_parcerias()`
+  cria a aba e semeia **só na criação** — é **idempotente**, senão cada deploy
+  apagaria a curadoria do Fábio. Sem Sheets, a tela roda do CSV.
+- **Escrita, só por duas portas:** `dados.atualizar_status_parceria` grava **só a
+  célula de status**, casando por **ID**, validando contra `PARCERIA_STATUS`
+  (`a abordar`/`em contato`/`ativa`/`recusou`); e a ponte para a Prospecção reusa
+  `adicionar_prospeccao` (Tipo `Patrocínio`, dedup por nome) — **não existe porta
+  nova de escrita**.
+- **Camada pura** em `src/parcerias.py` (sem `st`, sem rede): filtros, agrupamento
+  por módulo e `gancho_parceria`, que prioriza o `como_abordar` curado e, sem ele,
+  compõe do foco/tipo sem inventar canal.
+- **PENDENTE:** o card no hub e a entrada no menu **nunca foram vistos rodando**
+  (os commits dizem "[verificar no app publicado]"). A base tem `site`, não tem
+  e-mail nem telefone — preencher é curadoria manual.
+
 ## Armadilhas conhecidas deste projeto
 
 - **Custom Components v2 travam certas animações CSS.** `transition:visibility`, `transition:width` e `animation` com `scaleX` já congelaram elementos (largura ficou em zero, dropdown abrindo e fechando sozinho) — e `!important` inline foi ignorado. O padrão não está totalmente mapeado. **Solução:** use valores diretos no HTML, `display` em vez de `visibility`, ou anime via `setInterval`/`setTimeout` no JS (funciona). Se um elemento parecer "morto", suspeite disso primeiro.
@@ -266,6 +298,21 @@ ponte_partidaria), tela + dossiê + PDF + "Puxar para Prospecção".
   registrada. Telefone de secretaria municipal não tem base nacional aberta;
   chega-se por telefone da prefeitura ou da escola.
 
+**Método fiscal revisado — PRONTO E DESLIGADO** (`src/prefeituras/fiscal.py`).
+Pedido do Fábio (set/2026): além de MDE + CAPAG, olhar o que mostra melhor se a
+prefeitura **banca** o programa. Quatro fatores, todos de fonte pública:
+disponibilidade de **caixa** (RGF-Anexo 05), **pessoal vs. teto da LRF** (54% da
+RCL no executivo municipal; alerta 48,6 / prudencial 51,3), **dependência de FPM**
+e **CAUC**. O CAUC é **decisivo e é override**: município irregular não pode
+assinar convênio, então a temperatura vira `bloqueado` independente de MDE/CAPAG;
+caixa apertado ou pessoal no prudencial só **rebaixam** `quente`→`morno`; FPM alto
+é informativo. **Fator ausente é "sem dado" e NUNCA penaliza** (regra 5c).
+É **aditivo e puro**: recebe a temperatura-base pronta de
+`ui.formato.temperatura_prefeitura` e **não a recalcula**. Testado
+(`tests/test_prefeituras_fiscal.py`), mas **nenhuma tela o chama ainda** — falta
+o dado dos quatro fatores. Sonda de diagnóstico: `scripts/sondar_fiscal.py`
+(workflow **"Sonda Fiscal"**, só imprime, não grava).
+
 Coleta automática: **GitHub → Actions → "Dados do Painel Prefeituras" → Run
 workflow** (MDE/CAPAG/contatos; o TSE precisa do zip). Commita os CSVs sozinho.
 
@@ -276,6 +323,15 @@ ele definia o lead quente como "abaixo do mínimo de MDE", mas NENHUM vizinho
 está abaixo de 25% (em SP inteiro são 2 de 644). Usamos o outro caminho quente
 que a seção 0 do plano prevê — "acima com folga + caixa" — reusando
 `temperatura_prefeitura()`, que já era testada.
+
+**Fila imediata (out/2026):**
+1. **Ligar o método fiscal.** `src/prefeituras/fiscal.py` está pronto e testado,
+   sem nenhuma tela chamando. Ordem: rodar a **Sonda Fiscal** (Actions) → ler o
+   que RGF/FPM/CAUC devolvem de verdade → escrever o coletor só do que existir →
+   plugar no dossiê. **Não inventar fator que a fonte não der** — "sem dado" é
+   resposta legítima, e é o que o módulo já espera.
+2. **Conferir o Radar de Parcerias no ar** — card do hub e entrada no menu nunca
+   foram vistos rodando.
 
 **Depois:**
 - Notificação por **e-mail** quando faltarem 15 dias para um prazo.
