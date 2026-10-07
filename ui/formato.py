@@ -1531,6 +1531,41 @@ def _prazo_confiavel(dias) -> bool:
     return isinstance(dias, int) and -60 <= dias <= 180
 
 
+# Bônus de URGÊNCIA no ranking de Prioridade. Só vale para prazo CONFIÁVEL
+# (_prazo_confiavel): "prazo a confirmar" ganha ZERO — nunca se inventa
+# urgência a partir de data incerta (regra 3).
+_BONUS_PRAZO = ((7, 15), (30, 12), (90, 6), (180, 2))   # (até N dias, bônus)
+_BONUS_VALOR = 5
+
+
+def prioridade_oportunidade(op: dict) -> float:
+    """Ordem padrão da fila de Captação: o que VALE AGIR primeiro.
+
+    POR QUE EXISTE: o radar calcula prazo e valor, mas a planilha guarda só a
+    nota de TEMA (Score Aderência) — e o app ordenava só por ela. Um edital com
+    aderência 70 e inscrição fechando em 6 dias ficava ATRÁS de uma notícia com
+    aderência 72 e sem data nenhuma. Captação é janela: o que fecha antes pede
+    ação antes.
+
+    Composição (transparente, para caber numa frase na tela):
+      aderência (0–100)
+      + urgência, só com prazo confiável: ≤7d +15 · ≤30d +12 · ≤90d +6 · ≤180d +2
+      + 5 se o valor foi informado (dá para avaliar o esforço)
+    Vencido não pontua (a fila já tira vencidos; aqui é só rede de segurança).
+    """
+    base = float(op.get("score") or 0)
+    dias = op.get("dias")
+    bonus = 0
+    if _prazo_confiavel(dias) and dias >= 0:
+        for limite, b in _BONUS_PRAZO:
+            if dias <= limite:
+                bonus = b
+                break
+    if str(op.get("valor") or "").strip():
+        bonus += _BONUS_VALOR
+    return base + bonus
+
+
 def _op_de_novidade(nv: dict) -> dict:
     return {"titulo": str(nv.get("Título", "")).strip() or "(sem título)",
             "fonte": str(nv.get("Fonte", "")).strip() or "Radar",

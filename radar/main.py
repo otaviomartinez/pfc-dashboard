@@ -19,7 +19,7 @@ import threading
 from radar import dedup, descoberta, enriquecimento, prazos, publicacao
 from radar.fontes_ancora import ANCORA_URLS, FONTES
 from radar.fontes_genericas import dominio_de, extrair_generico
-from radar.scorer import avaliar_sinal, pontuacao
+from radar.scorer import texto_sem_termos, avaliar_sinal, pontuacao
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 CONFIG = os.path.join(BASE, "config_fontes.json")
@@ -36,6 +36,10 @@ LIMIAR_FILA = 45  # score_total mínimo para entrar na fila
 # e sobe 11 por termo do universo do PFC, então 41 = "pelo menos UM termo".
 # Abaixo disso é captação genérica de terceiro setor — não é o que buscamos.
 LIMIAR_ADERENCIA = 41
+# SEGUNDA CHANCE: quantos itens "de texto magro" (título genérico, nenhum termo
+# nem positivo nem negativo) têm a página lida ANTES do veredito. Teto para
+# não estourar o tempo do workflow (20 min): cada página tem timeout próprio.
+MAX_SEGUNDA_CHANCE = 25
 ABA = "Novidades_pendentes"
 # Mesmo cabeçalho de src/dados.py (mantido aqui para não importar Streamlit).
 # "Dias restantes" entra por ÚLTIMO para não desalinhar linhas já gravadas
@@ -135,6 +139,35 @@ def _conectar_worksheet():
         return None
 
 
+def segunda_chance(filtradas: list, maximo: int = MAX_SEGUNDA_CHANCE,
+                   enriquecer=None) -> tuple:
+    """Lê a página de quem foi barrado SEM INFORMAÇÃO e pontua de novo.
+
+    Só entra quem tem texto magro (nenhum termo positivo, negativo ou de aluno):
+    esse não foi reprovado pelo tema, foi julgado às cegas. Quem tinha termo
+    negativo/de aluno foi reprovado de verdade e NÃO tem a página lida.
+    `enriquecer` é injetável para testar sem rede (padrão: enriquecimento real).
+
+    Devolve (resgatadas, ainda_filtradas, magros, stats).
+    """
+    enriquecer = enriquecer or enriquecimento.enriquecer_lote
+    magros = [o for o in filtradas
+              if texto_sem_termos(f"{o.get('titulo', '')} {o.get('descricao', '')}")]
+    if not magros:
+        return [], filtradas, [], {"tentadas": 0, "enriquecidas": 0,
+                                   "com_prazo": 0, "com_valor": 0}
+    stats = enriquecer(magros, maximo=maximo)
+    resgatadas = []
+    for op in magros[:maximo]:
+        op.update(pontuacao(op))
+        if (op["score_total"] >= LIMIAR_FILA
+                and op["score_aderencia"] >= LIMIAR_ADERENCIA):
+            op["motivo"] = "resgatado na 2ª chance (página lida); " + op["motivo"]
+            resgatadas.append(op)
+    ids = {id(o) for o in resgatadas}
+    return resgatadas, [o for o in filtradas if id(o) not in ids], magros, stats
+
+
 def _linha(op) -> list:
     dias = op.get("dias_restantes")
     return [
@@ -225,6 +258,18 @@ def executar():
         (fila if entra else filtradas).append(op)
     fila.sort(key=lambda o: o["score_total"], reverse=True)
 
+    # SEGUNDA CHANCE — o furo que isto fecha: o veredito de aderência era dado
+    # SÓ pelo título + resumo da listagem, e a página só era lida DEPOIS, para
+    # quem já tinha passado. Um edital chamado "Chamada Pública 03/2026" não
+    # tem termo nenhum: caía sem nunca ter sido lido (na rodada de 07/10, 25 de
+    # 27 itens com sinal foram barrados por aderência e só 2 entraram).
+    # Agora quem foi julgado SEM INFORMAÇÃO (texto sem nenhum termo) tem a
+    # página lida e é pontuado de novo. Quem tinha termo negativo ou de aluno
+    # foi reprovado de verdade e não volta.
+    resgatadas, filtradas, magros, stats_sc = segunda_chance(filtradas)
+    fila.extend(resgatadas)
+    fila.sort(key=lambda o: o["score_total"], reverse=True)
+
     # Deduplicação contra a fila existente.
     ws = _conectar_worksheet()
     existentes = _existentes_da_planilha(ws) if ws else []
@@ -310,6 +355,10 @@ def _resumo(ancora_ok, generica_ok, brutos, com_sinal, descartados, unicas, filt
             print("   VAZIAS (0 itens — checar se o site mudou de layout):")
             for nome in mudas:
                 print(f"      - {nome}")
+    print(f"2ª chance: {len(magros)} itens de texto magro · "
+          f"{stats_sc['tentadas']} páginas lidas · {len(resgatadas)} resgatados para a fila")
+    for o in resgatadas[:10]:
+        print(f"   + {o.get('fonte', '')[:22]:22} {o.get('titulo', '')[:70]}")
     print(f"Prazos: {n_com_prazo} itens da fila com data-limite detectada"
           + (f" ({n_vencidas} vencida(s))" if n_vencidas else ""))
     print(f"Enriquecimento: {stats_enr['tentadas']} páginas visitadas · "

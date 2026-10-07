@@ -234,22 +234,25 @@ do direito da criança → módulos 2/3/4), nunca parceria confirmada: todo item
 - **Sidebar:** botão de recolher/expandir **no topo do rail**, 100% client-side
   (sem rerun); pontinho de status = cor de saúde (verde/vermelho).
 
-**Próximo trabalho — EM ANDAMENTO: melhorar a cobertura de datas do radar.**
-Diagnóstico feito (fila real: 31 itens, só **7 com data**). **7 NÃO é o teto** —
-dos 24 sem data, quase nenhum é impossível: ~16-18 são recuperáveis, e o grosso
-com engenharia BARATA. Duas correções pendentes, nesta ordem:
-1. **Usar a data "post publicado: 2026" do CORPO dos posts da captadores/ABCR como
-   âncora do ano**, em vez do JSON-LD `datePublished` (que fica STALE no ano
-   original, 2021/2017, e faz a inferência resolver pro passado e ser descartada).
-   A data real de 2026 está visível no corpo — parsear ela recupera ~13 itens
-   sem sair da página.
-2. **Ampliar as âncoras de prazo, que estão estreitas demais** — perdem frases
-   comuns MESMO com o ano escrito (ex.: "inscrições podem ser feitas até 22 de
-   julho **de 2026**", "inscrições: em andamento, até 17 de julho **de 2026**").
-   Recupera Glocal, Cecierj, tidesetubal etc.
-Só isso levaria de **7 para ~20+**. (3ª camada, mais pesada: seguir o link ao
-edital original — confirmado que funciona. Caso difícil de verdade: as ~5 notícias
-do MCTI que não trazem o prazo na página, só no sistema de chamadas.)
+**Radar de Captação — diagnóstico de out/2026 (o gargalo NÃO era a data).**
+As duas correções de data que constavam aqui como pendentes JÁ ESTÃO FEITAS
+(carimbo "Post publicado" do corpo como âncora de ano; âncoras amplas como
+"inscrições podem ser feitas até…"). O log da rodada de 07/10 mostrou o gargalo
+real: 284 itens → 36 com sinal → **só 2 na fila**, 25 barrados por aderência.
+Duas correções feitas:
+1. **Segunda chance** (`radar/main.py::segunda_chance`): o veredito de aderência
+   era dado só pelo título da listagem, e a página só era lida para quem já
+   tinha passado. Agora quem tem **texto magro** (`scorer.texto_sem_termos`:
+   nenhum termo positivo, negativo ou de aluno — "Chamada Pública 03/2026") tem
+   a página lida ANTES do veredito (teto `MAX_SEGUNDA_CHANCE = 25`). Reprovado
+   por termo negativo/de aluno NÃO volta. O log imprime "2ª chance: … resgatados".
+2. **Prioridade** (`ui.formato.prioridade_oportunidade`), ordem padrão da fila e
+   do painel inicial: aderência + urgência **só com prazo confiável** (≤7d +15,
+   ≤30d +12, ≤90d +6, ≤180d +2; "a confirmar" ganha 0) + 5 se há valor. Motivo:
+   a planilha guarda só a nota de TEMA; prazo e valor eram ignorados na ordem.
+**Pendente:** 18 de 42 fontes vêm VAZIAS (Lemann, Itaú Social, Unibanco,
+Roberto Marinho, Ayrton Senna, Prosas, GIFE, Finep, Prêmio Itaú-Unicef…) —
+provável mudança de layout ou bloqueio; cada uma precisa ser olhada.
 
 **Painel Federal — o que falta (a Parte 1 e o dossiê JÁ estão feitos; ver seção
 "Emendas — Painel Federal").** Já pronto: importação do xlsx para a aba `Deputados

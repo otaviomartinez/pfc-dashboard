@@ -104,6 +104,7 @@ from ui.formato import (
     SITUACAO_MDE_COR,
     SITUACAO_MDE_ROTULO,
     ORDEM_TEMPERATURA,
+    prioridade_oportunidade,
     TEMPERATURA_PREF_COR,
     TEMPERATURA_PREF_ROTULO,
     canais_oficiais,
@@ -3937,9 +3938,11 @@ def page_visao():
     n_verif = int(df[COL_VERIF].apply(verificada_ok).sum()) if TOTAL else 0
     pct_pros = round(n_prospectar / TOTAL * 100) if TOTAL else 0
 
-    # fila real do radar (Sheets), ordenada por aderência
+    # fila real do radar (Sheets), na MESMA ordem padrão da tela do Radar
+    # (Prioridade: tema + urgência confiável + valor) — o painel inicial e a
+    # lista não podem mostrar "os melhores" em ordens diferentes.
     ops = _ops_radar_filtradas()  # ponto único: tira vencidos, fora do Sudeste e ambiental
-    ops.sort(key=lambda o: o["score"], reverse=True)
+    ops.sort(key=lambda o: (prioridade_oportunidade(o), o["score"]), reverse=True)
     n_fontes = _n_fontes_radar()
     # Encerrando = prazo confiável a até 7 dias. Guarda a LISTA (não só a contagem)
     # para o clique no "N encerrando" mostrar TODAS, não só a primeira.
@@ -4094,7 +4097,9 @@ def _ordenar_ops(ops: list, modo: str) -> list:
     crescente (o que encerra antes no topo) -> vencidos (mais recentes primeiro)
     -> 'prazo a confirmar' (sem data confiável) por ÚLTIMO. Assim os que estão
     encerrando ficam à vista, e os sem data não somem nem quebram a ordenação.
-    'Valor' = maiores primeiro. 'Score' = relevância (padrão)."""
+    'Valor' = maiores primeiro. 'Score' = só o tema (aderência).
+    'Prioridade' (padrão) = tema + urgência de prazo CONFIÁVEL + valor
+    informado — ver ui.formato.prioridade_oportunidade."""
     if modo == "Dias restantes":
         def _chave(o):
             d = o["dias"]
@@ -4104,7 +4109,9 @@ def _ordenar_ops(ops: list, modo: str) -> list:
         return sorted(ops, key=_chave)
     if modo == "Valor":
         return sorted(ops, key=lambda o: dados._valor_para_reais(o.get("valor", "")), reverse=True)
-    return sorted(ops, key=lambda o: _score_novidade(o["nv"]), reverse=True)
+    if modo == "Score":
+        return sorted(ops, key=lambda o: _score_novidade(o["nv"]), reverse=True)
+    return sorted(ops, key=lambda o: (prioridade_oportunidade(o), o["score"]), reverse=True)
 
 
 def page_radar():
@@ -4113,8 +4120,10 @@ def page_radar():
         st.caption(HINT_ESCRITA + " — aprovar/descartar grava na aba Novidades_pendentes.")
 
     ordem = st.radio(
-        "Ordenar por", ["Score", "Dias restantes", "Valor"], horizontal=True, key="radar_ordem",
-        help="Score = relevância · Dias restantes = os que fecham antes primeiro "
+        "Ordenar por", ["Prioridade", "Score", "Dias restantes", "Valor"], horizontal=True,
+        key="radar_ordem",
+        help="Prioridade = tema + urgência (só prazo confiável) + valor informado · "
+             "Score = só o tema · Dias restantes = os que fecham antes primeiro "
              "(prazo a confirmar vai para o fim) · Valor = maiores primeiro")
     ops = _ops_radar_filtradas()  # ponto único: tira vencidos, fora do Sudeste e ambiental
     scores_spark = sorted((o["score"] for o in ops), reverse=True)[:16]  # sparkline por score

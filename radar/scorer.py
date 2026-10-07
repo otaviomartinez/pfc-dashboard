@@ -406,6 +406,21 @@ def _score_aderencia(texto: str):
     return score, motivo
 
 
+def texto_sem_termos(texto: str) -> bool:
+    """True quando o texto não tem NENHUM termo — nem positivo, nem negativo,
+    nem de aluno. É o caso "texto magro": título genérico tipo "Chamada
+    Pública 03/2026", que não diz nada sobre o tema.
+
+    Esses itens não foram REPROVADOS pelo tema: foram julgados sem informação.
+    Merecem ter a página lida antes do veredito (ver main.py, "segunda chance").
+    Quem tem termo negativo ou de aluno NÃO entra aqui: esse foi reprovado de
+    verdade.
+    """
+    t = _norm(texto)
+    return not any(k in t for k in POSITIVAS_FORTES + POSITIVAS + NEGATIVAS
+                   + NEGATIVAS_ALUNO)
+
+
 def _score_valor(op: dict):
     texto = f"{op.get('valor_estimado','')} {op.get('titulo','')} {op.get('descricao','')}"
     v = _valor_reais(texto)
