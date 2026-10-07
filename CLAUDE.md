@@ -152,18 +152,48 @@ lista da ALESP e sai dela para o Senado).
    judice e recontagem ainda mudam a lista. A tela diz "eleito em 2026", nunca
    "empossado". Número de votos: só do TSE (jornais divergem — a mais votada da
    ALESP saiu com 1,96 mi numa fonte e 213 mil em outra).
-**Dado:** `scripts/importar_eleicao_2026.py <consulta_cand_2026.zip>` →
-`data/eleicoes/candidatos_sp_2026.csv`. O zip é baixado **no navegador**
-(dadosabertos.tse.jus.br → Candidatos - 2026); o CDN do TSE recusa o robô do
-GitHub. Recusa gravar se o arquivo ainda não traz a totalização (TSE atualiza em
-lotes). Camada pura `src/eleicoes.py`: `situacao_2026` (reeleito / eleito para
-outro cargo / não reeleito / não encontrado / a conferir) e `novos_eleitos`.
-Casamento de nome conservador: igual, ou contido com ≥2 palavras ("Agente
-Federal Danilo Balas" ↔ "DANILO BALAS"); dois compatíveis = "a conferir";
-nenhum = "não encontrado entre os candidatos" (≠ "não concorreu").
-**Pendente:** baixar o zip; depois, selo de situação 2026 nos dossiês e a lista
-da bancada nova. Senadores: os 2 eleitos em 2018 saem em 31/jan/2027; o de 2022
-segue até 2031.
+**Dado — fonte oficial em uso: os PDFs do TRE-SP (SISTOT).**
+`scripts/importar_resultado_tse_pdf.py <pasta com os 5 PDFs>` →
+`data/eleicoes/resultado_sp_2026.csv` (2.393 candidatos; 94/70/2 eleitos;
+carimbo "04/10/2026 - 22:58:07" na coluna `resultado_em`, que a tela é obrigada
+a mostrar). Une o relatório de ELEITOS (nome de urna, % individual) ao POR
+PARTIDO (todos, nome civil, partido/federação) pelo (cargo, número). Três
+armadilhas tratadas: nome quebrado em 2 linhas; o "% Votos" do relatório por
+partido é do PARTIDO (não entra); dentro de federação o partido individual
+NÃO é deduzido do número. Requer `pdftotext`. O zip de dados abertos
+(`importar_eleicao_2026.py` → `candidatos_sp_2026.csv`) fica de reserva;
+`eleicoes.carregar()` prefere o CSV dos PDFs.
+**Casamento de nomes (`src/eleicoes.py::_evidencia`) — em níveis, conservador:**
+3 = nome inteiro igual ao de urna (urna com " - " vale pelas duas formas:
+"TELHADINHA - CAPITÃO TELHADA") ou ao civil; 2 = contido em sequência; 1 =
+contido em ordem com palavras no meio. Títulos e partículas não contam como
+palavra; "Jr" = "Junior"; apelidos só numa lista curta explícita. Contra o nome
+CIVIL, níveis 1/2 exigem o MESMO primeiro nome ("Ricardo Salles" ≠ "JORGE
+RICARDO SALLES RAMOS"). NUNCA igualar "depois de tirar o título" (Capitão
+Telhada ≠ Coronel Telhada, pai e filho). Não eleito em OUTRO cargo achado só
+pelo civil vira **a conferir** (homônimo), com os `possiveis` para o Fábio
+olhar. `CONFERIDOS` = 3 casos verificados à mão no documento (por cargo+número).
+Resultado na ALESP: 55 reeleitos · 5 trocaram de casa · 17 não reeleitos · 17
+sem confirmação. Na dúvida, o painel não afirma.
+
+**Aba "Legislatura 2027"** (sidebar de Emendas, logo abaixo da Visão geral) —
+**só leitura**, não escreve em nada (teste trava). Lógica pura em
+`src/legislatura2027.py` (`montar`), que **não recalcula** score nenhum: cruza a
+bancada eleita com o levantamento estadual (território/expansão, autorizado ×
+pago) e o federal (`emendas_federais_score_execucao.csv`, empenhado × pago).
+- **Ordem de abordagem por FAIXAS**, não nota nova: 1 já investe no território
+  do PFC · 2 edu/social forte fora do território · 3 mandato atual sem emenda
+  edu/social · 4 chega em 2027 (por votos — voto mede força eleitoral, não
+  interesse) · 5 a conferir. Partido nunca entra na ordem (teste trava).
+- **Duas janelas**: Orçamento 2027 é indicado AGORA pela bancada atual (aba
+  "Última janela": não reeleitos COM histórico, mandato até 31/jan) → Orçamento
+  2028 pela bancada eleita, no 2º semestre de 2027.
+- Na Câmara, "reeleito"/"fora da lista atual" é relativo aos 64 do levantamento
+  federal (a tela diz isso). Novo não tem contato: a Casa publica após a posse.
+- **Pendente:** "Puxar para o CRM" um eleito novo (não fiz de propósito: o CRM
+  hoje é da bancada atual — conversar antes); PDF da aba; selo de situação 2026
+  nos dossiês das outras telas. Senadores: os 2 eleitos em 2018 saem em
+  31/jan/2027; o de 2022 segue até 2031.
 
 ## Radar de Captação — como está
 
@@ -364,6 +394,11 @@ prudencial rebaixam `quente`→`morno`; FPM e déficit são informativos; **fato
 ausente nunca penaliza** (5c). A linha guarda `temperatura_base` para o dossiê
 dizer "pela base MDE+CAPAG seria…" quando o fiscal muda a leitura.
 Ordem única `ORDEM_TEMPERATURA`; dentro da mesma leitura, maior MDE primeiro.
+**"Ordenar por"** (lista e expansão): `ui.formato.ordenar_prefeituras` (pura) com
+os critérios de `ORDENS_PREFEITURA` — melhores leads (padrão = a ordem acima, a
+mesma do PDF), alfabética, educação (MDE), CAPAG, folga com pessoal (%RCL) e
+emendas edu/social. "Sem dado" vai sempre ao fim, sem virar nota ruim (5c);
+nenhum critério por partido (5d).
 
 Coleta automática: **GitHub → Actions → "Dados do Painel Prefeituras" → Run
 workflow** (MDE/CAPAG/contatos; o TSE precisa do zip). Commita os CSVs sozinho.
