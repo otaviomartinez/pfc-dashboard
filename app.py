@@ -46,6 +46,7 @@ from ui.estilos import (
     _EMENDAS_V2_CSS,
     _EMENDAS_V2_JS,
     _EMENDAS_CHROME_CSS,
+    _LEG27_CSS,
     _SIDEBAR_FIX_JS,
     _SIDEBAR_OPEN_CSS,
     _SIDEBAR_TOGGLE_CORE,
@@ -701,10 +702,11 @@ def dlg_em_articulacao(lista):
 # Federal/Senador) vive no segmented control de CONTEÚDO (emenda_escopo_filtro),
 # não na sidebar (Passo 8). A lista "quem abordar" (ex-aba "Descobrir") foi fundida
 # na Visão geral (aparece abaixo da capa, no mesmo escopo).
-EMENDA_PAGES = ["Visão geral", "Territórios em Aberto", "Prefeituras",
+EMENDA_PAGES = ["Visão geral", "Legislatura 2027", "Territórios em Aberto", "Prefeituras",
                 "Funil de negociação", "Relatório", "Metodologia"]
 # chave do botão -> ícone (a chave vira a classe st-key-<chave> que o CSS usa)
 EMENDA_ICONES = {"emnav_visao-geral": "visao-geral",
+                 "emnav_legislatura-2027": "posse",
                  "emnav_territorios-em-aberto": "local",
                  "emnav_prefeituras": "prefeitura",
                  "emnav_funil-de-negociacao": "funil-negociacao",
@@ -718,6 +720,7 @@ EMENDA_ROTULOS = {**{f"emnav_{slug(p)}": p for p in EMENDA_PAGES},
 # Paleta reusando as cores do app, uma por página. A Visão Geral (violeta) é o
 # ponto de entrada e ganha um realce permanente (ver _EMENDA_REALCE_CSS).
 EMENDA_CORES = {"emnav_visao-geral": "#8B7BF0",
+                "emnav_legislatura-2027": "#5B9BD5",
                 "emnav_territorios-em-aberto": "#4ADE80",
                 "emnav_prefeituras": "#4FA8A0",
                 "emnav_funil-de-negociacao": "#E8B54A", "emnav_relatorio": "#EC6A8C",
@@ -2511,6 +2514,7 @@ def render_emendas():
     subttl = {"Visão geral": "Articulação política",
               "Territórios em Aberto": "Oportunidade de captação · sem emenda edu/social",
               "Prefeituras": "Quem recebe a emenda e assina o convênio",
+              "Legislatura 2027": "A bancada eleita em 2026 · quem procurar e em que ordem",
               "Funil de negociação": "Negociações por temperatura",
               "Relatório": "Relatório de Prioridades · quem abordar",
               "Metodologia": "Como o Score de Emendas é calculado"}.get(emenda_page, "")
@@ -2539,6 +2543,10 @@ def render_emendas():
     if modo == "relatorio":
         render_relatorio_emendas()
         return
+    # Legislatura 2027: a bancada eleita em 2026 x o histórico de emendas (só leitura).
+    if modo == "legislatura":
+        render_legislatura_2027()
+        return
     # Metodologia: como o Score de Emendas é calculado (documentação da régua real).
     if modo == "metodologia":
         render_metodologia_emendas()
@@ -2563,6 +2571,306 @@ def render_emendas():
         # estadual + curados federal/senador) aparece ABAIXO da capa, mesmo escopo.
         render_descobrir_lista(escopo_sel)
         return
+
+
+# =========================================================================== #
+# LEGISLATURA 2027 — a bancada eleita em 2026, lida pelo olho do PFC
+# ---------------------------------------------------------------------------
+# Aba própria e SÓ DE LEITURA: não escreve no Sheets, não mexe no CRM nem no
+# funil. A lógica inteira (cruzamento, faixas, ganchos) está em
+# src/legislatura2027.py, que é pura e testada; aqui é só a casca.
+# Regras que a tela carrega: resultado "sujeito a modificações até a
+# diplomação"; ninguém some das listas atuais antes de 1º/fev; partido é fato
+# do documento, nunca critério de ordem; autorizado e pago nunca somados.
+# =========================================================================== #
+
+LG_ORIGEM_COR = {"reeleito": "#8B7BF0", "outra_casa": "#5B9BD5",
+                 "novo": "#C6CEDA", "a_conferir": "#7C8698"}
+LG_FAIXA_COR = {1: "#4ADE80", 2: "#E8B54A", 3: "#7C8698", 4: "#5B9BD5", 5: "#7C8698"}
+LG_FAIXA_EXPLICA = {
+    1: "Têm emenda edu/social nos municípios do PFC (levantamento 2023-25). "
+       "Ordem pelo score do levantamento — não recalculado.",
+    2: "Investem em edu/social, mas ainda fora dos nossos municípios. "
+       "Ordem pelo score do levantamento.",
+    3: "Têm mandato hoje, mas sem emenda edu/social no levantamento. Ordem por votos.",
+    4: "Sem histórico de emendas. Ordem por votos — voto mede força eleitoral, "
+       "não interesse pelo PFC.",
+    5: "O nome casa com mais de um candidato. Conferir antes de procurar.",
+}
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _dados_legislatura() -> dict:
+    """Legislatura 2027 montada. Nunca levanta: sem arquivo -> {} e a tela explica."""
+    try:
+        from src import legislatura2027 as _L
+        return _L.montar(**_L.carregar_fontes())
+    except Exception:
+        return {}
+
+
+def _lg_nomes_crm() -> set:
+    """Nomes (normalizados) que já estão no CRM — só para o selo 'NO CRM'."""
+    try:
+        from src.eleicoes import _norm as _n
+        nomes = [d.get("nome", "") for d in _deputados_ordenados()]
+        nomes += [d.get("nome", "") for d in _deputados_federais_ordenados()]
+        return {_n(x) for x in nomes if x}
+    except Exception:
+        return set()
+
+
+def _lg_selo(texto: str, cor: str) -> str:
+    return f'<span class="lg-selo" style="background:{cor}22;color:{cor}">{esc(texto)}</span>'
+
+
+def _lg_composicao(d: dict) -> str:
+    """As três casas em barras: quem continua, quem muda de casa, quem chega."""
+    c = d["contagens"]
+    blocos = []
+    notas = {"ALESP": "novos", "Câmara": "fora da lista atual", "Senado": "fora da lista atual"}
+    for casa, cadeiras in (("ALESP", 94), ("Câmara", 70), ("Senado", 2)):
+        k = c.get(casa, {})
+        tot = k.get("total", 0) or 1
+        vem = [p["casa_atual"] for p in d["casas"].get(casa, []) if p["origem"] == "outra_casa"]
+        de_onde = (f"vem da {vem[0]}" if len(set(vem)) == 1 else "mudam de casa") if vem else ""
+        partes = [(k.get("reeleito", 0), LG_ORIGEM_COR["reeleito"], "reeleitos"),
+                  (k.get("outra_casa", 0), LG_ORIGEM_COR["outra_casa"], de_onde or "mudam de casa"),
+                  (k.get("novo", 0), "#C6CEDA", notas[casa]),
+                  (k.get("a_conferir", 0), "#7C8698", "a conferir")]
+        barra = "".join(f'<span style="flex:{n};background:{cor}"></span>' for n, cor, _ in partes if n)
+        leg = "".join(f'<span><i style="background:{cor}"></i><b>{n}</b> {esc(r)}</span>'
+                      for n, cor, r in partes if n)
+        extra = (f' · renovação de {round(100 * k.get("novo", 0) / tot)}%'
+                 if casa == "ALESP" and k.get("total") else "")
+        blocos.append(
+            f'<div class="lg-casa"><div class="hd"><span class="nm">{casa}</span>'
+            f'<span class="tt">{k.get("total", 0)} de {cadeiras} cadeiras{extra}</span></div>'
+            f'<div class="lg-bar">{barra}</div><div class="lg-leg">{leg}</div></div>')
+    return f'<div class="lg-casas">{"".join(blocos)}</div>'
+
+
+def _lg_card(p: dict, idx: str, no_crm: bool) -> None:
+    """Um eleito, card inteiro clicável (abre o dossiê)."""
+    from src.legislatura2027 import votos_curto
+    h = p.get("historico")
+    selo = _lg_selo(p["origem_rotulo"], LG_ORIGEM_COR.get(p["origem"], "#7C8698"))
+    sub = " · ".join(x for x in (p.get("partido"), f"{votos_curto(p['votos'])} votos") if x)
+    if h:
+        direita = (f'<div class="lg-score" style="color:{_cor_score(h["score"])}">{round(h["score"])}</div>'
+                   f'<div class="lg-sub">score {"estadual" if h["fonte"] == "estadual" else "federal"}</div>')
+    else:
+        direita = (f'<div class="lg-votos">{votos_curto(p["votos"])}</div>'
+                   '<div class="lg-sub">votos</div>')
+    with st.container(key=f"lgrow_{idx}"):
+        st.markdown(
+            f'<div class="lg-cell" style="border-left-color:{LG_FAIXA_COR.get(p["faixa"], "#7C8698")}">'
+            f'<div class="lg-nomecol"><div class="lg-nome">{selo}{esc(p["nome"])}'
+            + ('<span class="lg-crm">NO CRM</span>' if no_crm else "")
+            + f'</div><div class="lg-sub">{esc(sub)}</div>'
+            f'<div class="lg-gch">{esc(p["gancho"])}</div></div>'
+            f'<div class="lg-scol">{direita}</div></div>', unsafe_allow_html=True)
+        if st.button(f"Abrir dossiê de {p['nome']}", key=f"lg_{idx}", use_container_width=True):
+            dlg_legislatura(p, no_crm)
+
+
+def _lg_lista_casa(d: dict, casa: str, busca: str, crm: set) -> None:
+    from src.eleicoes import _norm as _n
+    from src.legislatura2027 import FAIXAS
+    lista = d["casas"].get(casa, [])
+    if busca:
+        alvo = _n(busca)
+        lista = [p for p in lista if alvo in _n(p["nome"]) or alvo in _n(p.get("nome_civil"))
+                 or alvo in _n(p.get("partido"))]
+    if not lista:
+        st.markdown('<div class="lg-vazio">Ninguém com esse nome nesta casa.</div>',
+                    unsafe_allow_html=True)
+        return
+    slug_casa = slug(casa)
+    for faixa in sorted({p["faixa"] for p in lista}):
+        grupo = [p for p in lista if p["faixa"] == faixa]
+        st.markdown(
+            f'<div class="lg-fx"><span class="dot" style="background:{LG_FAIXA_COR[faixa]}"></span>'
+            f'<b>{esc(FAIXAS[faixa])}</b><span class="n">{len(grupo)}</span></div>'
+            f'<div class="lg-fx-d">{esc(LG_FAIXA_EXPLICA[faixa])}</div>', unsafe_allow_html=True)
+        visiveis = grupo if (busca or len(grupo) <= 12) else grupo[:10]
+        for p in visiveis:
+            _lg_card(p, f"{slug_casa}_{p['numero']}", _n(p.get("nome_atual") or p["nome"]) in crm)
+        if len(visiveis) < len(grupo):
+            with st.expander(f"Ver os outros {len(grupo) - len(visiveis)}"):
+                for p in grupo[len(visiveis):]:
+                    _lg_card(p, f"{slug_casa}_{p['numero']}", _n(p.get("nome_atual") or p["nome"]) in crm)
+
+
+def _lg_ultima_janela(d: dict, crm: set) -> None:
+    from src.eleicoes import _norm as _n
+    from src.legislatura2027 import votos_curto
+    saindo = d.get("saindo", [])
+    st.markdown(
+        '<div class="lg-fx"><span class="dot" style="background:#F0663F"></span>'
+        f'<b>Última janela — Orçamento 2027</b><span class="n">{len(saindo)}</span></div>'
+        '<div class="lg-fx-d">Não se reelegeram, mas seguem no mandato até 31/jan/2027 e ainda '
+        'indicam as emendas do Orçamento 2027. Só entra quem tem histórico edu/social.</div>',
+        unsafe_allow_html=True)
+    if not saindo:
+        st.markdown('<div class="lg-vazio">Ninguém com histórico está de saída.</div>',
+                    unsafe_allow_html=True)
+    for i, s in enumerate(saindo):
+        h = s["historico"]
+        no_crm = _n(s["nome"]) in crm
+        with st.container(key=f"lgrow_sai_{i}"):
+            st.markdown(
+                f'<div class="lg-cell" style="border-left-color:#F0663F">'
+                f'<div class="lg-nomecol"><div class="lg-nome">'
+                f'{_lg_selo("Até 31/jan", "#F0663F")}{esc(s["nome"])}'
+                + ('<span class="lg-crm">NO CRM</span>' if no_crm else "")
+                + f'</div><div class="lg-sub">{esc(s["casa"])} · casado com {esc(s["evidencia"])}, '
+                f'{votos_curto(s["votos"])} votos, não eleito</div>'
+                f'<div class="lg-gch">{esc(s["gancho"])}</div></div>'
+                f'<div class="lg-scol"><div class="lg-score" style="color:{_cor_score(h["score"])}">'
+                f'{round(h["score"])}</div><div class="lg-sub">score</div></div></div>',
+                unsafe_allow_html=True)
+            if st.button(f"Abrir {s['nome']}", key=f"lg_sai_{i}", use_container_width=True):
+                dlg_legislatura({**s, "saindo": True}, no_crm)
+
+    sem = d.get("sem_confirmacao", [])
+    if sem:
+        with st.expander(f"{len(sem)} nomes das listas atuais sem situação confirmada"):
+            st.caption("Não achamos um candidato que seja, com segurança, a mesma pessoa. "
+                       "\"Não encontrado\" não quer dizer \"não concorreu\" — pode ser só o "
+                       "nome na urna diferente. Na dúvida, o painel não afirma.")
+            for r in sem:
+                poss = "; ".join(f'{x["nome_urna"] or x["nome"]} ({x["cargo"].title()}, '
+                                 f'{votos_curto(x["votos"])} votos, {x["situacao"]})'
+                                 for x in r["possiveis"])
+                st.markdown(f'- **{esc(r["nome"])}** · {esc(r["casa"])} — '
+                            + (f"possíveis: {esc(poss)}" if poss else "nenhum candidato compatível"))
+
+
+def render_legislatura_2027() -> None:
+    st.markdown(_LEG27_CSS, unsafe_allow_html=True)
+    d = _dados_legislatura()
+    if not d or not d.get("resultado_em"):
+        st.markdown(
+            '<div class="lg-vazio">O resultado da eleição de 2026 ainda não foi importado.<br>'
+            'Rode <code>python scripts/importar_resultado_tse_pdf.py &lt;pasta com os PDFs do '
+            'TRE-SP&gt;</code>.</div>', unsafe_allow_html=True)
+        return
+    dias = d["dias_posse"]
+    contagem = (f'<div class="lg-count"><div class="n">{dias}</div><div class="r">'
+                f'{"dia" if dias == 1 else "dias"} até a posse</div></div>' if dias > 0 else
+                '<div class="lg-count"><div class="n">✓</div><div class="r">empossados</div></div>')
+    st.markdown(
+        '<div class="lg-hero"><div class="lg-hero-l">'
+        '<div class="lg-kicker">Legislatura 2027–2031 · São Paulo</div>'
+        '<div class="lg-title">A bancada que assume em 1º de fevereiro</div>'
+        f'<div class="lg-subt">Resultado oficial do TRE-SP ({esc(d["resultado_em"])}), cruzado com '
+        'o nosso levantamento de emendas. <b>Sujeito a modificações até a diplomação</b>, em '
+        'dezembro — candidaturas sub judice ainda podem mudar a lista. Por isso a tela diz '
+        '"eleito", nunca "empossado".</div></div>'
+        f'{contagem}</div>', unsafe_allow_html=True)
+
+    n_sai = len(d.get("saindo", []))
+    st.markdown(
+        '<div class="lg-janelas">'
+        '<div class="lg-jan agora"><div class="k">Agora até 31/jan/2027</div>'
+        '<div class="t">Orçamento 2027</div><div class="d">Quem indica é a bancada '
+        f'<b>atual</b> — inclusive quem não se reelegeu. <b>{n_sai}</b> deles têm histórico '
+        'edu/social e estão de saída: é a última janela.</div></div>'
+        '<div class="lg-seta">→</div>'
+        '<div class="lg-jan depois"><div class="k">A partir de 1º/fev/2027</div>'
+        '<div class="t">Orçamento 2028</div><div class="d">Quem indica é a bancada '
+        '<b>eleita</b>, quando o projeto do orçamento tramitar no 2º semestre de 2027. '
+        'Com os novos, a relação começa antes da posse.</div></div></div>',
+        unsafe_allow_html=True)
+
+    st.markdown(_lg_composicao(d), unsafe_allow_html=True)
+    st.markdown(
+        '<div class="lg-nota">Câmara: "reeleito" e "fora da lista atual" são relativos aos 64 '
+        'deputados federais do nosso levantamento de execução. Nada foi apagado das listas '
+        'atuais — elas valem até 31/jan.</div>', unsafe_allow_html=True)
+
+    st.session_state.setdefault("lg_casa", "ALESP")
+    aba = st.segmented_control(
+        "Casa", options=["ALESP", "Câmara", "Senado", "Última janela"],
+        key="lg_casa", label_visibility="collapsed") or "ALESP"
+    crm = _lg_nomes_crm()
+    if aba == "Última janela":
+        _lg_ultima_janela(d, crm)
+        return
+    busca = st.text_input("Buscar", key="lg_busca", placeholder="Buscar por nome ou partido",
+                          label_visibility="collapsed")
+    st.markdown(
+        '<div class="lg-leg" style="margin:2px 0 4px">'
+        + "".join(f'<span><i style="background:{c}"></i>{esc(r)}</span>' for r, c in (
+            ("Reeleito", LG_ORIGEM_COR["reeleito"]), ("Muda de casa", LG_ORIGEM_COR["outra_casa"]),
+            ("Novo / fora da lista", LG_ORIGEM_COR["novo"]))) + '</div>', unsafe_allow_html=True)
+    _lg_lista_casa(d, aba, busca, crm)
+
+
+@st.dialog("Legislatura 2027", width="large")
+def dlg_legislatura(p: dict, no_crm: bool = False) -> None:
+    from src.legislatura2027 import dossie_texto, votos_curto
+    st.markdown(_LEG27_CSS, unsafe_allow_html=True)
+    breadcrumb("Emendas", "Legislatura 2027", p["nome"])
+    st.markdown(f"### {esc(p['nome'])}")
+    h = p.get("historico")
+    if p.get("saindo"):
+        st.caption(f"{p['casa']} · mandato até 31/jan/2027" + (" · já está no CRM" if no_crm else ""))
+        st.markdown('<div class="lg-gancho" style="border-left-color:#F0663F"><div class="k">'
+                    'Última janela</div>'
+                    f'<div class="t">{esc(p["gancho"])}</div></div>', unsafe_allow_html=True)
+        linhas = [("Casa hoje", p["casa"]),
+                  ("Candidato com quem o nome casou", p["evidencia"]),
+                  ("Votos em 2026 (TRE-SP)", f"{votos_curto(p['votos'])} · não eleito")]
+    else:
+        st.caption(f"{p['origem_rotulo']} · {p['casa']} em 2027"
+                   + (" · já está no CRM" if no_crm else ""))
+        st.markdown('<div class="lg-gancho"><div class="k">Por onde começar</div>'
+                    f'<div class="t">{esc(p["gancho"])}</div></div>', unsafe_allow_html=True)
+        linhas = dossie_texto(p)
+    st.markdown('<div class="lg-bloco"><h4>Eleição 2026</h4>'
+                + "".join(f'<div class="lg-linha"><span class="k">{esc(k)}</span>'
+                          f'<span class="v">{esc(v)}</span></div>' for k, v in linhas)
+                + '</div>', unsafe_allow_html=True)
+
+    if h:
+        if h["fonte"] == "estadual":
+            hl = [("Score do levantamento", f"{round(h['score'])} (não recalculado)"),
+                  ("Autorizado edu/social", brl_curto(h["autorizado"])),
+                  ("Pago edu/social", brl_curto(h["pago"])),
+                  ("Fatia edu/social", f"{h['alinhamento']:.0f}% do que indicou")]
+        else:
+            hl = [("Score de execução", f"{round(h['score'])} (não recalculado)"),
+                  ("Empenhado edu/social", brl_curto(h["empenhado"])),
+                  ("Pago edu/social", brl_curto(h["pago"])),
+                  ("Fatia edu/social", f"{h['alinhamento']:.0f}% do que indicou")]
+        if h.get("municipios"):
+            hl.append(("Municípios do PFC", str(h["municipios"]).title()))
+        st.markdown(f'<div class="lg-bloco"><h4>Histórico de emendas · {esc(h["casa"])}</h4>'
+                    + "".join(f'<div class="lg-linha"><span class="k">{esc(k)}</span>'
+                              f'<span class="v">{esc(v)}</span></div>' for k, v in hl)
+                    + '</div>', unsafe_allow_html=True)
+        st.caption("Autorizado (ou empenhado) e pago aparecem separados — nunca somados.")
+    elif not p.get("saindo"):
+        st.markdown('<div class="lg-bloco"><h4>Histórico de emendas</h4>'
+                    '<div class="lg-linha"><span class="k">No levantamento 2023-25</span>'
+                    '<span class="v">nenhuma emenda edu/social</span></div></div>',
+                    unsafe_allow_html=True)
+
+    of = p.get("contato_oficial") or {}
+    if any(of.values()):
+        cl = [(k, v) for k, v in (("E-mail de gabinete", of.get("email")),
+                                  ("Telefone de gabinete", of.get("telefone")),
+                                  ("Página ALESP", of.get("pagina"))) if v]
+        st.markdown('<div class="lg-bloco"><h4>Contato oficial (ALESP)</h4>'
+                    + "".join(f'<div class="lg-linha"><span class="k">{esc(k)}</span>'
+                              f'<span class="v">{esc(v)}</span></div>' for k, v in cl)
+                    + '</div>', unsafe_allow_html=True)
+    elif not p.get("saindo") and p.get("origem") == "novo":
+        st.caption("Contato de gabinete: a Casa publica depois da posse (1º/fev/2027). "
+                   "O painel não tem — e não inventa — contato pessoal.")
+    st.caption("Fonte: relatórios oficiais do TRE-SP · sujeito a modificações até a diplomação.")
 
 
 # =========================================================================== #

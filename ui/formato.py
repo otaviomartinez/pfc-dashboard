@@ -1144,6 +1144,7 @@ def aviso_contexto_territorios(escopo_sel: str) -> str:
 # e testável. Página desconhecida ou LEGADA (ex.: 'Lista' do painel Federal antigo,
 # ou 'Deputados', ambas aposentadas) cai em 'visao' — blinda a migração de estado.
 _MODO_EMENDA = {"Visão geral": "visao",
+                "Legislatura 2027": "legislatura",
                 "Territórios em Aberto": "orfaos",
                 "Prefeituras": "prefeituras",
                 "Funil de negociação": "funil", "Relatório": "relatorio",

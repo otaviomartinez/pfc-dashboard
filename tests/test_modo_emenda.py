@@ -17,6 +17,7 @@ from ui.formato import _modo_emenda  # noqa: E402
 # As 5 páginas atuais da sidebar (espelham EMENDA_PAGES em app.py).
 ESPERADO = {
     "Visão geral": "visao",
+    "Legislatura 2027": "legislatura",
     "Territórios em Aberto": "orfaos",
     "Funil de negociação": "funil",
     "Relatório": "relatorio",
