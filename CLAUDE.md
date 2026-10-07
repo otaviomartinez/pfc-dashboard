@@ -277,6 +277,10 @@ Duas correções feitas:
    nenhum termo positivo, negativo ou de aluno — "Chamada Pública 03/2026") tem
    a página lida ANTES do veredito (teto `MAX_SEGUNDA_CHANCE = 25`). Reprovado
    por termo negativo/de aluno NÃO volta. O log imprime "2ª chance: … resgatados".
+   **A página lida passa de novo pelo crivo** (`avaliar_sinal`) — a 1ª versão só
+   repontuava e deixou entrar "Floresta+ Amazônia". 1ª rodada real: 25 páginas
+   lidas, 9 resgatados, ~5 bons; os ruins eram notícia de quem ganhou prêmio →
+   novo filtro `e_noticia_de_resultado` (no radar E na exibição do app).
 2. **Prioridade** (`ui.formato.prioridade_oportunidade`), ordem padrão da fila e
    do painel inicial: aderência + urgência **só com prazo confiável** (≤7d +15,
    ≤30d +12, ≤90d +6, ≤180d +2; "a confirmar" ganha 0) + 5 se há valor. Motivo:
