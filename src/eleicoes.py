@@ -1,8 +1,8 @@
 """Eleição geral de 2026 — o que muda para o painel de Emendas.
 
-Lê data/eleicoes/candidatos_sp_2026.csv (gerado por
-scripts/importar_eleicao_2026.py a partir do consulta_cand_2026 do TSE) e cruza
-com quem está HOJE no mandato.
+Lê data/eleicoes/resultado_sp_2026.csv (relatórios OFICIAIS do TRE-SP, via
+scripts/importar_resultado_tse_pdf.py) — ou, na falta dele, o candidatos_sp_2026.csv
+do zip do TSE — e cruza com quem está HOJE no mandato.
 
 TRÊS FATOS QUE MANDAM AQUI (conferidos em out/2026):
   1. A posse é em 1º de FEVEREIRO de 2027 para os três cargos — inclusive na
@@ -15,8 +15,9 @@ TRÊS FATOS QUE MANDAM AQUI (conferidos em out/2026):
      2026", nunca "empossado".
 
 Casamento de NOMES é o ponto frágil (a ALESP chama de "Agente Federal Danilo
-Balas" quem a urna chama de "DANILO BALAS"). Regra conservadora: só afirma
-quando há UM candidato compatível; dois ou mais viram "a conferir"; nenhum vira
+Balas" quem a urna chama de "DANILO BALAS"). Regra conservadora, em níveis
+(ver `_nivel`): só afirma quando há UM candidato no nível mais forte; dois ou
+mais viram "a conferir"; nenhum vira
 "não encontrado entre os candidatos" — que NÃO é o mesmo que "não concorreu"
 (pode ser só grafia diferente).
 
@@ -30,6 +31,10 @@ import unicodedata
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CSV_CANDIDATOS = os.path.join(BASE, "data", "eleicoes", "candidatos_sp_2026.csv")
+# Fonte preferida: os relatórios OFICIAIS do TRE-SP (SISTOT), lidos por
+# scripts/importar_resultado_tse_pdf.py. O CSV do zip de dados abertos fica de
+# reserva — mesmas colunas essenciais (cargo, nome_urna, nome, situação).
+CSV_RESULTADO = os.path.join(BASE, "data", "eleicoes", "resultado_sp_2026.csv")
 
 POSSE_2027 = "2027-02-01"
 CARGOS = ("DEPUTADO ESTADUAL", "DEPUTADO FEDERAL", "SENADOR")
@@ -56,8 +61,10 @@ def eleito(c: dict) -> bool:
 
 
 def carregar(caminho: str | None = None) -> list[dict]:
-    """Candidatos de SP aos 3 cargos. Sem arquivo -> [] (a tela segue como hoje)."""
-    caminho = caminho or CSV_CANDIDATOS
+    """Candidatos de SP aos 3 cargos. Sem arquivo -> [] (a tela segue como hoje).
+    Sem caminho: o resultado oficial (PDF do TRE-SP) e, na falta dele, o zip."""
+    if caminho is None:
+        caminho = CSV_RESULTADO if os.path.isfile(CSV_RESULTADO) else CSV_CANDIDATOS
     try:
         with open(caminho, encoding="utf-8-sig", newline="") as f:
             return [dict(r) for r in csv.DictReader(f)]
@@ -65,34 +72,91 @@ def carregar(caminho: str | None = None) -> list[dict]:
         return []
 
 
-def _compativel(nome_atual: str, cand: dict) -> bool:
-    """Igual, ou um nome contido no outro com pelo menos 2 palavras.
-    "Agente Federal Danilo Balas" x "DANILO BALAS" -> compatível.
-    "Ana" x "Ana Paula Silva" -> NÃO (uma palavra só é ambígua demais)."""
-    a = _norm(nome_atual)
-    if not a:
-        return False
-    for b in (_norm(cand.get("nome_urna")), _norm(cand.get("nome"))):
-        if not b:
+# Títulos que o nome PARLAMENTAR carrega e o nome CIVIL não ("Agente Federal
+# Danilo Balas" é "DANILO MASCARENHAS DE BALAS" no TSE).
+_TITULOS = {"dr", "dra", "doutor", "doutora", "major", "delegado", "delegada",
+            "professor", "professora", "prof", "pastor", "pastora", "sargento",
+            "coronel", "capitao", "tenente", "cabo", "agente", "federal", "irmao",
+            "irma", "bispo", "missionario", "missionaria"}
+# Apelido -> formas do nome civil. Lista curta e EXPLÍCITA, só com casos vistos
+# nos 94 da ALESP — apelido genérico ("Zé") geraria casamento errado.
+_APELIDOS = {"beth": ("elisabeth", "elizabeth", "isabeth"), "rafa": ("rafael",),
+             "carlao": ("carlos",)}
+
+
+def _tokens(nome: str) -> list[str]:
+    return [t for t in _norm(nome).split() if t not in _TITULOS]
+
+
+def _contido_em_ordem(curto: list[str], longo: list[str]) -> bool:
+    """Todas as palavras do nome curto aparecem, NA ORDEM, no longo — palavras a
+    mais no meio são permitidas ("edson giriboni" em "edson de oliveira
+    giriboni"). Apelido conhecido vale pela forma civil."""
+    i = 0
+    for t in longo:
+        if i < len(curto) and (t == curto[i] or t in _APELIDOS.get(curto[i], ())):
+            i += 1
+    return i == len(curto)
+
+
+def _nivel(nome_atual: str, cand: dict) -> int:
+    """Força da evidência de que `cand` é a pessoa `nome_atual`. 0 = nenhuma.
+
+      3  IGUAL, nome INTEIRO com título — ao de urna (vale mesmo com uma palavra
+         só: "Donato" = "DONATO", "Professora Bebel" = "PROFESSORA BEBEL") ou
+         ao civil. NUNCA igual "depois de tirar os títulos": "Capitão Telhada"
+         virava "telhada" = "telhada" de "CORONEL TELHADA" — pai e filho,
+         pessoas diferentes, e o painel diria que o deputado foi para a Câmara;
+      2  CONTIDO, palavras seguidas, ≥2 palavras ("Agente Federal Danilo Balas"
+         x "DANILO BALAS");
+      1  CONTIDO EM ORDEM, com palavras a mais no meio, ≥2 palavras ("Edson
+         Giriboni" x "EDSON DE OLIVEIRA GIRIBONI"; "Beth" vale "Elisabeth").
+    Títulos (Dr., Major, Agente Federal…) não contam como palavra.
+    """
+    a_txt, a = _norm(nome_atual), _tokens(nome_atual)
+    urna, civil = cand.get("nome_urna"), cand.get("nome")
+    if a_txt and a_txt in (_norm(urna), _norm(civil)):
+        return 3
+    if len(a) < 2:
+        return 0                               # uma palavra só: só vale se IGUAL
+    melhor = 0
+    for nome_cand in (urna, civil):
+        b = _tokens(nome_cand)
+        if len(b) < 2:
             continue
-        if a == b:
-            return True
         curto, longo = (a, b) if len(a) <= len(b) else (b, a)
-        if len(curto.split()) >= 2 and f" {curto} " in f" {longo} ":
-            return True
-    return False
+        if f" {' '.join(curto)} " in f" {' '.join(longo)} ":
+            melhor = max(melhor, 2)
+        elif _contido_em_ordem(curto, longo):
+            melhor = max(melhor, 1)
+    return melhor
+
+
+def _compativel(nome_atual: str, cand: dict) -> bool:
+    return _nivel(nome_atual, cand) > 0
+
+
+def _melhores(nome_atual: str, candidatos: list[dict]) -> list[dict]:
+    """Os candidatos do nível MAIS FORTE encontrado. Um IGUAL vence qualquer
+    número de parecidos — antes, "Rafael Silva" (urna idêntica) virava "a
+    conferir" porque outros nomes civis também continham rafael…silva."""
+    por_nivel: dict[int, dict] = {}
+    for c in candidatos:
+        n = _nivel(nome_atual, c)
+        if n:
+            chave = c.get("sq_candidato") or (c.get("cargo"), c.get("numero") or c.get("nome"))
+            por_nivel.setdefault(n, {})[chave] = c
+    return list(por_nivel[max(por_nivel)].values()) if por_nivel else []
 
 
 def situacao_2026(nome_atual: str, cargo_atual: str, candidatos: list[dict]) -> dict:
     """O que a eleição de 2026 decidiu sobre quem está HOJE no cargo.
 
-    Devolve {status, rotulo, cargo_2027, partido}. `cargo_atual` é
+    Devolve {status, rotulo, cargo_2027, cargo_disputado, partido, votos, numero}.
+    `votos` só existe com o resultado oficial (PDF do TRE-SP); no zip vem vazio. `cargo_atual` é
     'DEPUTADO ESTADUAL', 'DEPUTADO FEDERAL' ou 'SENADOR'.
     """
-    achados = [c for c in candidatos if _compativel(nome_atual, c)]
-    # o mesmo candidato pode aparecer duas vezes (urna e nome civil): dedup por id
-    unicos = {c.get("sq_candidato") or (c.get("nome"), c.get("cargo")): c for c in achados}
-    achados = list(unicos.values())
+    achados = _melhores(nome_atual, candidatos)
     if not achados:
         status, c = "nao_encontrado", {}
     elif len(achados) > 1:
@@ -107,7 +171,9 @@ def situacao_2026(nome_atual: str, cargo_atual: str, candidatos: list[dict]) -> 
             status = "eleito_outro_cargo"
     return {"status": status, "rotulo": ROTULOS[status],
             "cargo_2027": c.get("cargo", "") if status in ("reeleito", "eleito_outro_cargo") else "",
-            "partido": c.get("partido", "")}
+            "cargo_disputado": c.get("cargo", ""),
+            "partido": c.get("sigla") or c.get("partido", ""),
+            "votos": c.get("votos", ""), "numero": c.get("numero", "")}
 
 
 def eleitos(candidatos: list[dict], cargo: str) -> list[dict]:
