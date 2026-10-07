@@ -105,6 +105,8 @@ from ui.formato import (
     SITUACAO_MDE_COR,
     SITUACAO_MDE_ROTULO,
     ORDEM_TEMPERATURA,
+    ORDENS_PREFEITURA,
+    ordenar_prefeituras,
     prioridade_oportunidade,
     TEMPERATURA_PREF_COR,
     TEMPERATURA_PREF_ROTULO,
@@ -3102,6 +3104,20 @@ def _pf_selo(texto: str, cor: str) -> str:
             f'{esc(texto)}</span>')
 
 
+def _pf_seletor_ordem(alvo, chave: str, opcoes: list) -> str:
+    """Seletor "Ordenar por" (lista e expansão). A explicação do critério
+    escolhido vai no help — "sem dado" sempre no fim, sem virar nota ruim."""
+    st.session_state.setdefault(chave, opcoes[0])
+    if st.session_state[chave] not in opcoes:
+        st.session_state[chave] = opcoes[0]
+    escolha = alvo.selectbox(
+        "Ordenar por", opcoes, key=chave,
+        help="\n\n".join(f"**{o}** — {ORDENS_PREFEITURA[o]}" for o in opcoes)
+        + "\n\nMunicípio sem dado no critério vai para o fim — não é nota baixa, "
+          "é só o que ainda não se sabe.")
+    return escolha or opcoes[0]
+
+
 def render_prefeituras():
     """Tela Prefeituras: aviso da regra de ouro, placar, filtros e cards."""
     st.markdown(_PREFEITURAS_CSS, unsafe_allow_html=True)
@@ -3163,7 +3179,8 @@ def render_prefeituras():
                 "dado** — de propósito, para não inventar número.",
                 icon=":material/info:")
 
-    f1, f2, f3 = st.columns(3)
+    f1, f2, f3, f4 = st.columns([1, 1, 1, 1.15])
+    ordem = _pf_seletor_ordem(f4, "pf_ordem", list(ORDENS_PREFEITURA))
     f_temp = f1.multiselect("Temperatura", list(ORDEM_TEMPERATURA),
                             format_func=lambda x: TEMPERATURA_PREF_ROTULO.get(x, x),
                             key="pf_f_temp")
@@ -3182,12 +3199,9 @@ def render_prefeituras():
                     unsafe_allow_html=True)
         return
 
-    # Ordem ÚNICA (a mesma da expansão e do PDF): leitura primeiro; dentro dela,
-    # quem mais aplica em educação. Antes era alfabética dentro da temperatura,
-    # o que punha Capela do Alto atrás de qualquer cidade com nome em "A".
-    for i, l in enumerate(sorted(vis, key=lambda x: (ORDEM_TEMPERATURA.get(x["temperatura"], 9),
-                                                     -(x.get("mde_percentual") or 0),
-                                                     x["municipio"]))):
+    # Ordem escolhida pelo usuário. O padrão ("Melhores leads") é a ordem da
+    # leitura única — a mesma da expansão e do PDF. A função é pura e testada.
+    for i, l in enumerate(ordenar_prefeituras(vis, ordem)):
         cor_t = TEMPERATURA_PREF_COR.get(l["temperatura"], "#7C8698")
         cor_m = SITUACAO_MDE_COR.get(l["situacao_mde"], "#7C8698")
         sub = " · ".join(x for x in (
@@ -3237,9 +3251,13 @@ def _render_expansao():
         '<div class="r">no limite (25–28%)</div></div>'
         '</div>', unsafe_allow_html=True)
     st.caption("Municípios da MESMA Região Imediata (IBGE) dos nossos, onde o PFC "
-               "ainda **não** atua. Ordenados por temperatura e depois por porte "
-               "(quanto empenham em ensino). O PFC não opera aqui — é mapa de "
-               "prospecção, não carteira.")
+               "ainda **não** atua. Em \"Melhores leads\", a ordem é temperatura e "
+               "depois porte (quanto empenham em ensino). O PFC não opera aqui — é "
+               "mapa de prospecção, não carteira.")
+    _, c_ord = st.columns([2.2, 1])
+    ordem = _pf_seletor_ordem(c_ord, "px_ordem",
+                              [o for o in ORDENS_PREFEITURA if o != "Mais emendas edu/social"])
+    linhas = ordenar_prefeituras(linhas, ordem, expansao=True)
 
     for i, l in enumerate(linhas[:40]):
         cor_t = TEMPERATURA_PREF_COR.get(l["temperatura"], "#7C8698")

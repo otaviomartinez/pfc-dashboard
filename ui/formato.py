@@ -1737,11 +1737,72 @@ def leitura_prefeitura(situacao: str, capag_nota=None, percentual=None,
             "bloqueio": cap["bloqueio"], "sinais": cap["sinais"],
             "resumo": cap["resumo"],
             "exercicio_tce": f.get("exercicio_tce"),
-            "exercicio_fpm": f.get("exercicio_fpm")}
+            "exercicio_fpm": f.get("exercicio_fpm"),
+            "pessoal_pct": f.get("pessoal_pct")}
 
 
 # Ordem de prioridade da leitura — a MESMA na lista, na expansão e no PDF.
 ORDEM_TEMPERATURA = {"quente": 0, "morno": 1, "sem_dado": 2, "frio": 3, "bloqueado": 4}
+
+# Ordenação da tela de Prefeituras (lista e expansão). "Melhores leads" é a
+# ordem da leitura única — a MESMA do PDF; as outras são lentes do usuário.
+# Regra 5c: "sem dado" vai SEMPRE para o fim, em qualquer critério — não por
+# ser ruim, mas porque não dá para comparar o que não se sabe.
+ORDENS_PREFEITURA = {
+    "Melhores leads": "Leitura (quente → bloqueado) e, dentro dela, quem mais aplica em educação",
+    "Alfabética (A–Z)": "Nome do município",
+    "Maior aplicação em educação": "MDE apurado pelo TCE-SP, do maior para o menor",
+    "Melhor CAPAG": "Nota do Tesouro, de A para D",
+    "Mais folga com pessoal": "Menor gasto com pessoal sobre a RCL (limite da LRF: 54%)",
+    "Mais emendas edu/social": "Quantos parlamentares já mandaram emenda edu/social para cá",
+}
+_CAPAG_POS = {"A+": 0, "A": 1, "B+": 2, "B": 3, "C": 4, "D": 5}
+
+
+def _num_ou_none(v):
+    try:
+        return None if v is None or str(v).strip() == "" else float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def ordenar_prefeituras(linhas: list, criterio: str = "Melhores leads",
+                        expansao: bool = False) -> list:
+    """PURA: devolve uma NOVA lista ordenada pelo `criterio` (ORDENS_PREFEITURA).
+
+    Desempate sempre pelo nome (sem acento), para a ordem ser estável. Critério
+    desconhecido cai em "Melhores leads". Na expansão, "Melhores leads" usa o
+    porte (quanto empenham em ensino) no lugar do MDE, como sempre foi.
+    """
+    nome = lambda x: _norm_mun(x.get("municipio"))  # noqa: E731
+    temp = lambda x: ORDEM_TEMPERATURA.get(x.get("temperatura"), 9)  # noqa: E731
+
+    def _desc(v):
+        """(sem_dado?, -valor): dado conhecido primeiro, maior primeiro."""
+        n = _num_ou_none(v)
+        return (1, 0.0) if n is None else (0, -n)
+
+    def _asc(v):
+        n = _num_ou_none(v)
+        return (1, 0.0) if n is None else (0, n)
+
+    if criterio == "Alfabética (A–Z)":
+        chave = lambda x: (nome(x),)  # noqa: E731
+    elif criterio == "Maior aplicação em educação":
+        chave = lambda x: (_desc(x.get("mde_percentual")), nome(x))  # noqa: E731
+    elif criterio == "Melhor CAPAG":
+        chave = lambda x: (_CAPAG_POS.get(str(x.get("capag_nota") or "").strip().upper(), 9),  # noqa: E731
+                           temp(x), nome(x))
+    elif criterio == "Mais folga com pessoal":
+        chave = lambda x: (_asc((x.get("fiscal") or {}).get("pessoal_pct")), nome(x))  # noqa: E731
+    elif criterio == "Mais emendas edu/social":
+        chave = lambda x: (-len(x.get("deputados_emenda") or []), temp(x), nome(x))  # noqa: E731
+    elif expansao:
+        chave = lambda x: (temp(x), _desc(x.get("porte") or None), nome(x))  # noqa: E731
+    else:
+        chave = lambda x: (temp(x), _desc(x.get("mde_percentual")), nome(x))  # noqa: E731
+    return sorted(linhas or [], key=chave)
+
 
 TEMPERATURA_PREF_COR = {"quente": "#F0663F", "morno": "#E8B54A",
                         "frio": "#7C8698", "sem_dado": "#7C8698",
