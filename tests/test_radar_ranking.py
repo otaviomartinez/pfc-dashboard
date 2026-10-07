@@ -79,6 +79,28 @@ def test_teto_de_paginas_respeitado():
     assert len(lidas) == 25, "o workflow tem 20 min; o teto protege o tempo"
 
 
+def test_resumo_da_rodada_roda_com_e_sem_segunda_chance():
+    """BUG REAL da 1ª versão: o resumo é uma função SEPARADA de executar(), e a
+    linha nova leu `magros` como se estivesse lá dentro -> NameError no fim da
+    rodada de 07/10 (depois de gravar, então a fila entrou, mas o workflow
+    ficou vermelho). Os testes da segunda_chance passavam: ninguém chamava o
+    resumo. Agora chama."""
+    import contextlib
+    import io as _io
+    resg = [{"fonte": "Capta", "titulo": "Chamada Pública 03/2026"}]
+    base = dict(ancora_ok=1, generica_ok=1, brutos=[], com_sinal=[], descartados=[],
+                unicas=[], filtradas=[], falhas={}, n_cand=0, destino="teste",
+                stats_enr={"tentadas": 0, "enriquecidas": 0, "com_prazo": 0, "com_valor": 0})
+    out = _io.StringIO()
+    with contextlib.redirect_stdout(out):
+        radar_main._resumo(**base, segunda={"magros": resg, "resgatadas": resg,
+                                            "stats": {"tentadas": 1}})
+        radar_main._resumo(**base)          # rodada antiga, sem o parâmetro
+    texto = out.getvalue()
+    assert "2ª chance: 1 itens de texto magro · 1 páginas lidas · 1 resgatados" in texto
+    assert "Chamada Pública 03/2026" in texto
+
+
 # ---------------------------------------------------------------- Prioridade
 def test_edital_que_fecha_logo_passa_noticia_sem_data():
     edital = {"score": 70, "dias": 6, "valor": ""}

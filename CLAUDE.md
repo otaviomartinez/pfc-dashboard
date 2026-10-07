@@ -134,6 +134,37 @@ roteia para `render_federal` quando o escopo é Federal.
   (`relatorios.pdf_resumo_federal`, com o gabinete/sala da Câmara e o valor sugerido).
 - **O que FALTA no Federal:** ver "Fila de trabalho".
 
+## Eleição de 2026 — o que muda (e o que NÃO muda agora)
+
+1º turno em 04/10/2026. SP elegeu 94 deputados estaduais, 70 federais e 2
+senadores (Guilherme Derrite, PP; André do Prado, PL — este hoje está na NOSSA
+lista da ALESP e sai dela para o Senado).
+**Três fatos que mandam (conferidos em out/2026):**
+1. **Posse em 1º de fevereiro de 2027 para os três cargos** — inclusive a ALESP,
+   que mudou a data (era 15 de março até 2023; não usar a data antiga).
+2. **Até lá, quem manda é a bancada ATUAL — e é ela que indica as emendas do
+   Orçamento de 2027, que tramita agora.** Quem NÃO foi reeleito continua
+   indicando emenda até 31/jan. Por isso **não se apaga ninguém das listas antes
+   de 1º/fev**: a atualização é ADITIVA (situação 2026 por parlamentar + bancada
+   nova à parte). Trocar a lista agora quebraria o CRM e jogaria fora a janela
+   de emendas 2027.
+3. **Resultado só é definitivo na diplomação (dezembro)** — candidatura sub
+   judice e recontagem ainda mudam a lista. A tela diz "eleito em 2026", nunca
+   "empossado". Número de votos: só do TSE (jornais divergem — a mais votada da
+   ALESP saiu com 1,96 mi numa fonte e 213 mil em outra).
+**Dado:** `scripts/importar_eleicao_2026.py <consulta_cand_2026.zip>` →
+`data/eleicoes/candidatos_sp_2026.csv`. O zip é baixado **no navegador**
+(dadosabertos.tse.jus.br → Candidatos - 2026); o CDN do TSE recusa o robô do
+GitHub. Recusa gravar se o arquivo ainda não traz a totalização (TSE atualiza em
+lotes). Camada pura `src/eleicoes.py`: `situacao_2026` (reeleito / eleito para
+outro cargo / não reeleito / não encontrado / a conferir) e `novos_eleitos`.
+Casamento de nome conservador: igual, ou contido com ≥2 palavras ("Agente
+Federal Danilo Balas" ↔ "DANILO BALAS"); dois compatíveis = "a conferir";
+nenhum = "não encontrado entre os candidatos" (≠ "não concorreu").
+**Pendente:** baixar o zip; depois, selo de situação 2026 nos dossiês e a lista
+da bancada nova. Senadores: os 2 eleitos em 2018 saem em 31/jan/2027; o de 2022
+segue até 2031.
+
 ## Radar de Captação — como está
 
 Pipeline em `radar/` (roda no GitHub Actions, `radar.yml`, cron 06:00 Brasília;
