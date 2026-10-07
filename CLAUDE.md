@@ -234,22 +234,25 @@ do direito da criança → módulos 2/3/4), nunca parceria confirmada: todo item
 - **Sidebar:** botão de recolher/expandir **no topo do rail**, 100% client-side
   (sem rerun); pontinho de status = cor de saúde (verde/vermelho).
 
-**Próximo trabalho — EM ANDAMENTO: melhorar a cobertura de datas do radar.**
-Diagnóstico feito (fila real: 31 itens, só **7 com data**). **7 NÃO é o teto** —
-dos 24 sem data, quase nenhum é impossível: ~16-18 são recuperáveis, e o grosso
-com engenharia BARATA. Duas correções pendentes, nesta ordem:
-1. **Usar a data "post publicado: 2026" do CORPO dos posts da captadores/ABCR como
-   âncora do ano**, em vez do JSON-LD `datePublished` (que fica STALE no ano
-   original, 2021/2017, e faz a inferência resolver pro passado e ser descartada).
-   A data real de 2026 está visível no corpo — parsear ela recupera ~13 itens
-   sem sair da página.
-2. **Ampliar as âncoras de prazo, que estão estreitas demais** — perdem frases
-   comuns MESMO com o ano escrito (ex.: "inscrições podem ser feitas até 22 de
-   julho **de 2026**", "inscrições: em andamento, até 17 de julho **de 2026**").
-   Recupera Glocal, Cecierj, tidesetubal etc.
-Só isso levaria de **7 para ~20+**. (3ª camada, mais pesada: seguir o link ao
-edital original — confirmado que funciona. Caso difícil de verdade: as ~5 notícias
-do MCTI que não trazem o prazo na página, só no sistema de chamadas.)
+**Radar de Captação — diagnóstico de out/2026 (o gargalo NÃO era a data).**
+As duas correções de data que constavam aqui como pendentes JÁ ESTÃO FEITAS
+(carimbo "Post publicado" do corpo como âncora de ano; âncoras amplas como
+"inscrições podem ser feitas até…"). O log da rodada de 07/10 mostrou o gargalo
+real: 284 itens → 36 com sinal → **só 2 na fila**, 25 barrados por aderência.
+Duas correções feitas:
+1. **Segunda chance** (`radar/main.py::segunda_chance`): o veredito de aderência
+   era dado só pelo título da listagem, e a página só era lida para quem já
+   tinha passado. Agora quem tem **texto magro** (`scorer.texto_sem_termos`:
+   nenhum termo positivo, negativo ou de aluno — "Chamada Pública 03/2026") tem
+   a página lida ANTES do veredito (teto `MAX_SEGUNDA_CHANCE = 25`). Reprovado
+   por termo negativo/de aluno NÃO volta. O log imprime "2ª chance: … resgatados".
+2. **Prioridade** (`ui.formato.prioridade_oportunidade`), ordem padrão da fila e
+   do painel inicial: aderência + urgência **só com prazo confiável** (≤7d +15,
+   ≤30d +12, ≤90d +6, ≤180d +2; "a confirmar" ganha 0) + 5 se há valor. Motivo:
+   a planilha guarda só a nota de TEMA; prazo e valor eram ignorados na ordem.
+**Pendente:** 18 de 42 fontes vêm VAZIAS (Lemann, Itaú Social, Unibanco,
+Roberto Marinho, Ayrton Senna, Prosas, GIFE, Finep, Prêmio Itaú-Unicef…) —
+provável mudança de layout ou bloqueio; cada uma precisa ser olhada.
 
 **Painel Federal — o que falta (a Parte 1 e o dossiê JÁ estão feitos; ver seção
 "Emendas — Painel Federal").** Já pronto: importação do xlsx para a aba `Deputados
@@ -306,20 +309,26 @@ ponte_partidaria), tela + dossiê + PDF + "Puxar para Prospecção".
   registrada. Telefone de secretaria municipal não tem base nacional aberta;
   chega-se por telefone da prefeitura ou da escola.
 
-**Método fiscal revisado — PRONTO E DESLIGADO** (`src/prefeituras/fiscal.py`).
-Pedido do Fábio (set/2026): além de MDE + CAPAG, olhar o que mostra melhor se a
-prefeitura **banca** o programa. Quatro fatores, todos de fonte pública:
-disponibilidade de **caixa** (RGF-Anexo 05), **pessoal vs. teto da LRF** (54% da
-RCL no executivo municipal; alerta 48,6 / prudencial 51,3), **dependência de FPM**
-e **CAUC**. O CAUC é **decisivo e é override**: município irregular não pode
-assinar convênio, então a temperatura vira `bloqueado` independente de MDE/CAPAG;
-caixa apertado ou pessoal no prudencial só **rebaixam** `quente`→`morno`; FPM alto
-é informativo. **Fator ausente é "sem dado" e NUNCA penaliza** (regra 5c).
-É **aditivo e puro**: recebe a temperatura-base pronta de
-`ui.formato.temperatura_prefeitura` e **não a recalcula**. Testado
-(`tests/test_prefeituras_fiscal.py`), mas **nenhuma tela o chama ainda** — falta
-o dado dos quatro fatores. Sonda de diagnóstico: `scripts/sondar_fiscal.py`
-(workflow **"Sonda Fiscal"**, só imprime, não grava).
+**Leitura ÚNICA da prefeitura — `ui.formato.leitura_prefeitura` (out/2026).**
+É o ÚNICO lugar que decide se a cidade é quente/morna/fria/bloqueada/sem dado.
+A lista, o placar, o filtro, a ordenação, a expansão, o dossiê e o PDF leem o
+mesmo campo `temperatura` da linha. **Nunca recalcule por fora** — havia dois
+cálculos (a lista só com MDE+CAPAG, o dossiê com o fiscal por cima) e eles
+podiam discordar; o teste `test_prefeituras_leitura_unica.py` trava isso.
+Composição: base = `temperatura_prefeitura` (MDE+CAPAG) → enriquecida por
+`src/prefeituras/fiscal.capacidade_fiscal` com os fatores reais:
+- **pessoal %RCL** e **resultado orçamentário**: CSV do TCE-SP (`tce.carregar_fiscal`,
+  FRAÇÃO ×100; o ano corrente pode vir sem pessoal → `exercicio_com_pessoal`).
+  Resultado **não é caixa** — é sinal informativo.
+- **FPM**: DCA do Tesouro (`scripts/importar_fpm.py` → `fpm_<ano>.csv`). Valor
+  repetido entre municípios é ESPERADO (coeficiente por faixa de população).
+- **caixa** (RGF-Anexo 05) e **CAUC**: sem fonte automática (RGF não existe no
+  SICONFI para SP; CAUC não tem API — 9 endereços, todos 404). Ficam "sem dado".
+Regras: CAUC irregular → `bloqueado` (override, fim da fila); caixa/pessoal no
+prudencial rebaixam `quente`→`morno`; FPM e déficit são informativos; **fator
+ausente nunca penaliza** (5c). A linha guarda `temperatura_base` para o dossiê
+dizer "pela base MDE+CAPAG seria…" quando o fiscal muda a leitura.
+Ordem única `ORDEM_TEMPERATURA`; dentro da mesma leitura, maior MDE primeiro.
 
 Coleta automática: **GitHub → Actions → "Dados do Painel Prefeituras" → Run
 workflow** (MDE/CAPAG/contatos; o TSE precisa do zip). Commita os CSVs sozinho.
@@ -333,13 +342,10 @@ que a seção 0 do plano prevê — "acima com folga + caixa" — reusando
 `temperatura_prefeitura()`, que já era testada.
 
 **Fila imediata (out/2026):**
-1. **Ligar o método fiscal.** `src/prefeituras/fiscal.py` está pronto e testado,
-   sem nenhuma tela chamando. Ordem: rodar a **Sonda Fiscal** (Actions) → ler o
-   que RGF/FPM/CAUC devolvem de verdade → escrever o coletor só do que existir →
-   plugar no dossiê. **Não inventar fator que a fonte não der** — "sem dado" é
-   resposta legítima, e é o que o módulo já espera.
-2. **Conferir o Radar de Parcerias no ar** — card do hub e entrada no menu nunca
-   foram vistos rodando.
+1. ~~Ligar o método fiscal~~ — FEITO e UNIFICADO (ver "Leitura ÚNICA").
+2. **FPM incompleto:** 53 de 88 municípios (6 dos nossos 11, incl. Mirassol)
+   sem DCA de 2024. Conserto previsto: tentar o exercício anterior por
+   município, cada linha com o próprio ano.
 
 **Depois:**
 - Notificação por **e-mail** quando faltarem 15 dias para um prazo.

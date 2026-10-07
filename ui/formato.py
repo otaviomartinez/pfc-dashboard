@@ -1531,6 +1531,41 @@ def _prazo_confiavel(dias) -> bool:
     return isinstance(dias, int) and -60 <= dias <= 180
 
 
+# Bônus de URGÊNCIA no ranking de Prioridade. Só vale para prazo CONFIÁVEL
+# (_prazo_confiavel): "prazo a confirmar" ganha ZERO — nunca se inventa
+# urgência a partir de data incerta (regra 3).
+_BONUS_PRAZO = ((7, 15), (30, 12), (90, 6), (180, 2))   # (até N dias, bônus)
+_BONUS_VALOR = 5
+
+
+def prioridade_oportunidade(op: dict) -> float:
+    """Ordem padrão da fila de Captação: o que VALE AGIR primeiro.
+
+    POR QUE EXISTE: o radar calcula prazo e valor, mas a planilha guarda só a
+    nota de TEMA (Score Aderência) — e o app ordenava só por ela. Um edital com
+    aderência 70 e inscrição fechando em 6 dias ficava ATRÁS de uma notícia com
+    aderência 72 e sem data nenhuma. Captação é janela: o que fecha antes pede
+    ação antes.
+
+    Composição (transparente, para caber numa frase na tela):
+      aderência (0–100)
+      + urgência, só com prazo confiável: ≤7d +15 · ≤30d +12 · ≤90d +6 · ≤180d +2
+      + 5 se o valor foi informado (dá para avaliar o esforço)
+    Vencido não pontua (a fila já tira vencidos; aqui é só rede de segurança).
+    """
+    base = float(op.get("score") or 0)
+    dias = op.get("dias")
+    bonus = 0
+    if _prazo_confiavel(dias) and dias >= 0:
+        for limite, b in _BONUS_PRAZO:
+            if dias <= limite:
+                bonus = b
+                break
+    if str(op.get("valor") or "").strip():
+        bonus += _BONUS_VALOR
+    return base + bonus
+
+
 def _op_de_novidade(nv: dict) -> dict:
     return {"titulo": str(nv.get("Título", "")).strip() or "(sem título)",
             "fonte": str(nv.get("Fonte", "")).strip() or "Radar",
@@ -1668,10 +1703,51 @@ def temperatura_prefeitura(situacao: str, capag_nota=None, percentual=None) -> s
     return "quente" if pct > MDE_FOLGA else "morno"
 
 
+def leitura_prefeitura(situacao: str, capag_nota=None, percentual=None,
+                       fatores: dict | None = None) -> dict:
+    """A LEITURA ÚNICA de uma prefeitura — o único lugar que decide se ela é
+    quente, morna, fria, bloqueada ou sem dado.
+
+    POR QUE EXISTE: havia DOIS cálculos. A lista, o placar, o filtro e a
+    ordenação usavam só MDE+CAPAG (`temperatura_prefeitura`); o dossiê usava o
+    método fiscal revisado por cima. Os dois podiam discordar — a lista dizendo
+    "quente" e o dossiê dizendo "morno" para a mesma cidade, bastando ela cruzar
+    o limite prudencial de pessoal numa coleta. Agora todo mundo lê daqui.
+
+    Como compõe (nada é recalculado, só encadeado):
+      1. base   = MDE + CAPAG            (temperatura_prefeitura, já testada)
+      2. final  = base enriquecida pelos fatores fiscais (capacidade_fiscal):
+                  CAUC irregular -> 'bloqueado'; caixa/pessoal ruim rebaixam
+                  'quente' -> 'morno'; FPM e déficit são só informativos.
+    Fator ausente é "sem dado" e NUNCA penaliza (regra 5c).
+
+    `fatores` = {pessoal_pct, resultado_pct, fpm_pct, caixa, cauc,
+                 exercicio_tce, exercicio_fpm}; tudo opcional.
+    Devolve {temperatura, temperatura_base, bloqueio, sinais, resumo,
+             exercicio_tce, exercicio_fpm}.
+    """
+    from src.prefeituras.fiscal import capacidade_fiscal  # lazy: módulo puro
+    base = temperatura_prefeitura(situacao, capag_nota, percentual)
+    f = fatores or {}
+    cap = capacidade_fiscal(base, caixa=f.get("caixa"), pessoal_pct=f.get("pessoal_pct"),
+                            dependencia_fpm=f.get("fpm_pct"), cauc=f.get("cauc"),
+                            resultado_pct=f.get("resultado_pct"))
+    return {"temperatura": cap["temperatura"], "temperatura_base": base,
+            "bloqueio": cap["bloqueio"], "sinais": cap["sinais"],
+            "resumo": cap["resumo"],
+            "exercicio_tce": f.get("exercicio_tce"),
+            "exercicio_fpm": f.get("exercicio_fpm")}
+
+
+# Ordem de prioridade da leitura — a MESMA na lista, na expansão e no PDF.
+ORDEM_TEMPERATURA = {"quente": 0, "morno": 1, "sem_dado": 2, "frio": 3, "bloqueado": 4}
+
 TEMPERATURA_PREF_COR = {"quente": "#F0663F", "morno": "#E8B54A",
-                        "frio": "#7C8698", "sem_dado": "#7C8698"}
+                        "frio": "#7C8698", "sem_dado": "#7C8698",
+                        "bloqueado": "#F0663F"}
 TEMPERATURA_PREF_ROTULO = {"quente": "Lead quente", "morno": "Lead morno",
-                           "frio": "Frio", "sem_dado": "Sem dado"}
+                           "frio": "Frio", "sem_dado": "Sem dado",
+                           "bloqueado": "Bloqueado (CAUC)"}
 SITUACAO_MDE_ROTULO = {"cumpriu": "Cumpre o mínimo", "nao_cumpriu": "Abaixo do mínimo",
                        "sem_dado": "Sem dado"}
 SITUACAO_MDE_COR = {"cumpriu": "#4ADE80", "nao_cumpriu": "#F0663F",
@@ -1790,10 +1866,18 @@ def gancho_prefeitura(municipio: str, situacao: str, percentual=None,
             "orçamentária clara, nem parlamentar do CRM atuando no município.")
 
 
+def _campos_leitura(leitura: dict) -> dict:
+    """Achata a leitura única nos campos da linha do painel."""
+    return {"temperatura": leitura["temperatura"],
+            "temperatura_base": leitura["temperatura_base"],
+            "fiscal": leitura}
+
+
 def normalizar_prefeituras(municipios: list, mde: dict | None = None,
                            capag: dict | None = None, eleitos: list | None = None,
                            ranking: list | None = None,
-                           crm_parlamentares: list | None = None) -> list:
+                           crm_parlamentares: list | None = None,
+                           fiscal: dict | None = None) -> list:
     """Uma linha por município, juntando MDE + CAPAG + eleitos + emendas.
 
     PURA: recebe tudo pronto (quem lê arquivo é src/prefeituras/*). Município sem
@@ -1829,7 +1913,10 @@ def normalizar_prefeituras(municipios: list, mde: dict | None = None,
                                                           reg_mde.get("periodo")),
             "capag_nota": nota,
             "capag_rotulo": nota if nota else "não avaliado",
-            "temperatura": temperatura_prefeitura(sit, nota, pct),
+            # leitura ÚNICA: a lista, o placar, o filtro, a ordem e o dossiê
+            # leem o mesmo campo. Nada recalcula por fora.
+            **_campos_leitura(leitura_prefeitura(sit, nota, pct,
+                                                 (fiscal or {}).get(cod))),
             "prefeito": (prefeito or {}).get("nome_urna", ""),
             "prefeito_partido": (prefeito or {}).get("partido", ""),
             "n_vereadores": sum(1 for e in locais if e.get("cargo") == "VEREADOR"),
@@ -1849,6 +1936,7 @@ def contagens_prefeituras(linhas: list) -> dict:
         "quentes": sum(1 for x in linhas if x["temperatura"] == "quente"),
         "mornos": sum(1 for x in linhas if x["temperatura"] == "morno"),
         "frios": sum(1 for x in linhas if x["temperatura"] == "frio"),
+        "bloqueados": sum(1 for x in linhas if x["temperatura"] == "bloqueado"),
         "sem_dado": sum(1 for x in linhas if x["situacao_mde"] == "sem_dado"),
         "com_ponte": sum(1 for x in linhas if x["deputados_emenda"]),
     }
@@ -1907,7 +1995,8 @@ def motivo_expansao(faixa: str, capag_nota, municipio_ancora: str = "") -> str:
 
 def candidatos_expansao(vizinhos: list, mde: dict | None = None,
                         capag: dict | None = None,
-                        ancoras_por_regiao: dict | None = None) -> list:
+                        ancoras_por_regiao: dict | None = None,
+                        fiscal: dict | None = None) -> list:
     """Ranqueia os vizinhos para expansão. PURA (recebe tudo pronto).
 
     Ordem: temperatura (quente > morno > sem dado > frio) e, dentro dela, o
@@ -1916,7 +2005,7 @@ def candidatos_expansao(vizinhos: list, mde: dict | None = None,
     """
     mde, capag = mde or {}, capag or {}
     ancoras_por_regiao = ancoras_por_regiao or {}
-    ordem = {"quente": 0, "morno": 1, "sem_dado": 2, "frio": 3}
+    ordem = ORDEM_TEMPERATURA
     saida = []
     for viz in vizinhos or []:
         cod = str(viz.get("cod_ibge", ""))
@@ -1935,7 +2024,8 @@ def candidatos_expansao(vizinhos: list, mde: dict | None = None,
             "faixa": faixa, "faixa_rotulo": FAIXA_MDE_ROTULO.get(faixa, ""),
             "porte": reg_mde.get("valor_aplicado") or 0,
             "capag_nota": nota, "capag_rotulo": nota if nota else "não avaliado",
-            "temperatura": temperatura_prefeitura(situacao_mde(pct), nota, pct),
+            **_campos_leitura(leitura_prefeitura(situacao_mde(pct), nota, pct,
+                                                 (fiscal or {}).get(cod))),
             "ancora": ancora,
             "motivo": motivo_expansao(faixa, nota, ancora),
         })
