@@ -103,6 +103,7 @@ from ui.formato import (
     AVISO_PREFEITURAS,
     SITUACAO_MDE_COR,
     SITUACAO_MDE_ROTULO,
+    ORDEM_TEMPERATURA,
     TEMPERATURA_PREF_COR,
     TEMPERATURA_PREF_ROTULO,
     canais_oficiais,
@@ -2636,7 +2637,7 @@ def _dados_prefeituras() -> list:
 
     try:
         return normalizar_prefeituras(municipios, reg_mde, reg_capag, lista_eleitos,
-                                      ranking, crm)
+                                      ranking, crm, fiscal=_fatores_fiscais())
     except Exception:
         return []
 
@@ -2683,32 +2684,23 @@ _CORES_NIVEL = {"bom": "#4ADE80", "alerta": "#E8B54A",
                 "ruim": "#F0663F", "sem_dado": "#7C8698"}
 
 
-def _render_capacidade_fiscal(cod_ibge, temperatura_base: str):
-    """Bloco "a cidade banca?" — o método fiscal revisado, no dossiê.
+def _render_capacidade_fiscal(linha: dict):
+    """Bloco "a cidade banca?" — desenha a LEITURA ÚNICA da linha.
 
-    ADITIVO: não altera a temperatura que o resto do painel já mostra; exibe a
-    leitura enriquecida ao lado dela. Todo fator carrega o EXERCÍCIO de onde
-    saiu (regra 5b/5e: percentual sem exercício não existe, e o ano anterior
-    nunca é apresentado como se fosse o atual).
+    Antes este bloco recalculava a leitura por conta própria, enquanto a lista
+    usava outro cálculo; os dois podiam discordar. Agora ele só desenha o que
+    `ui.formato.leitura_prefeitura` já decidiu para a linha — a mesma que a
+    lista, o placar, o filtro e o PDF mostram. Todo fator carrega o EXERCÍCIO
+    de onde saiu (regra 5b/5e).
     """
-    fatores = _fatores_fiscais().get(str(cod_ibge or "").strip())
-    if not fatores:
+    leitura = (linha or {}).get("fiscal")
+    if not leitura:
         return
-    try:
-        from src.prefeituras import fiscal as _fiscal
-    except Exception:
-        return
-    cap = _fiscal.capacidade_fiscal(
-        temperatura_base,
-        pessoal_pct=fatores.get("pessoal_pct"),
-        resultado_pct=fatores.get("resultado_pct"),
-        dependencia_fpm=fatores.get("fpm_pct"),
-        caixa=None, cauc=None)          # sem fonte automática — ver docstring
-
-    ex_tce, ex_fpm = fatores.get("exercicio_tce"), fatores.get("exercicio_fpm")
-    ano_do_fator = {"pessoal": ex_tce, "resultado": ex_tce, "fpm": ex_fpm}
+    ano_do_fator = {"pessoal": leitura.get("exercicio_tce"),
+                    "resultado": leitura.get("exercicio_tce"),
+                    "fpm": leitura.get("exercicio_fpm")}
     linhas = []
-    for sinal in cap["sinais"]:
+    for sinal in leitura["sinais"]:
         cor = _CORES_NIVEL.get(sinal["nivel"], "#7C8698")
         ano = ano_do_fator.get(sinal["fator"])
         sufixo = f" (exercício {ano})" if ano and sinal["nivel"] != "sem_dado" else ""
@@ -2716,17 +2708,24 @@ def _render_capacidade_fiscal(cod_ibge, temperatura_base: str):
             f'<div class="pf-linha"><span class="k">'
             f'<span style="color:{cor}">&#9679;</span> {esc(sinal["fator"].upper())}</span>'
             f'<span class="v">{esc(sinal["texto"] + sufixo)}</span></div>')
-    rotulo = ("BLOQUEADO" if cap["bloqueio"] else cap["temperatura"].upper())
+    rotulo = TEMPERATURA_PREF_ROTULO.get(leitura["temperatura"], leitura["temperatura"])
+    base_txt = ""
+    if leitura["temperatura_base"] != leitura["temperatura"]:
+        # transparência: quando o fiscal muda a leitura, diz de onde ela veio
+        base_txt = (f' · pela base MDE+CAPAG seria '
+                    f'{TEMPERATURA_PREF_ROTULO.get(leitura["temperatura_base"], "")}')
     st.markdown('<div class="pf-bloco"><h4>Capacidade fiscal — a cidade banca?</h4>'
                 + "".join(linhas)
                 + f'<div class="pf-linha"><span class="k">LEITURA</span>'
-                  f'<span class="v">{esc(rotulo)} · {esc(cap["resumo"])}</span></div>'
+                  f'<span class="v">{esc(rotulo)} · {esc(leitura["resumo"])}'
+                  f'{esc(base_txt)}</span></div>'
                 + '</div>', unsafe_allow_html=True)
     st.caption("Pessoal e resultado orçamentário são **apurados pelo TCE-SP**; "
                "FPM vem do DCA do Tesouro. **Disponibilidade de caixa e CAUC "
                "aparecem como sem dado porque não há fonte pública automática** "
                "— o CAUC precisa ser consultado à mão no site do Tesouro. "
-               "Nada aqui é \"verba disponível\": é capacidade e prioridade.")
+               "Nada aqui é \"verba disponível\": é capacidade e prioridade. "
+               "Esta leitura é a mesma que aparece na lista e no placar.")
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -2781,7 +2780,7 @@ def _dados_expansao() -> list:
 
     try:
         return candidatos_expansao(list(vizinhos.values()), reg_mde, reg_capag,
-                                   ancoras)
+                                   ancoras, fiscal=_fatores_fiscais())
     except Exception:
         return []
 
@@ -2853,7 +2852,7 @@ def render_prefeituras():
                 icon=":material/info:")
 
     f1, f2, f3 = st.columns(3)
-    f_temp = f1.multiselect("Temperatura", ["quente", "morno", "frio", "sem_dado"],
+    f_temp = f1.multiselect("Temperatura", list(ORDEM_TEMPERATURA),
                             format_func=lambda x: TEMPERATURA_PREF_ROTULO.get(x, x),
                             key="pf_f_temp")
     f_mde = f2.multiselect("Situação do MDE", ["cumpriu", "nao_cumpriu", "sem_dado"],
@@ -2871,8 +2870,11 @@ def render_prefeituras():
                     unsafe_allow_html=True)
         return
 
-    ordem = {"quente": 0, "morno": 1, "sem_dado": 2, "frio": 3}
-    for i, l in enumerate(sorted(vis, key=lambda x: (ordem.get(x["temperatura"], 9),
+    # Ordem ÚNICA (a mesma da expansão e do PDF): leitura primeiro; dentro dela,
+    # quem mais aplica em educação. Antes era alfabética dentro da temperatura,
+    # o que punha Capela do Alto atrás de qualquer cidade com nome em "A".
+    for i, l in enumerate(sorted(vis, key=lambda x: (ORDEM_TEMPERATURA.get(x["temperatura"], 9),
+                                                     -(x.get("mde_percentual") or 0),
                                                      x["municipio"]))):
         cor_t = TEMPERATURA_PREF_COR.get(l["temperatura"], "#7C8698")
         cor_m = SITUACAO_MDE_COR.get(l["situacao_mde"], "#7C8698")
@@ -2986,7 +2988,7 @@ def dlg_expansao(viz: dict):
 
     # Mesma leitura fiscal dos nossos municípios: na expansão ela vale ainda
     # mais, porque é o primeiro filtro de quem vale a visita.
-    _render_capacidade_fiscal(viz.get("cod_ibge"), viz.get("temperatura", "sem_dado"))
+    _render_capacidade_fiscal(viz)
 
     # --- Contato oficial da prefeitura (cadastro de CNPJ) -------------------
     # Vem PRONTO, sem o usuário clicar em nada. Quando não houver, a tela cai
@@ -3105,7 +3107,7 @@ def dlg_prefeitura(pref: dict):
         st.caption("**Não avaliado** não é nota ruim: o município pode não ter "
                    "homologado a DCA no exercício.")
 
-    _render_capacidade_fiscal(pref.get("cod_ibge"), pref.get("temperatura", "sem_dado"))
+    _render_capacidade_fiscal(pref)
 
     # --- Político (TSE, campo factual — zero editorial) ---------------------
     eleitos_mun = pref.get("eleitos") or []
