@@ -335,6 +335,8 @@ def avaliar_sinal(op: dict) -> tuple[bool, str]:
         return False, "título genérico/administrativo excluído"
     if e_encerrado(titulo, descricao):
         return False, "edição passada / inscrições encerradas"
+    if e_noticia_de_resultado(titulo, descricao):
+        return False, "notícia de resultado (quem venceu), não oportunidade"
     if e_oportunidade_aluno(titulo, descricao):
         return False, "oportunidade para aluno (olimpíada/medalha/bolsa), não captação"
     if e_premio_pessoa_fisica(titulo, descricao):
@@ -348,6 +350,28 @@ def avaliar_sinal(op: dict) -> tuple[bool, str]:
     if tem_sinal_de_oportunidade(titulo, descricao):
         return True, ""
     return False, "sem sinal de oportunidade"
+
+
+# Notícia de RESULTADO: anuncia quem ganhou, não convida a concorrer. Visto na
+# rodada de 07/10: "Lupa do Bem vence como dinamizadores no Prêmio…" e
+# "Superintendente do Instituto Jô Clemente é vencedora…" entraram na fila.
+# Só o TÍTULO é julgado, e só com formas inequívocas: "vencem em 30/10" (prazo)
+# NÃO casa. Se o texto convida a se inscrever, não é notícia de resultado —
+# "inscrições abertas; vencedores recebem R$ 50 mil" é oportunidade.
+RESULTADO_TITULO = ("vencedor", "vencedora", "vencedores", "vencedoras", "venceu",
+                    "vence como", "e premiada", "e premiado", "foi premiada",
+                    "foi premiado", "sao premiados", "conquista o premio",
+                    "conquista premio", "recebe o premio", "recebe premio")
+CONVITE = ("inscricoes abertas", "inscricao aberta", "inscreva", "inscricoes ate",
+           "inscricoes vao ate", "abre inscricoes", "abrem inscricoes",
+           "prorroga as inscricoes", "prorrogadas as inscricoes")
+
+
+def e_noticia_de_resultado(titulo: str, descricao: str = "") -> bool:
+    t = _norm(titulo)
+    if not any(k in t for k in RESULTADO_TITULO):
+        return False
+    return not any(k in _norm(f"{titulo} {descricao}") for k in CONVITE)
 
 
 def titulo_excluido(titulo: str) -> bool:

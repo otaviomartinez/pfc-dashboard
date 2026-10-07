@@ -157,7 +157,7 @@ from ui.formato import (
 # Filtro geográfico do radar (restrito a fora de SP/Sudeste). Roda na coleta
 # (radar.scorer.avaliar_sinal), mas também na EXIBIÇÃO da fila — assim itens que
 # já estavam na planilha antes do filtro existir também somem da lista.
-from radar.scorer import e_ambiental, e_restrito_fora_sudeste
+from radar.scorer import e_ambiental, e_noticia_de_resultado, e_restrito_fora_sudeste
 
 try:
     import plotly.graph_objects as go
@@ -170,13 +170,16 @@ def _ops_radar_filtradas(novidades=None) -> list[dict]:
     """Fila do radar já LIMPA para exibição — PONTO ÚNICO. Toda tela que mostra a
     fila (dashboard, tela do Radar, Relatório de Prioridades) deve passar por
     aqui, senão um filtro escapa numa tela e não na outra (já aconteceu).
-    Tira: vencidos (data de prazo já passada), restritos a fora do Sudeste e
-    ambientais/ecologia. Não ordena — quem chama ordena como precisar."""
+    Tira: vencidos (data de prazo já passada), restritos a fora do Sudeste,
+    ambientais/ecologia e notícias de resultado ("X vence o prêmio Y") — estas
+    últimas também para limpar as que já estavam na planilha, que é só-acréscimo.
+    Não ordena — quem chama ordena como precisar."""
     fonte = novidades if novidades is not None else dados.carregar_novidades_pendentes()
     ops = [_op_de_novidade(nv) for nv in fonte]
     ops = [o for o in ops if not _op_vencida(o)]
     ops = [o for o in ops if not e_restrito_fora_sudeste(o["titulo"], o["desc"])]
     ops = [o for o in ops if not e_ambiental(o["titulo"], o["desc"])]
+    ops = [o for o in ops if not e_noticia_de_resultado(o["titulo"], o["desc"])]
     return ops
 
 # Componente de drag-and-drop do funil (HTML5 nativo, sem dependências externas).

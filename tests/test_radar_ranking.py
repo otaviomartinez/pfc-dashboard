@@ -71,6 +71,38 @@ def test_reprovado_de_verdade_nem_tem_a_pagina_lida():
     assert lidas == [] and magros == [] and resto == [reprovado]
 
 
+def test_pagina_lida_repassa_pelo_crivo():
+    """BUG REAL: a 1ª versão só repontuava a página lida. "Chamada Pública
+    01/2026 – Projeto Floresta+ Amazônia" entrou na fila: o título não tinha os
+    gatilhos de ambiental/fora do Sudeste, a página tinha, e ninguém olhou."""
+    magro = {"titulo": "Chamada Pública 01/2026 – Projeto Floresta+", "descricao": "",
+             "url": "https://f.org"}
+    enriquecer, _ = _pagina_falsa({"Chamada Pública 01/2026 – Projeto Floresta+":
+        "Apoio a projetos de educação e juventude em comunidades da Amazônia Legal, "
+        "com foco em escola pública e iniciação científica."})
+    resg, resto, _, _ = radar_main.segunda_chance([magro], enriquecer=enriquecer)
+    assert resg == [], "fora do Sudeste: nem página lida salva"
+    assert "barrada no crivo" in magro["motivo"]
+
+
+def test_noticia_de_quem_ganhou_nao_e_oportunidade():
+    from radar.scorer import e_noticia_de_resultado as res
+    assert res("Lupa do Bem vence como “dinamizadores” no Prêmio Impactos Positivos")
+    assert res("Superintendente do Instituto Jô Clemente é vencedora de prêmio")
+    # o que NÃO pode ser barrado:
+    assert not res("Globo e Fundação Roberto Marinho lançam Prêmio LED 2026")
+    assert not res("Prêmio X para ONGs: vencedores recebem R$ 50 mil", "Inscrições abertas"), \
+        "convite a se inscrever mencionando vencedores é OPORTUNIDADE"
+    assert not res("Edital social: inscrições vencem em 30 de outubro"), \
+        "'vencem em' é PRAZO, não vitória"
+
+
+def test_app_tira_noticia_de_resultado_que_ja_estava_na_planilha():
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    app = open(os.path.join(raiz, "app.py"), encoding="utf-8").read()
+    assert "e_noticia_de_resultado(o[\"titulo\"], o[\"desc\"])" in app
+
+
 def test_teto_de_paginas_respeitado():
     lote = [{"titulo": f"Chamada {i}", "descricao": "", "url": f"https://w/{i}"}
             for i in range(40)]

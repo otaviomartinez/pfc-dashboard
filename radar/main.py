@@ -160,6 +160,14 @@ def segunda_chance(filtradas: list, maximo: int = MAX_SEGUNDA_CHANCE,
     resgatadas = []
     for op in magros[:maximo]:
         op.update(pontuacao(op))
+        # A página lida pode revelar o que o título escondia: ambiental, fora do
+        # Sudeste, edição encerrada, notícia de quem ganhou. A 1ª versão só
+        # repontuava — e "Floresta+ Amazônia" entrou na fila. Agora o texto novo
+        # passa de novo pelo MESMO crivo do pré-filtro.
+        passa_crivo, motivo_crivo = avaliar_sinal(op)
+        if not passa_crivo:
+            op["motivo"] = f"2ª chance barrada no crivo: {motivo_crivo}; " + op["motivo"]
+            continue
         if (op["score_total"] >= LIMIAR_FILA
                 and op["score_aderencia"] >= LIMIAR_ADERENCIA):
             op["motivo"] = "resgatado na 2ª chance (página lida); " + op["motivo"]
