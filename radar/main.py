@@ -322,11 +322,13 @@ def executar():
 
     _resumo(ancora_ok, generica_ok, brutos, com_sinal, descartados, unicas, filtradas,
             {**ancora_falhas, **generica_falhas}, resultado_desc["n"], destino, stats_enr,
-            stats_alerta, contagens)
+            stats_alerta, contagens,
+            segunda={"magros": magros, "stats": stats_sc, "resgatadas": resgatadas})
 
 
 def _resumo(ancora_ok, generica_ok, brutos, com_sinal, descartados, unicas, filtradas,
-            falhas, n_cand, destino, stats_enr, stats_alerta=None, contagens=None):
+            falhas, n_cand, destino, stats_enr, stats_alerta=None, contagens=None,
+            segunda=None):
     n_com_prazo = sum(1 for o in unicas if isinstance(o.get("dias_restantes"), int))
     n_vencidas = sum(1 for o in unicas
                      if isinstance(o.get("dias_restantes"), int) and o["dias_restantes"] < 0)
@@ -355,8 +357,14 @@ def _resumo(ancora_ok, generica_ok, brutos, com_sinal, descartados, unicas, filt
             print("   VAZIAS (0 itens — checar se o site mudou de layout):")
             for nome in mudas:
                 print(f"      - {nome}")
+    # A 2ª chance chega como parâmetro: esta função é separada de executar(), e
+    # a 1ª versão leu `magros` direto daqui — NameError depois de gravar a fila.
+    segunda = segunda or {}
+    magros = segunda.get("magros") or []
+    resgatadas = segunda.get("resgatadas") or []
+    tentadas = (segunda.get("stats") or {}).get("tentadas", 0)
     print(f"2ª chance: {len(magros)} itens de texto magro · "
-          f"{stats_sc['tentadas']} páginas lidas · {len(resgatadas)} resgatados para a fila")
+          f"{tentadas} páginas lidas · {len(resgatadas)} resgatados para a fila")
     for o in resgatadas[:10]:
         print(f"   + {o.get('fonte', '')[:22]:22} {o.get('titulo', '')[:70]}")
     print(f"Prazos: {n_com_prazo} itens da fila com data-limite detectada"
