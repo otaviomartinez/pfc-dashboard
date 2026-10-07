@@ -84,8 +84,26 @@ _APELIDOS = {"beth": ("elisabeth", "elizabeth", "isabeth"), "rafa": ("rafael",),
              "carlao": ("carlos",)}
 
 
+# Casos CONFERIDOS À MÃO contra o relatório do TRE-SP: o nome parlamentar não
+# tem palavra em comum suficiente com o de urna/civil para a regra automática,
+# mas o documento não deixa dúvida (cargo + número). Só entra aqui quem foi
+# conferido — na dúvida, fica "não encontrado", que é o rótulo honesto.
+CONFERIDOS = {
+    "monica seixas do movimento pretas": ("DEPUTADO ESTADUAL", "50900"),  # MONICA DAS PRETAS · MONICA CRISTINA SEIXAS BONFIM
+    "teonilio barba": ("DEPUTADO ESTADUAL", "13110"),  # BARBA · TEONILIO MONTEIRO DA COSTA
+    "maurici": ("DEPUTADO ESTADUAL", "13011"),         # MARIO MAURICI DE LIMA MORAIS
+}
+
+
 def _tokens(nome: str) -> list[str]:
-    return [t for t in _norm(nome).split() if t not in _TITULOS]
+    return [("junior" if t == "jr" else t) for t in _norm(nome).split() if t not in _TITULOS]
+
+
+def _formas(nome_cand) -> list[str]:
+    """Nome de urna com duas formas ("TELHADINHA - CAPITÃO TELHADA") vale pelas duas."""
+    txt = str(nome_cand or "")
+    partes = [p for p in txt.split(" - ") if p.strip()] if " - " in txt else []
+    return [txt] + partes
 
 
 def _contido_em_ordem(curto: list[str], longo: list[str]) -> bool:
@@ -114,13 +132,17 @@ def _nivel(nome_atual: str, cand: dict) -> int:
     Títulos (Dr., Major, Agente Federal…) não contam como palavra.
     """
     a_txt, a = _norm(nome_atual), _tokens(nome_atual)
-    urna, civil = cand.get("nome_urna"), cand.get("nome")
-    if a_txt and a_txt in (_norm(urna), _norm(civil)):
+    conferido = CONFERIDOS.get(a_txt)
+    if conferido:                              # conferido à mão: só aquele candidato
+        return 3 if (_norm(cand.get("cargo")), str(cand.get("numero"))) == \
+            (_norm(conferido[0]), conferido[1]) else 0
+    nomes = _formas(cand.get("nome_urna")) + [cand.get("nome")]
+    if a_txt and a_txt in {_norm(n) for n in nomes}:
         return 3
     if len(a) < 2:
         return 0                               # uma palavra só: só vale se IGUAL
     melhor = 0
-    for nome_cand in (urna, civil):
+    for nome_cand in nomes:
         b = _tokens(nome_cand)
         if len(b) < 2:
             continue

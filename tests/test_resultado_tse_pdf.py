@@ -93,6 +93,26 @@ def test_titulo_nao_faz_pai_virar_filho():
     assert eleicoes.situacao_2026("Capitão Telhada", "DEPUTADO ESTADUAL", cands)["status"] == "nao_encontrado"
 
 
+def test_urna_com_duas_formas_vale_pelas_duas():
+    """O filho é "TELHADINHA - CAPITÃO TELHADA" na urna — e é ele, não o pai."""
+    cands = [_c("DEPUTADO FEDERAL", "1100", "CORONEL TELHADA", "PAULO ADRIANO LOPES LUCINDA TELHADA"),
+             _c("DEPUTADO ESTADUAL", "11190", "TELHADINHA - CAPITÃO TELHADA", "RAFAEL HENRIQUE CANO TELHADA")]
+    s = eleicoes.situacao_2026("Capitão Telhada", "DEPUTADO ESTADUAL", cands)
+    assert (s["status"], s["numero"]) == ("reeleito", "11190")
+
+
+def test_jr_vale_junior():
+    cands = [_c("DEPUTADO ESTADUAL", "10699", "", "PAULO ALVES CORREA JUNIOR", "Suplente")]
+    assert eleicoes.situacao_2026("Paulo Correa Jr", "DEPUTADO ESTADUAL", cands)["status"] == "nao_eleito"
+
+
+def test_conferido_a_mao_so_casa_com_aquele_numero():
+    cands = [_c("DEPUTADO ESTADUAL", "13110", "BARBA", "TEONILIO MONTEIRO DA COSTA"),
+             _c("DEPUTADO ESTADUAL", "99999", "TEONILIO BARBA", "OUTRA PESSOA")]
+    s = eleicoes.situacao_2026("Teonilio Barba", "DEPUTADO ESTADUAL", cands)
+    assert (s["status"], s["numero"]) == ("reeleito", "13110")
+
+
 def test_igual_vence_parecidos():
     cands = [_c("DEPUTADO ESTADUAL", "1", "RAFAEL SILVA", "RAFAEL DA SILVA"),
              _c("DEPUTADO ESTADUAL", "2", "RAFA", "RAFAEL PEREIRA DA SILVA", "Não eleito")]
