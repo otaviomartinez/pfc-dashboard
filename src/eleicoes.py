@@ -95,8 +95,14 @@ CONFERIDOS = {
 }
 
 
+_PARTICULAS = {"da", "de", "do", "das", "dos", "e"}
+
+
 def _tokens(nome: str) -> list[str]:
-    return [("junior" if t == "jr" else t) for t in _norm(nome).split() if t not in _TITULOS]
+    """Palavras que IDENTIFICAM: sem título e sem partícula ("Delegado Da Cunha"
+    é só "cunha" — uma palavra, que sozinha não basta para afirmar nada)."""
+    return [("junior" if t == "jr" else t) for t in _norm(nome).split()
+            if t not in _TITULOS and t not in _PARTICULAS]
 
 
 def _formas(nome_cand) -> list[str]:
@@ -117,41 +123,57 @@ def _contido_em_ordem(curto: list[str], longo: list[str]) -> bool:
     return i == len(curto)
 
 
-def _nivel(nome_atual: str, cand: dict) -> int:
-    """Força da evidência de que `cand` é a pessoa `nome_atual`. 0 = nenhuma.
+def _mesmo_inicio(a: list[str], b: list[str]) -> bool:
+    return bool(a and b) and (a[0] == b[0] or b[0] in _APELIDOS.get(a[0], ()))
+
+
+def _evidencia(nome_atual: str, cand: dict) -> tuple[int, bool]:
+    """(nível, veio_da_urna). Nível = força da evidência de que `cand` é a
+    pessoa `nome_atual`; 0 = nenhuma.
 
       3  IGUAL, nome INTEIRO com título — ao de urna (vale mesmo com uma palavra
-         só: "Donato" = "DONATO", "Professora Bebel" = "PROFESSORA BEBEL") ou
-         ao civil. NUNCA igual "depois de tirar os títulos": "Capitão Telhada"
-         virava "telhada" = "telhada" de "CORONEL TELHADA" — pai e filho,
-         pessoas diferentes, e o painel diria que o deputado foi para a Câmara;
+         só: "Donato" = "DONATO") ou ao civil. NUNCA igual "depois de tirar os
+         títulos": "Capitão Telhada" virava "telhada" = "telhada" de "CORONEL
+         TELHADA" — pai e filho, pessoas diferentes;
       2  CONTIDO, palavras seguidas, ≥2 palavras ("Agente Federal Danilo Balas"
          x "DANILO BALAS");
       1  CONTIDO EM ORDEM, com palavras a mais no meio, ≥2 palavras ("Edson
          Giriboni" x "EDSON DE OLIVEIRA GIRIBONI"; "Beth" vale "Elisabeth").
-    Títulos (Dr., Major, Agente Federal…) não contam como palavra.
+    Contra o nome CIVIL, os níveis 1 e 2 exigem que ele COMECE pelo mesmo
+    primeiro nome: "Ricardo Salles" não é "JORGE RICARDO SALLES RAMOS" (536
+    votos), nem "Paulo Teixeira" é "LUIZ PAULO TEIXEIRA FERREIRA".
     """
     a_txt, a = _norm(nome_atual), _tokens(nome_atual)
     conferido = CONFERIDOS.get(a_txt)
     if conferido:                              # conferido à mão: só aquele candidato
-        return 3 if (_norm(cand.get("cargo")), str(cand.get("numero"))) == \
-            (_norm(conferido[0]), conferido[1]) else 0
-    nomes = _formas(cand.get("nome_urna")) + [cand.get("nome")]
-    if a_txt and a_txt in {_norm(n) for n in nomes}:
-        return 3
+        ok = (_norm(cand.get("cargo")), str(cand.get("numero"))) == (_norm(conferido[0]), conferido[1])
+        return (3, True) if ok else (0, False)
+    urnas, civil = _formas(cand.get("nome_urna")), cand.get("nome")
+    if a_txt and a_txt in {_norm(n) for n in urnas if n}:
+        return 3, True
+    if a_txt and a_txt == _norm(civil):
+        return 3, False
     if len(a) < 2:
-        return 0                               # uma palavra só: só vale se IGUAL
-    melhor = 0
-    for nome_cand in nomes:
+        return 0, False                        # uma palavra só: só vale se IGUAL
+    melhor, via_urna = 0, False
+    for nome_cand, e_urna in [(u, True) for u in urnas] + [(civil, False)]:
         b = _tokens(nome_cand)
-        if len(b) < 2:
+        if len(b) < 2 or (not e_urna and not _mesmo_inicio(a, b)):
             continue
         curto, longo = (a, b) if len(a) <= len(b) else (b, a)
         if f" {' '.join(curto)} " in f" {' '.join(longo)} ":
-            melhor = max(melhor, 2)
+            n = 2
         elif _contido_em_ordem(curto, longo):
-            melhor = max(melhor, 1)
-    return melhor
+            n = 1
+        else:
+            continue
+        if n > melhor or (n == melhor and e_urna):
+            melhor, via_urna = n, e_urna
+    return melhor, via_urna
+
+
+def _nivel(nome_atual: str, cand: dict) -> int:
+    return _evidencia(nome_atual, cand)[0]
 
 
 def _compativel(nome_atual: str, cand: dict) -> bool:
@@ -171,31 +193,48 @@ def _melhores(nome_atual: str, candidatos: list[dict]) -> list[dict]:
     return list(por_nivel[max(por_nivel)].values()) if por_nivel else []
 
 
+def _resumo_cand(c: dict) -> dict:
+    return {"cargo": c.get("cargo", ""), "numero": c.get("numero", ""),
+            "nome_urna": c.get("nome_urna", ""), "nome": c.get("nome", ""),
+            "votos": c.get("votos", ""), "situacao": c.get("situacao", "")}
+
+
 def situacao_2026(nome_atual: str, cargo_atual: str, candidatos: list[dict]) -> dict:
     """O que a eleição de 2026 decidiu sobre quem está HOJE no cargo.
 
-    Devolve {status, rotulo, cargo_2027, cargo_disputado, partido, votos, numero}.
-    `votos` só existe com o resultado oficial (PDF do TRE-SP); no zip vem vazio. `cargo_atual` é
-    'DEPUTADO ESTADUAL', 'DEPUTADO FEDERAL' ou 'SENADOR'.
+    Devolve {status, rotulo, cargo_2027, cargo_disputado, partido, votos, numero,
+    possiveis}. `votos` só existe com o resultado oficial (PDF do TRE-SP).
+    `cargo_atual` é 'DEPUTADO ESTADUAL', 'DEPUTADO FEDERAL' ou 'SENADOR'.
+
+    Afirmar "não reeleito" exige evidência forte. Um candidato NÃO eleito a
+    OUTRO cargo, achado só pelo nome civil (o relatório não traz o nome de urna
+    de quem não se elegeu), vira "a conferir" — homônimo com 6 mil votos não
+    pode virar "o deputado federal não se elegeu deputado estadual".
+    `possiveis` lista os candidatos que o Fábio deve conferir.
     """
     achados = _melhores(nome_atual, candidatos)
+    possiveis = [_resumo_cand(c) for c in achados[:4]]
     if not achados:
         status, c = "nao_encontrado", {}
     elif len(achados) > 1:
         status, c = "a_conferir", {}
     else:
         c = achados[0]
-        if not eleito(c):
+        mesmo_cargo = _norm(c.get("cargo")) == _norm(cargo_atual)
+        if eleito(c):
+            status = "reeleito" if mesmo_cargo else "eleito_outro_cargo"
+        elif mesmo_cargo or _evidencia(nome_atual, c)[1]:
             status = "nao_eleito"
-        elif _norm(c.get("cargo")) == _norm(cargo_atual):
-            status = "reeleito"
         else:
-            status = "eleito_outro_cargo"
+            status, c = "a_conferir", {}
     return {"status": status, "rotulo": ROTULOS[status],
             "cargo_2027": c.get("cargo", "") if status in ("reeleito", "eleito_outro_cargo") else "",
             "cargo_disputado": c.get("cargo", ""),
             "partido": c.get("sigla") or c.get("partido", ""),
-            "votos": c.get("votos", ""), "numero": c.get("numero", "")}
+            "votos": c.get("votos", ""), "numero": c.get("numero", ""),
+            # a evidência, para a tela mostrar COMO casou (o Fábio confere)
+            "nome_urna": c.get("nome_urna", ""), "nome_civil": c.get("nome", ""),
+            "possiveis": possiveis if status == "a_conferir" else []}
 
 
 def eleitos(candidatos: list[dict], cargo: str) -> list[dict]:

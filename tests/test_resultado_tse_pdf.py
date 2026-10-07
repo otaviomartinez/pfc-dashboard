@@ -128,8 +128,27 @@ def test_nome_civil_com_palavras_no_meio():
 
 
 def test_apelido_explicito():
-    cands = [_c("DEPUTADO FEDERAL", "4", "BETH", "ELISABETH SAHAO", "Não eleito")]
+    cands = [_c("DEPUTADO ESTADUAL", "4", "", "ELISABETH SAHAO", "Suplente")]
     assert eleicoes.situacao_2026("Beth Sahão", "DEPUTADO ESTADUAL", cands)["status"] == "nao_eleito"
+
+
+def test_nome_civil_no_meio_nao_e_a_mesma_pessoa():
+    """'Ricardo Salles' não é 'JORGE RICARDO SALLES RAMOS' (536 votos)."""
+    cands = [_c("DEPUTADO FEDERAL", "7016", "", "JORGE RICARDO SALLES RAMOS", "Não eleito")]
+    assert eleicoes.situacao_2026("Ricardo Salles", "DEPUTADO FEDERAL", cands)["status"] == "nao_encontrado"
+
+
+def test_particula_nao_conta_como_palavra():
+    cands = [_c("DEPUTADO FEDERAL", "4422", "", "CARLOS ALBERTO DA CUNHA", "Suplente")]
+    assert eleicoes.situacao_2026("Delegado Da Cunha", "DEPUTADO FEDERAL", cands)["status"] == "nao_encontrado"
+
+
+def test_nao_eleito_em_outro_cargo_so_pelo_civil_fica_a_conferir():
+    """Homônimo não eleito em OUTRO cargo: mostra o possível, não afirma."""
+    cands = [_c("DEPUTADO ESTADUAL", "44033", "", "MILTON VIEIRA", "Suplente")]
+    s = eleicoes.situacao_2026("Milton Vieira", "DEPUTADO FEDERAL", cands)
+    assert s["status"] == "a_conferir"
+    assert s["possiveis"][0]["numero"] == "44033"
 
 
 def test_troca_de_casa():
