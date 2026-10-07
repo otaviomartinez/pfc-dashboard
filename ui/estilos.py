@@ -51,6 +51,9 @@ ICONES = {
     # documento com linhas: Relatório de Prioridades (os dois painéis reusam)
     "relatorio": ("<path d='M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z'/>"
                   "<path d='M14 3v6h6'/><path d='M8 13h8M8 17h6'/>"),
+    # calendário com visto: Legislatura 2027 (a posse de 1º/fev)
+    "posse": ("<rect x='3' y='5' width='18' height='16' rx='2'/><path d='M3 10h18M8 3v4M16 3v4'/>"
+              "<path d='M9 15.5l2 2 4-4'/>"),
     "bloqueado": ("<rect x='4' y='11' width='16' height='10' rx='2'/>"
                   "<path d='M8 11V7a4 4 0 0 1 8 0v4'/>"),
 }
@@ -2196,5 +2199,112 @@ _PREFEITURAS_CSS = """
 .pf-vazio{text-align:center;padding:30px 18px;color:#7C8698;
   font-family:'Inter',system-ui,sans-serif;font-size:.86rem;background:#13171E;
   border:1px dashed rgba(255,255,255,.10);border-radius:11px}
+</style>
+"""
+
+
+# Legislatura 2027 (aba do painel de Emendas). Prefixo lg- isolado: nada aqui
+# encosta nas outras telas. Mesma técnica de overlay dos cards de Prefeituras.
+_LEG27_CSS = """
+<style>
+.lg-hero{position:relative;overflow:hidden;display:flex;align-items:center;gap:22px;
+  background:linear-gradient(135deg,#1B1830 0%,#161A21 55%,#141821 100%);
+  border:1px solid rgba(139,123,240,.30);border-radius:16px;padding:22px 24px;margin:0 0 14px}
+.lg-hero::before{content:'';position:absolute;right:-60px;top:-80px;width:260px;height:260px;
+  background:radial-gradient(circle,rgba(139,123,240,.30) 0%,rgba(139,123,240,0) 70%);pointer-events:none}
+.lg-hero-l{flex:1;min-width:0;position:relative}
+.lg-kicker{font-family:'JetBrains Mono',monospace;font-size:.66rem;letter-spacing:.12em;
+  text-transform:uppercase;color:#A99CF5;margin-bottom:6px}
+.lg-title{font-family:'Inter',system-ui,sans-serif;font-size:1.55rem;font-weight:760;
+  color:#F5F7FA;line-height:1.2;letter-spacing:-.01em}
+.lg-subt{font-family:'Inter',system-ui,sans-serif;font-size:.84rem;color:#A4AEBF;
+  line-height:1.55;margin-top:8px;max-width:640px}
+.lg-count{position:relative;flex:0 0 auto;text-align:center;background:rgba(14,17,22,.55);
+  border:1px solid rgba(139,123,240,.35);border-radius:14px;padding:12px 18px;min-width:120px}
+.lg-count .n{font-family:'JetBrains Mono',monospace;font-size:2.5rem;font-weight:700;
+  color:#C9C0FF;line-height:1}
+.lg-count .r{font-family:'Inter',system-ui,sans-serif;font-size:.7rem;color:#A4AEBF;
+  text-transform:uppercase;letter-spacing:.08em;margin-top:6px}
+.lg-janelas{display:flex;align-items:stretch;gap:10px;margin:0 0 14px}
+.lg-jan{flex:1;background:#161A21;border:1px solid rgba(255,255,255,.06);border-radius:12px;
+  padding:13px 15px;border-top:3px solid #7C8698}
+.lg-jan.agora{border-top-color:#F0663F}
+.lg-jan.depois{border-top-color:#8B7BF0}
+.lg-jan .k{font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.1em;
+  text-transform:uppercase;color:#7C8698}
+.lg-jan .t{font-family:'Inter',system-ui,sans-serif;font-size:1.02rem;font-weight:700;
+  color:#F5F7FA;margin:3px 0 5px}
+.lg-jan .d{font-family:'Inter',system-ui,sans-serif;font-size:.8rem;line-height:1.5;color:#A4AEBF}
+.lg-jan .d b{color:#F5F7FA}
+.lg-seta{flex:0 0 auto;display:flex;align-items:center;color:#6B7688;font-size:1.2rem}
+.lg-casas{display:flex;gap:10px;margin:0 0 6px}
+.lg-casa{flex:1;background:#161A21;border:1px solid rgba(255,255,255,.06);border-radius:12px;
+  padding:12px 14px;min-width:0}
+.lg-casa .hd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.lg-casa .nm{font-family:'Inter',system-ui,sans-serif;font-weight:700;color:#F5F7FA;font-size:.92rem}
+.lg-casa .tt{font-family:'JetBrains Mono',monospace;font-size:.72rem;color:#7C8698}
+.lg-bar{display:flex;height:9px;border-radius:5px;overflow:hidden;gap:2px;background:#0E1116}
+.lg-bar span{display:block;height:100%}
+.lg-leg{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px;font-family:'Inter',system-ui,sans-serif;
+  font-size:.73rem;color:#A4AEBF}
+.lg-leg i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:middle}
+.lg-leg b{color:#F5F7FA;font-weight:650}
+.lg-nota{font-family:'Inter',system-ui,sans-serif;font-size:.72rem;color:#6B7688;margin:4px 2px 16px}
+.lg-fx{display:flex;align-items:center;gap:9px;margin:18px 0 2px}
+.lg-fx .dot{width:9px;height:9px;border-radius:50%}
+.lg-fx b{font-family:'Inter',system-ui,sans-serif;font-size:.92rem;color:#F5F7FA;font-weight:680}
+.lg-fx .n{font-family:'JetBrains Mono',monospace;font-size:.72rem;color:#7C8698;
+  background:#1C222B;border-radius:6px;padding:1px 7px}
+.lg-fx-d{font-family:'Inter',system-ui,sans-serif;font-size:.76rem;color:#7C8698;margin:0 0 9px 18px}
+.lg-cell{display:flex;align-items:center;gap:14px;background:#161A21;
+  border:1px solid rgba(255,255,255,.06);border-left:3px solid #8B7BF0;border-radius:11px;
+  padding:11px 15px}
+.lg-nomecol{flex:1;min-width:0}
+.lg-nome{font-family:'Inter',system-ui,sans-serif;font-weight:650;font-size:.96rem;color:#F5F7FA}
+.lg-sub{font-family:'Inter',system-ui,sans-serif;font-size:.75rem;color:#7C8698;margin-top:2px}
+.lg-gch{font-family:'Inter',system-ui,sans-serif;font-size:.8rem;color:#C9D2DF;margin-top:5px;
+  line-height:1.45}
+.lg-scol{flex:0 0 92px;text-align:right}
+.lg-score{font-family:'JetBrains Mono',monospace;font-size:1.35rem;font-weight:700;line-height:1}
+.lg-votos{font-family:'JetBrains Mono',monospace;font-size:.95rem;font-weight:700;color:#C6CEDA}
+.lg-selo{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:.58rem;
+  letter-spacing:.07em;text-transform:uppercase;padding:2px 7px;border-radius:5px;
+  margin-right:7px;vertical-align:middle}
+.lg-crm{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:.56rem;
+  letter-spacing:.07em;padding:2px 6px;border-radius:5px;margin-left:7px;vertical-align:middle;
+  color:#4ADE80;background:rgba(74,222,128,.10);border:1px solid rgba(74,222,128,.25)}
+.lg-gancho{background:linear-gradient(180deg,#1B1830 0%,#161A21 100%);
+  border:1px solid rgba(139,123,240,.30);border-left:3px solid #8B7BF0;border-radius:11px;
+  padding:13px 16px;margin-bottom:12px}
+.lg-gancho .k{font-family:'JetBrains Mono',monospace;font-size:.63rem;letter-spacing:.09em;
+  text-transform:uppercase;color:#A99CF5;margin-bottom:5px}
+.lg-gancho .t{font-family:'Inter',system-ui,sans-serif;font-size:.9rem;line-height:1.55;color:#EAF0F6}
+.lg-bloco{background:#161A21;border:1px solid rgba(255,255,255,.06);border-radius:11px;
+  padding:14px 16px;margin-bottom:12px}
+.lg-bloco h4{font-family:'Inter',system-ui,sans-serif;font-size:.78rem;font-weight:660;
+  color:#A99CF5;text-transform:uppercase;letter-spacing:.07em;margin:0 0 10px}
+.lg-linha{display:flex;justify-content:space-between;gap:12px;padding:5px 0;
+  border-bottom:1px solid rgba(255,255,255,.04);font-family:'Inter',system-ui,sans-serif;font-size:.84rem}
+.lg-linha:last-child{border-bottom:none}
+.lg-linha .k{color:#7C8698}
+.lg-linha .v{color:#E6EBF2;text-align:right;font-weight:560;word-break:break-word}
+.lg-vazio{text-align:center;padding:26px 18px;color:#7C8698;font-family:'Inter',system-ui,sans-serif;
+  font-size:.86rem;background:#13171E;border:1px dashed rgba(255,255,255,.10);border-radius:11px}
+[class*="st-key-lgrow_"]{position:relative;margin-bottom:-8px}
+[class*="st-key-lgrow_"] .lg-cell{cursor:pointer}
+[class*="st-key-lgrow_"] [class*="st-key-lg_"]{position:absolute;inset:0;z-index:4;margin:0;padding:0}
+[class*="st-key-lgrow_"] [class*="st-key-lg_"] .stButton,
+[class*="st-key-lgrow_"] [class*="st-key-lg_"] button{height:100%;width:100%;min-height:0;
+  border:none;background:transparent;box-shadow:none}
+[class*="st-key-lgrow_"] [class*="st-key-lg_"] button{opacity:0;cursor:pointer}
+[class*="st-key-lgrow_"]:hover .lg-cell{background:#1A1F27;border-color:rgba(139,123,240,.40)}
+@media (max-width:640px){
+  .lg-hero{flex-direction:column;align-items:flex-start;padding:18px}
+  .lg-title{font-size:1.25rem}
+  .lg-count{align-self:stretch;display:flex;align-items:baseline;gap:10px;justify-content:center}
+  .lg-janelas,.lg-casas{flex-direction:column}
+  .lg-seta{transform:rotate(90deg);justify-content:center}
+  .lg-scol{flex:0 0 64px}
+}
 </style>
 """
