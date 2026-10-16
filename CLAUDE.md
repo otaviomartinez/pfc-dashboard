@@ -190,6 +190,17 @@ pago) e o federal (`emendas_federais_score_execucao.csv`, empenhado × pago).
   2028 pela bancada eleita, no 2º semestre de 2027.
 - Na Câmara, "reeleito"/"fora da lista atual" é relativo aos 64 do levantamento
   federal (a tela diz isso). Novo não tem contato: a Casa publica após a posse.
+- **Score de SENADOR** (`src/score_senador.py`, aparece no Senado da aba e no
+  dossiê): 0-100 = território 40 (fatia dos votos dele nas cidades do PFC +
+  vizinhas ÷ fatia delas no estado; razão 1,0 = 20 pts, teto no dobro) +
+  histórico 35 (score do cargo anterior, NÃO recalculado) + afinidade 25 (coluna
+  "Aderência PFC (0-100)" da aba Senadores, nota do Fábio). Parte sem dado NÃO
+  vale zero: sai da conta e o score é sobre os pontos medidos ("parcial"). Só há
+  número com o território medido + mais uma parte; senão "a completar" com o que
+  falta. Território precisa de `scripts/importar_votacao_municipio_2026.py <zip>`
+  (TSE → Resultados 2026 → "Votação nominal por município e zona", baixado no
+  navegador) → `data/eleicoes/votacao_senador_municipio_2026.csv`. Hoje (sem o
+  zip e sem nota) os dois eleitos estão "a completar".
 - **Pendente:** "Puxar para o CRM" um eleito novo (não fiz de propósito: o CRM
   hoje é da bancada atual — conversar antes); PDF da aba; selo de situação 2026
   nos dossiês das outras telas. Senadores: os 2 eleitos em 2018 saem em
