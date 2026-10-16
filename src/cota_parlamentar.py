@@ -34,10 +34,16 @@ PRESENCA = "presenca"
 ESCRITORIO = "escritorio"
 # Mínimo de notas para dizer "frequenta" (uma nota só pode ser passagem).
 MIN_FREQUENTA = 3
+# Peso de uma nota numa cidade VIZINHA na ordem da lista: o mesmo fator de
+# vizinhança do ranking de emendas (config/pfc_municipios.toml). Sem isso,
+# Sorocaba — vizinha no config, mas a cidade do campus — sumia da ordem:
+# Vitor Lippi, com 153 notas na região, aparecia em 10º.
+PESO_VIZINHA = 0.45
 
 CLASSES = {
     "frequenta_pfc": "Frequenta cidades do PFC",
-    "passa_regiao": "Passa pela região",
+    "frequenta_vizinhas": "Frequenta cidades vizinhas",
+    "passa_regiao": "Passou pela região",
     "sem_registro": "Sem registro na região",
 }
 
@@ -87,15 +93,29 @@ def territorio_padrao() -> tuple[set, set]:
     return pfc, {norm_municipio(m) for m in viz} - pfc
 
 
-def montar_mapa(linhas: list[dict], pfc: set, vizinhas: set) -> list[dict]:
+def nomes_oficiais() -> dict:
+    """{municipio_norm: nome oficial do IBGE} — o cadastro de CNPJ grava a cidade
+    em maiúscula e sem acento ('SAO ROQUE'); a tela mostra 'São Roque'."""
+    try:
+        with open(os.path.join(BASE, "data", "ibge_regioes_imediatas_sp.csv"),
+                  encoding="utf-8-sig", newline="") as f:
+            return {norm_municipio(r["municipio"]): r["municipio"] for r in csv.DictReader(f)}
+    except (FileNotFoundError, OSError, KeyError):
+        return {}
+
+
+def montar_mapa(linhas: list[dict], pfc: set, vizinhas: set,
+                nomes: dict | None = None) -> list[dict]:
     """Um registro por deputado, do que mais circula no território ao que menos.
 
     Cada um: {deputado_id, deputado, partido, notas_pfc, notas_vizinhas,
     notas_sp, cidades_pfc [(cidade, notas, ultima)], cidades_vizinhas,
     ultima_regiao, escritorio [(cidade, notas)], classe, classe_rotulo}.
     A ordem usa NOTAS (contagem), não valor: um jantar caro não é mais
-    presença que três abastecimentos.
+    presença que três abastecimentos. Dentro da classe, a nota numa vizinha
+    vale PESO_VIZINHA de uma nota numa cidade do PFC.
     """
+    nomes = nomes if nomes is not None else nomes_oficiais()
     por_dep: dict[str, dict] = {}
     for r in linhas:
         did = str(r.get("deputado_id") or r.get("deputado")).strip()
@@ -105,7 +125,8 @@ def montar_mapa(linhas: list[dict], pfc: set, vizinhas: set) -> list[dict]:
             "deputado_id": did, "deputado": r.get("deputado", ""), "partido": r.get("partido", ""),
             "notas_pfc": 0, "notas_vizinhas": 0, "notas_sp": 0, "_pfc": {}, "_viz": {},
             "_esc": {}, "ultima_regiao": ""})
-        mun, cidade = norm_municipio(r.get("municipio")), r.get("municipio", "")
+        mun = norm_municipio(r.get("municipio"))
+        cidade = nomes.get(mun) or str(r.get("municipio", "")).title()
         n, ultima = _int(r.get("notas")), str(r.get("ultima_data", ""))[:10]
         if r.get("grupo") == ESCRITORIO:
             if str(r.get("uf", "SP")).upper() == "SP":
@@ -131,14 +152,18 @@ def montar_mapa(linhas: list[dict], pfc: set, vizinhas: set) -> list[dict]:
         d["escritorio"] = sorted(d.pop("_esc").items(), key=lambda x: (-x[1], x[0]))
         if d["notas_pfc"] >= MIN_FREQUENTA:
             d["classe"] = "frequenta_pfc"
-        elif d["notas_pfc"] or d["notas_vizinhas"] >= MIN_FREQUENTA:
+        elif d["notas_vizinhas"] >= MIN_FREQUENTA:
+            d["classe"] = "frequenta_vizinhas"
+        elif d["notas_pfc"] or d["notas_vizinhas"]:
             d["classe"] = "passa_regiao"
         else:
             d["classe"] = "sem_registro"
+        d["presenca"] = round(d["notas_pfc"] + PESO_VIZINHA * d["notas_vizinhas"], 1)
+        d["notas_regiao"] = d["notas_pfc"] + d["notas_vizinhas"]
         d["classe_rotulo"] = CLASSES[d["classe"]]
         saida.append(d)
     ordem = list(CLASSES)
-    saida.sort(key=lambda d: (ordem.index(d["classe"]), -d["notas_pfc"], -d["notas_vizinhas"],
+    saida.sort(key=lambda d: (ordem.index(d["classe"]), -d["presenca"], -d["notas_pfc"],
                               d["deputado"]))
     return saida
 
