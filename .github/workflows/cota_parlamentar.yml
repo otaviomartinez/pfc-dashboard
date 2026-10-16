@@ -1,0 +1,74 @@
+name: Mapa da cota parlamentar
+
+# Por que isto existe: o site da Câmara é bloqueado no ambiente do assistente,
+# mas AQUI a internet é livre. A coleta baixa os gastos da cota parlamentar dos
+# deputados federais de SP, descobre a cidade de cada fornecedor (combustível,
+# alimentação, hospedagem) e commita o resultado de volta — a tela "Presença
+# regional" do painel de Emendas lê esses CSVs.
+#
+# Mensal: a Câmara publica com atraso (até 90 dias para apresentar a nota).
+# São milhares de CNPJs; o que não der tempo fica no cache para a próxima rodada.
+on:
+  workflow_dispatch:
+    inputs:
+      anos:
+        description: "Anos (ex.: 2025 2026). Vazio = ano atual e anterior"
+        required: false
+        default: ""
+      minutos:
+        description: "Teto de tempo para consultar CNPJs (minutos)"
+        required: false
+        default: "40"
+  schedule:
+    - cron: "0 9 5 * *"   # 06:00 Brasília, dia 5 de cada mês
+
+permissions:
+  contents: write                # precisa para commitar os CSVs de volta
+
+jobs:
+  cota:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Só biblioteca padrão: nada a instalar.
+      - name: Coletar a cota e descobrir as cidades
+        id: cota
+        continue-on-error: true
+        run: python scripts/importar_cota_parlamentar.py ${{ github.event.inputs.anos }} --minutos ${{ github.event.inputs.minutos || '40' }}
+
+      - name: Conferir o que foi gerado
+        run: |
+          echo "### Arquivos em data/cota/" >> $GITHUB_STEP_SUMMARY
+          if [ -d data/cota ]; then
+            for f in data/cota/*.csv; do
+              echo "- \`$(basename "$f")\` — $(($(wc -l < "$f") - 1)) linha(s)" >> $GITHUB_STEP_SUMMARY
+            done
+            echo "" >> $GITHUB_STEP_SUMMARY
+            [ -f data/cota/coleta_resumo.csv ] && sed 's/^/    /' data/cota/coleta_resumo.csv >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- nada gerado" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "Coleta: ${{ steps.cota.outcome }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Commitar os CSVs
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/cota/ 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "Nada mudou — nenhum commit."
+          else
+            git commit -m "dados: atualiza o mapa da cota parlamentar (federais de SP)"
+            git pull --rebase origin ${{ github.ref_name }} || true
+            git push origin HEAD:${{ github.ref_name }}
+          fi
