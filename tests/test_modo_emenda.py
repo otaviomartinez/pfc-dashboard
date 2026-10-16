@@ -18,6 +18,7 @@ from ui.formato import _modo_emenda  # noqa: E402
 ESPERADO = {
     "Visão geral": "visao",
     "Legislatura 2027": "legislatura",
+    "Presença regional": "presenca",
     "Territórios em Aberto": "orfaos",
     "Funil de negociação": "funil",
     "Relatório": "relatorio",

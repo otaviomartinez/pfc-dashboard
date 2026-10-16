@@ -704,11 +704,13 @@ def dlg_em_articulacao(lista):
 # Federal/Senador) vive no segmented control de CONTEÚDO (emenda_escopo_filtro),
 # não na sidebar (Passo 8). A lista "quem abordar" (ex-aba "Descobrir") foi fundida
 # na Visão geral (aparece abaixo da capa, no mesmo escopo).
-EMENDA_PAGES = ["Visão geral", "Legislatura 2027", "Territórios em Aberto", "Prefeituras",
+EMENDA_PAGES = ["Visão geral", "Legislatura 2027", "Territórios em Aberto", "Presença regional",
+                "Prefeituras",
                 "Funil de negociação", "Relatório", "Metodologia"]
 # chave do botão -> ícone (a chave vira a classe st-key-<chave> que o CSS usa)
 EMENDA_ICONES = {"emnav_visao-geral": "visao-geral",
                  "emnav_legislatura-2027": "posse",
+                 "emnav_presenca-regional": "rota",
                  "emnav_territorios-em-aberto": "local",
                  "emnav_prefeituras": "prefeitura",
                  "emnav_funil-de-negociacao": "funil-negociacao",
@@ -723,6 +725,7 @@ EMENDA_ROTULOS = {**{f"emnav_{slug(p)}": p for p in EMENDA_PAGES},
 # ponto de entrada e ganha um realce permanente (ver _EMENDA_REALCE_CSS).
 EMENDA_CORES = {"emnav_visao-geral": "#8B7BF0",
                 "emnav_legislatura-2027": "#5B9BD5",
+                "emnav_presenca-regional": "#38BDF8",
                 "emnav_territorios-em-aberto": "#4ADE80",
                 "emnav_prefeituras": "#4FA8A0",
                 "emnav_funil-de-negociacao": "#E8B54A", "emnav_relatorio": "#EC6A8C",
@@ -2517,6 +2520,7 @@ def render_emendas():
               "Territórios em Aberto": "Oportunidade de captação · sem emenda edu/social",
               "Prefeituras": "Quem recebe a emenda e assina o convênio",
               "Legislatura 2027": "A bancada eleita em 2026 · quem procurar e em que ordem",
+              "Presença regional": "Onde os deputados federais circulam · cota parlamentar",
               "Funil de negociação": "Negociações por temperatura",
               "Relatório": "Relatório de Prioridades · quem abordar",
               "Metodologia": "Como o Score de Emendas é calculado"}.get(emenda_page, "")
@@ -2548,6 +2552,10 @@ def render_emendas():
     # Legislatura 2027: a bancada eleita em 2026 x o histórico de emendas (só leitura).
     if modo == "legislatura":
         render_legislatura_2027()
+        return
+    # Presença regional: onde os federais circulam (cota parlamentar), só leitura.
+    if modo == "presenca":
+        render_presenca_regional()
         return
     # Metodologia: como o Score de Emendas é calculado (documentação da régua real).
     if modo == "metodologia":
@@ -2606,27 +2614,7 @@ def _dados_legislatura() -> dict:
     """Legislatura 2027 montada. Nunca levanta: sem arquivo -> {} e a tela explica."""
     try:
         from src import legislatura2027 as _L
-        return _L.montar(**_L.carregar_fontes(), afinidade_senado=_afinidade_senadores())
-    except Exception:
-        return {}
-
-
-def _afinidade_senadores() -> dict:
-    """{nome_norm: nota 0-100} da coluna "Aderência PFC (0-100)" da aba Senadores
-    (a nota do Fábio, parte "afinidade" do score de senador). Célula vazia NÃO
-    vira zero: fica de fora, e a parte aparece como "sem dado"."""
-    try:
-        from src.eleicoes import _norm as _n
-        df = dados.carregar_senadores()
-        saida = {}
-        for _, r in df.iterrows():
-            nome, nota = str(r.get("Senador", "")).strip(), str(r.get("Aderência PFC (0-100)", "")).strip()
-            if nome and nota:
-                try:
-                    saida[_n(nome)] = float(nota.replace(",", "."))
-                except ValueError:
-                    continue
-        return saida
+        return _L.montar(**_L.carregar_fontes())
     except Exception:
         return {}
 
@@ -2683,7 +2671,7 @@ def _lg_card(p: dict, idx: str, no_crm: bool) -> None:
         direita = (f'<div class="lg-score" style="color:{_cor_score(ss["score"])}">{ss["score"]}</div>'
                    f'<div class="lg-sub">score senador{" · parcial" if ss["status"] == "parcial" else ""}</div>')
     elif ss:
-        direita = ('<div class="lg-votos" style="font-size:.8rem">a completar</div>'
+        direita = ('<div class="lg-votos" style="font-size:.8rem">sem dado</div>'
                    '<div class="lg-sub">score senador</div>')
     elif h:
         direita = (f'<div class="lg-score" style="color:{_cor_score(h["score"])}">{round(h["score"])}</div>'
@@ -2875,10 +2863,10 @@ def dlg_legislatura(p: dict, no_crm: bool = False) -> None:
                     + '</div>', unsafe_allow_html=True)
         for x in ss["partes"]:
             st.caption(f'**{x["rotulo"]}:** {x["texto"]}')
-        st.caption("Parte sem dado não vale zero: fica de fora. Só há número com o território "
-                   "medido e mais uma parte. Como é calculado: território 40 (votos nas cidades "
-                   "do PFC e vizinhas x peso delas no estado) · histórico 35 (score do cargo "
-                   "anterior, não recalculado) · afinidade 25 (nota do Fábio).")
+        st.caption("Como é calculado, só com dado público: território 50 (votos nas cidades "
+                   "do PFC e vizinhas x peso delas no estado) + histórico 50 (score do cargo "
+                   "anterior, não recalculado). Parte sem dado não vale zero: fica de fora, e o "
+                   "score sai \"parcial\", calculado sobre a parte medida.")
     if h:
         if h["fonte"] == "estadual":
             hl = [("Score do levantamento", f"{round(h['score'])} (não recalculado)"),
@@ -2916,6 +2904,188 @@ def dlg_legislatura(p: dict, no_crm: bool = False) -> None:
         st.caption("Contato de gabinete: a Casa publica depois da posse (1º/fev/2027). "
                    "O painel não tem — e não inventa — contato pessoal.")
     st.caption("Fonte: relatórios oficiais do TRE-SP · sujeito a modificações até a diplomação.")
+
+
+# =========================================================================== #
+# PRESENÇA REGIONAL — onde os deputados federais de SP circulam (cota parlamentar)
+# ---------------------------------------------------------------------------
+# Só leitura. Os dados vêm do workflow "Mapa da cota parlamentar" (o site da
+# Câmara é bloqueado no ambiente do assistente); a lógica está em
+# src/cota_parlamentar.py, pura e testada. É SINAL DE CIRCULAÇÃO (combustível,
+# alimentação, hospedagem pagos pela cota), não agenda — a tela diz isso.
+# =========================================================================== #
+
+PR_CLASSE_COR = {"frequenta_pfc": "#4ADE80", "passa_regiao": "#E8B54A", "sem_registro": "#7C8698"}
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _dados_presenca() -> tuple:
+    """(mapa por deputado, resumo da coleta). Sem arquivo -> ([], {})."""
+    try:
+        from src import cota_parlamentar as _C
+        pfc, viz = _C.territorio_padrao()
+        return _C.montar_mapa(_C.carregar(), pfc, viz), _C.carregar_resumo()
+    except Exception:
+        return [], {}
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _situacao_2026_federais(nomes: tuple) -> dict:
+    """{nome: rótulo curto da eleição de 2026} — só para o selo do card."""
+    try:
+        from src import eleicoes as _E
+        cands = _E.carregar()
+        curto = {"reeleito": "reeleito em 2026", "eleito_outro_cargo": "eleito p/ outro cargo",
+                 "nao_eleito": "não reeleito · mandato até 31/jan"}
+        saida = {}
+        for n in nomes:
+            s = _E.situacao_2026(n, "DEPUTADO FEDERAL", cands)
+            if s["status"] in curto:
+                saida[n] = curto[s["status"]] + (f' ({s["cargo_2027"].title()})'
+                                                  if s["status"] == "eleito_outro_cargo" else "")
+        return saida
+    except Exception:
+        return {}
+
+
+def _pr_cidades_txt(cidades: list, limite: int = 3) -> str:
+    partes = [f"{c.title()} · {n} nota{'s' if n != 1 else ''}" for c, n, _ in cidades[:limite]]
+    if len(cidades) > limite:
+        partes.append(f"+{len(cidades) - limite} cidade(s)")
+    return " · ".join(partes) if partes else ""
+
+
+def _pr_card(d: dict, idx: int, situacao: str, no_crm: bool) -> None:
+    from src.cota_parlamentar import data_br
+    cor = PR_CLASSE_COR.get(d["classe"], "#7C8698")
+    linha_pfc = _pr_cidades_txt(d["cidades_pfc"])
+    linha_viz = _pr_cidades_txt(d["cidades_vizinhas"], 2)
+    detalhe = " | ".join(x for x in (linha_pfc and f"PFC: {linha_pfc}",
+                                      linha_viz and f"vizinhas: {linha_viz}") if x) \
+        or "nenhuma nota nas cidades do PFC ou vizinhas"
+    sub = " · ".join(x for x in (d.get("partido"), situacao,
+                                  d["ultima_regiao"] and f"última na região {data_br(d['ultima_regiao'])}") if x)
+    with st.container(key=f"lgrow_pr_{idx}"):
+        st.markdown(
+            f'<div class="lg-cell" style="border-left-color:{cor}">'
+            f'<div class="lg-nomecol"><div class="lg-nome">{_lg_selo(d["classe_rotulo"], cor)}'
+            f'{esc(d["deputado"].title())}'
+            + ('<span class="lg-crm">NO CRM</span>' if no_crm else "")
+            + f'</div><div class="lg-sub">{esc(sub)}</div>'
+            f'<div class="lg-gch">{esc(detalhe)}</div></div>'
+            f'<div class="lg-scol"><div class="lg-score" style="color:{cor}">{d["notas_pfc"]}</div>'
+            '<div class="lg-sub">notas no PFC</div></div></div>', unsafe_allow_html=True)
+        if st.button(f"Abrir presença de {d['deputado']}", key=f"lg_pr_{idx}", use_container_width=True):
+            dlg_presenca(d, situacao, no_crm)
+
+
+@st.dialog("Presença regional", width="large")
+def dlg_presenca(d: dict, situacao: str = "", no_crm: bool = False) -> None:
+    from src.cota_parlamentar import data_br
+    st.markdown(_LEG27_CSS, unsafe_allow_html=True)
+    breadcrumb("Emendas", "Presença regional", d["deputado"].title())
+    st.markdown(f"### {esc(d['deputado'].title())}")
+    st.caption(" · ".join(x for x in (d.get("partido"), "Deputado federal (SP)", situacao,
+                                       "já está no CRM" if no_crm else "") if x))
+    st.markdown(
+        f'<div class="lg-gancho"><div class="k">{esc(d["classe_rotulo"])}</div>'
+        f'<div class="t">{d["notas_pfc"]} nota(s) nas cidades do PFC e {d["notas_vizinhas"]} nas '
+        f'vizinhas, de {d["notas_sp"]} em SP com cidade identificada. '
+        + (f'Última na região em {data_br(d["ultima_regiao"])}.' if d["ultima_regiao"] else "")
+        + '</div></div>', unsafe_allow_html=True)
+    for titulo, cidades in (("Cidades do PFC", d["cidades_pfc"]),
+                            ("Cidades vizinhas (mesma Região Imediata)", d["cidades_vizinhas"])):
+        if cidades:
+            st.markdown(f'<div class="lg-bloco"><h4>{esc(titulo)}</h4>'
+                        + "".join(f'<div class="lg-linha"><span class="k">{esc(c.title())}</span>'
+                                  f'<span class="v">{n} nota(s) · última {esc(data_br(u))}</span></div>'
+                                  for c, n, u in cidades)
+                        + '</div>', unsafe_allow_html=True)
+    if d["escritorio"]:
+        st.markdown('<div class="lg-bloco"><h4>Fornecedores do escritório de apoio</h4>'
+                    + "".join(f'<div class="lg-linha"><span class="k">{esc(c.title())}</span>'
+                              f'<span class="v">{n} nota(s)</span></div>' for c, n in d["escritorio"][:6])
+                    + '</div>', unsafe_allow_html=True)
+        st.caption("Cidade do FORNECEDOR, não endereço do escritório: conta de luz ou telefone "
+                   "vem da sede da empresa. Indício, não prova.")
+    if str(d.get("deputado_id", "")).isdigit():
+        st.markdown(f"[Página oficial na Câmara](https://www.camara.leg.br/deputados/{d['deputado_id']})")
+    st.caption("Sinal de circulação: notas de combustível, alimentação e hospedagem pagas pela "
+               "cota parlamentar. Não é agenda — a Câmara publica com até 90 dias de atraso. "
+               "Para saber quando ele estará na região, pergunte ao gabinete.")
+
+
+def render_presenca_regional() -> None:
+    from src.cota_parlamentar import data_br, por_cidade
+    st.markdown(_LEG27_CSS, unsafe_allow_html=True)
+    st.markdown(
+        '<div class="pf-aviso" style="background:rgba(56,189,248,.07);border-color:rgba(56,189,248,.28);'
+        'border-left-color:#38BDF8"><div><p class="pf-tag" style="color:#38BDF8">Como ler esta tela</p>'
+        '<p>Quais deputados federais de SP <b>circulam</b> pelas cidades do PFC e vizinhas, pelas '
+        'notas de combustível, alimentação e hospedagem pagas pela cota parlamentar. É sinal de '
+        'circulação, <b>não agenda</b>: a Câmara publica com até 90 dias de atraso. Sem registro '
+        'não quer dizer que ele nunca veio.</p></div></div>', unsafe_allow_html=True)
+    mapa, resumo = _dados_presenca()
+    if not mapa:
+        st.markdown(
+            '<div class="lg-vazio">O mapa ainda não foi coletado.<br>No GitHub: <b>Actions → '
+            '"Mapa da cota parlamentar" → Run workflow</b>. Ele roda sozinho todo dia 5.</div>',
+            unsafe_allow_html=True)
+        return
+    try:
+        notas, com = int(resumo.get("notas", 0)), int(resumo.get("notas_com_cidade", 0))
+    except ValueError:
+        notas = com = 0
+    cobertura = round(100 * com / notas) if notas else 0
+    st.caption(f"Notas de {data_br(resumo.get('periodo_inicio', ''))} a "
+               f"{data_br(resumo.get('periodo_fim', ''))} · coletado em "
+               f"{data_br(resumo.get('gerado_em', ''))} · {cobertura}% das notas com cidade "
+               "identificada" + (" — coleta em andamento, o resto entra nas próximas rodadas"
+                                 if cobertura < 90 else ""))
+    n = {k: sum(1 for d in mapa if d["classe"] == k) for k in PR_CLASSE_COR}
+    st.markdown(
+        '<div class="pf-placar">'
+        f'<div class="pf-kpi"><div class="n" style="color:#4ADE80">{n["frequenta_pfc"]}</div>'
+        '<div class="r">frequentam cidades do PFC</div></div>'
+        f'<div class="pf-kpi"><div class="n" style="color:#E8B54A">{n["passa_regiao"]}</div>'
+        '<div class="r">passam pela região</div></div>'
+        f'<div class="pf-kpi"><div class="n" style="color:#7C8698">{n["sem_registro"]}</div>'
+        '<div class="r">sem registro na região</div></div></div>'
+        f'<div class="lg-leg" style="margin:-6px 0 12px"><span><i style="background:#4ADE80"></i>'
+        f'3+ notas em cidades do PFC</span><span><i style="background:#E8B54A"></i>alguma nota no PFC '
+        'ou 3+ nas vizinhas</span><span><i style="background:#7C8698"></i>nenhum registro</span></div>',
+        unsafe_allow_html=True)
+
+    st.session_state.setdefault("pr_visao", "Por deputado")
+    visao = st.segmented_control("Visão", options=["Por deputado", "Por cidade do PFC"],
+                                 key="pr_visao", label_visibility="collapsed") or "Por deputado"
+    crm = _lg_nomes_crm()
+    situ = _situacao_2026_federais(tuple(d["deputado"] for d in mapa))
+    from src.eleicoes import _norm as _n
+
+    if visao == "Por cidade do PFC":
+        viz = st.checkbox("Incluir as cidades vizinhas", key="pr_viz")
+        cidades = por_cidade(mapa, incluir_vizinhas=viz)
+        if not cidades:
+            st.markdown('<div class="lg-vazio">Nenhuma nota nas cidades do território.</div>',
+                        unsafe_allow_html=True)
+        for c in cidades:
+            nomes = " · ".join(f"{dep.title()} ({n_} · {data_br(u)})" for dep, n_, u, _ in c["deputados"][:8])
+            extra = f" · +{len(c['deputados']) - 8}" if len(c["deputados"]) > 8 else ""
+            st.markdown(
+                f'<div class="lg-bloco"><h4>{esc(c["cidade"].title())} · {c["total_notas"]} nota(s) · '
+                f'{len(c["deputados"])} deputado(s)</h4><div class="lg-gch">{esc(nomes + extra)}</div></div>',
+                unsafe_allow_html=True)
+        st.caption("Entre parênteses: número de notas e a data da última.")
+        return
+
+    ativos = [d for d in mapa if d["classe"] != "sem_registro"]
+    for i, d in enumerate(ativos):
+        _pr_card(d, i, situ.get(d["deputado"], ""), _n(d["deputado"]) in crm)
+    sem = [d for d in mapa if d["classe"] == "sem_registro"]
+    if sem:
+        with st.expander(f"{len(sem)} deputado(s) sem registro na região"):
+            st.caption(", ".join(d["deputado"].title() for d in sem))
 
 
 # =========================================================================== #

@@ -54,6 +54,9 @@ ICONES = {
     # calendário com visto: Legislatura 2027 (a posse de 1º/fev)
     "posse": ("<rect x='3' y='5' width='18' height='16' rx='2'/><path d='M3 10h18M8 3v4M16 3v4'/>"
               "<path d='M9 15.5l2 2 4-4'/>"),
+    # rota com dois pontos: Presença regional (por onde o deputado circula)
+    "rota": ("<circle cx='6' cy='19' r='2.5'/><circle cx='18' cy='5' r='2.5'/>"
+             "<path d='M8.5 19H15a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h6.5'/>"),
     "bloqueado": ("<rect x='4' y='11' width='16' height='10' rx='2'/>"
                   "<path d='M8 11V7a4 4 0 0 1 8 0v4'/>"),
 }
