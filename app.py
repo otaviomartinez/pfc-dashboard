@@ -2614,27 +2614,7 @@ def _dados_legislatura() -> dict:
     """Legislatura 2027 montada. Nunca levanta: sem arquivo -> {} e a tela explica."""
     try:
         from src import legislatura2027 as _L
-        return _L.montar(**_L.carregar_fontes(), afinidade_senado=_afinidade_senadores())
-    except Exception:
-        return {}
-
-
-def _afinidade_senadores() -> dict:
-    """{nome_norm: nota 0-100} da coluna "Aderência PFC (0-100)" da aba Senadores
-    (a nota do Fábio, parte "afinidade" do score de senador). Célula vazia NÃO
-    vira zero: fica de fora, e a parte aparece como "sem dado"."""
-    try:
-        from src.eleicoes import _norm as _n
-        df = dados.carregar_senadores()
-        saida = {}
-        for _, r in df.iterrows():
-            nome, nota = str(r.get("Senador", "")).strip(), str(r.get("Aderência PFC (0-100)", "")).strip()
-            if nome and nota:
-                try:
-                    saida[_n(nome)] = float(nota.replace(",", "."))
-                except ValueError:
-                    continue
-        return saida
+        return _L.montar(**_L.carregar_fontes())
     except Exception:
         return {}
 
@@ -2691,7 +2671,7 @@ def _lg_card(p: dict, idx: str, no_crm: bool) -> None:
         direita = (f'<div class="lg-score" style="color:{_cor_score(ss["score"])}">{ss["score"]}</div>'
                    f'<div class="lg-sub">score senador{" · parcial" if ss["status"] == "parcial" else ""}</div>')
     elif ss:
-        direita = ('<div class="lg-votos" style="font-size:.8rem">a completar</div>'
+        direita = ('<div class="lg-votos" style="font-size:.8rem">sem dado</div>'
                    '<div class="lg-sub">score senador</div>')
     elif h:
         direita = (f'<div class="lg-score" style="color:{_cor_score(h["score"])}">{round(h["score"])}</div>'
@@ -2883,10 +2863,10 @@ def dlg_legislatura(p: dict, no_crm: bool = False) -> None:
                     + '</div>', unsafe_allow_html=True)
         for x in ss["partes"]:
             st.caption(f'**{x["rotulo"]}:** {x["texto"]}')
-        st.caption("Parte sem dado não vale zero: fica de fora. Só há número com o território "
-                   "medido e mais uma parte. Como é calculado: território 40 (votos nas cidades "
-                   "do PFC e vizinhas x peso delas no estado) · histórico 35 (score do cargo "
-                   "anterior, não recalculado) · afinidade 25 (nota do Fábio).")
+        st.caption("Como é calculado, só com dado público: território 50 (votos nas cidades "
+                   "do PFC e vizinhas x peso delas no estado) + histórico 50 (score do cargo "
+                   "anterior, não recalculado). Parte sem dado não vale zero: fica de fora, e o "
+                   "score sai \"parcial\", calculado sobre a parte medida.")
     if h:
         if h["fonte"] == "estadual":
             hl = [("Score do levantamento", f"{round(h['score'])} (não recalculado)"),

@@ -233,32 +233,25 @@ def _situacoes(nomes: list[str], cargo: str, candidatos: list[dict], casa_atual:
     return vinculo, todos
 
 
-def _score_senado(p: dict, votacao: dict | None, pesos: dict | None,
-                  afinidade: dict | None) -> dict:
-    """Score de senador (src/score_senador.py) de um eleito para o Senado.
-    `afinidade` = {nome_norm: nota 0-100} da aba Senadores (nota do Fábio)."""
+def _score_senado(p: dict, votacao: dict | None, pesos: dict | None) -> dict:
+    """Score de senador (src/score_senador.py) de um eleito para o Senado."""
     terr = None
     cand = ((votacao or {}).get("por_candidato") or {}).get(str(p.get("numero")))
     if cand and pesos:
         terr = score_senador.indice_territorial(cand["votos"], votacao["totais"], pesos)
     h = p.get("historico")
-    nota = None
-    for nome in (p.get("nome"), p.get("nome_urna"), p.get("nome_atual")):
-        if nome and eleicoes._norm(nome) in (afinidade or {}):
-            nota = afinidade[eleicoes._norm(nome)]
-            break
-    s = score_senador.calcular(terr, h["score"] if h else None, nota,
+    s = score_senador.calcular(terr, h["score"] if h else None,
                                f"da {h['casa']}" if h else "")
     s["territorio"] = terr
     return s
 
 
 def montar(candidatos, titulares, territorio, expansao, federal, hoje=None,
-           votacao_senado=None, pesos_territorio=None, afinidade_senado=None) -> dict:
+           votacao_senado=None, pesos_territorio=None) -> dict:
     """A legislatura 2027 inteira, pronta para a tela. PURA.
 
-    Os três últimos alimentam o score de SENADOR; sem eles, o score fica
-    "a completar" (nunca zero)."""
+    Os dois últimos alimentam o score de SENADOR; sem eles, o território fica
+    "sem dado" (nunca zero)."""
     hoje = hoje or datetime.date.today()
     terr = {eleicoes._norm(r.get("deputado")): r for r in territorio}
     expa = {eleicoes._norm(r.get("deputado")): r for r in expansao}
@@ -311,8 +304,7 @@ def montar(candidatos, titulares, territorio, expansao, federal, hoje=None,
             p["faixa_rotulo"] = FAIXAS[p["faixa"]]
             p["gancho"] = gancho(p)
             if casa == "Senado":
-                p["score_senador"] = _score_senado(p, votacao_senado, pesos_territorio,
-                                                   afinidade_senado)
+                p["score_senador"] = _score_senado(p, votacao_senado, pesos_territorio)
             casas[casa].append(p)
         casas[casa].sort(key=lambda p: (p["faixa"], -(p["historico"] or {}).get("score", 0), -p["votos"]))
 

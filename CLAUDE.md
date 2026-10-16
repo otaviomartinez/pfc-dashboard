@@ -191,16 +191,24 @@ pago) e o federal (`emendas_federais_score_execucao.csv`, empenhado × pago).
 - Na Câmara, "reeleito"/"fora da lista atual" é relativo aos 64 do levantamento
   federal (a tela diz isso). Novo não tem contato: a Casa publica após a posse.
 - **Score de SENADOR** (`src/score_senador.py`, aparece no Senado da aba e no
-  dossiê): 0-100 = território 40 (fatia dos votos dele nas cidades do PFC +
-  vizinhas ÷ fatia delas no estado; razão 1,0 = 20 pts, teto no dobro) +
-  histórico 35 (score do cargo anterior, NÃO recalculado) + afinidade 25 (coluna
-  "Aderência PFC (0-100)" da aba Senadores, nota do Fábio). Parte sem dado NÃO
-  vale zero: sai da conta e o score é sobre os pontos medidos ("parcial"). Só há
-  número com o território medido + mais uma parte; senão "a completar" com o que
-  falta. Território precisa de `scripts/importar_votacao_municipio_2026.py <zip>`
-  (TSE → Resultados 2026 → "Votação nominal por município e zona", baixado no
-  navegador) → `data/eleicoes/votacao_senador_municipio_2026.csv`. Hoje (sem o
-  zip e sem nota) os dois eleitos estão "a completar".
+  dossiê): 0-100, SÓ dado público, meio a meio = território 50 (fatia dos votos
+  dele nas cidades do PFC + vizinhas ÷ fatia delas no estado; razão 1,0 = 25
+  pts, teto no dobro) + histórico 50 (score do cargo anterior, NÃO recalculado).
+  A nota manual do Fábio foi TIRADA a pedido (out/2026): o score não pode
+  depender de preenchimento. Parte sem dado NÃO vale zero: sai da conta e o
+  score vira "parcial: só <parte>"; nada medido = "sem dado". Território precisa
+  de `scripts/importar_votacao_municipio_2026.py <zip>` (TSE → Resultados 2026 →
+  "Votação nominal por município e zona", baixado no navegador) →
+  `data/eleicoes/votacao_senador_municipio_2026.csv`. Hoje: André do Prado 17
+  (parcial, só histórico da ALESP); Derrite "sem dado".
+- **Tela "Presença regional"** (Emendas): onde os federais de SP CIRCULAM, pelas
+  notas de combustível/alimentação/hospedagem da cota parlamentar (cidade do
+  fornecedor). Coletor `scripts/importar_cota_parlamentar.py` roda no workflow
+  "Mapa da cota parlamentar" (dia 5, ou Run workflow) → `data/cota/`; CNPJ →
+  cidade por BrasilAPI/minhareceita com cache incremental (teto de tempo; a
+  cobertura aparece na tela). Lógica pura em `src/cota_parlamentar.py`. É sinal
+  de circulação, NÃO agenda (até 90 dias de atraso); escritório fica à parte
+  (conta de luz vem da sede da empresa); CPF nunca é gravado.
 - **Pendente:** "Puxar para o CRM" um eleito novo (não fiz de propósito: o CRM
   hoje é da bancada atual — conversar antes); PDF da aba; selo de situação 2026
   nos dossiês das outras telas. Senadores: os 2 eleitos em 2018 saem em
