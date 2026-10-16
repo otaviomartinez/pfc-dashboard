@@ -28,7 +28,7 @@ import csv
 import datetime
 import os
 
-from src import eleicoes
+from src import eleicoes, score_senador
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _DATA = os.path.join(BASE, "data")
@@ -68,7 +68,10 @@ def carregar_fontes() -> dict:
     """Tudo o que `montar` precisa, lido do disco. Arquivo ausente -> lista vazia."""
     return {"candidatos": eleicoes.carregar(), "titulares": _ler(CSV_TITULARES),
             "territorio": _ler(CSV_TERRITORIO), "expansao": _ler(CSV_EXPANSAO),
-            "federal": _ler(CSV_FEDERAL)}
+            "federal": _ler(CSV_FEDERAL),
+            # score de senador: votação por município (TSE) + território do PFC
+            "votacao_senado": score_senador.carregar_votacao(),
+            "pesos_territorio": score_senador.pesos_territorio_padrao()}
 
 
 # ---------------------------------------------------------------- formato
@@ -230,8 +233,32 @@ def _situacoes(nomes: list[str], cargo: str, candidatos: list[dict], casa_atual:
     return vinculo, todos
 
 
-def montar(candidatos, titulares, territorio, expansao, federal, hoje=None) -> dict:
-    """A legislatura 2027 inteira, pronta para a tela. PURA."""
+def _score_senado(p: dict, votacao: dict | None, pesos: dict | None,
+                  afinidade: dict | None) -> dict:
+    """Score de senador (src/score_senador.py) de um eleito para o Senado.
+    `afinidade` = {nome_norm: nota 0-100} da aba Senadores (nota do Fábio)."""
+    terr = None
+    cand = ((votacao or {}).get("por_candidato") or {}).get(str(p.get("numero")))
+    if cand and pesos:
+        terr = score_senador.indice_territorial(cand["votos"], votacao["totais"], pesos)
+    h = p.get("historico")
+    nota = None
+    for nome in (p.get("nome"), p.get("nome_urna"), p.get("nome_atual")):
+        if nome and eleicoes._norm(nome) in (afinidade or {}):
+            nota = afinidade[eleicoes._norm(nome)]
+            break
+    s = score_senador.calcular(terr, h["score"] if h else None, nota,
+                               f"da {h['casa']}" if h else "")
+    s["territorio"] = terr
+    return s
+
+
+def montar(candidatos, titulares, territorio, expansao, federal, hoje=None,
+           votacao_senado=None, pesos_territorio=None, afinidade_senado=None) -> dict:
+    """A legislatura 2027 inteira, pronta para a tela. PURA.
+
+    Os três últimos alimentam o score de SENADOR; sem eles, o score fica
+    "a completar" (nunca zero)."""
     hoje = hoje or datetime.date.today()
     terr = {eleicoes._norm(r.get("deputado")): r for r in territorio}
     expa = {eleicoes._norm(r.get("deputado")): r for r in expansao}
@@ -283,6 +310,9 @@ def montar(candidatos, titulares, territorio, expansao, federal, hoje=None) -> d
             p["faixa"] = _faixa(origem, hist)
             p["faixa_rotulo"] = FAIXAS[p["faixa"]]
             p["gancho"] = gancho(p)
+            if casa == "Senado":
+                p["score_senador"] = _score_senado(p, votacao_senado, pesos_territorio,
+                                                   afinidade_senado)
             casas[casa].append(p)
         casas[casa].sort(key=lambda p: (p["faixa"], -(p["historico"] or {}).get("score", 0), -p["votos"]))
 
