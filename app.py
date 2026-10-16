@@ -2915,7 +2915,8 @@ def dlg_legislatura(p: dict, no_crm: bool = False) -> None:
 # alimentação, hospedagem pagos pela cota), não agenda — a tela diz isso.
 # =========================================================================== #
 
-PR_CLASSE_COR = {"frequenta_pfc": "#4ADE80", "passa_regiao": "#E8B54A", "sem_registro": "#7C8698"}
+PR_CLASSE_COR = {"frequenta_pfc": "#4ADE80", "frequenta_vizinhas": "#E8B54A",
+                 "passa_regiao": "#A4AEBF", "sem_registro": "#7C8698"}
 
 
 @st.cache_data(ttl=600, show_spinner=False)
@@ -2949,7 +2950,7 @@ def _situacao_2026_federais(nomes: tuple) -> dict:
 
 
 def _pr_cidades_txt(cidades: list, limite: int = 3) -> str:
-    partes = [f"{c.title()} · {n} nota{'s' if n != 1 else ''}" for c, n, _ in cidades[:limite]]
+    partes = [f"{c} · {n} nota{'s' if n != 1 else ''}" for c, n, _ in cidades[:limite]]
     if len(cidades) > limite:
         partes.append(f"+{len(cidades) - limite} cidade(s)")
     return " · ".join(partes) if partes else ""
@@ -2973,8 +2974,8 @@ def _pr_card(d: dict, idx: int, situacao: str, no_crm: bool) -> None:
             + ('<span class="lg-crm">NO CRM</span>' if no_crm else "")
             + f'</div><div class="lg-sub">{esc(sub)}</div>'
             f'<div class="lg-gch">{esc(detalhe)}</div></div>'
-            f'<div class="lg-scol"><div class="lg-score" style="color:{cor}">{d["notas_pfc"]}</div>'
-            '<div class="lg-sub">notas no PFC</div></div></div>', unsafe_allow_html=True)
+            f'<div class="lg-scol"><div class="lg-score" style="color:{cor}">{d["notas_regiao"]}</div>'
+            '<div class="lg-sub">notas na região</div></div></div>', unsafe_allow_html=True)
         if st.button(f"Abrir presença de {d['deputado']}", key=f"lg_pr_{idx}", use_container_width=True):
             dlg_presenca(d, situacao, no_crm)
 
@@ -2997,13 +2998,13 @@ def dlg_presenca(d: dict, situacao: str = "", no_crm: bool = False) -> None:
                             ("Cidades vizinhas (mesma Região Imediata)", d["cidades_vizinhas"])):
         if cidades:
             st.markdown(f'<div class="lg-bloco"><h4>{esc(titulo)}</h4>'
-                        + "".join(f'<div class="lg-linha"><span class="k">{esc(c.title())}</span>'
+                        + "".join(f'<div class="lg-linha"><span class="k">{esc(c)}</span>'
                                   f'<span class="v">{n} nota(s) · última {esc(data_br(u))}</span></div>'
                                   for c, n, u in cidades)
                         + '</div>', unsafe_allow_html=True)
     if d["escritorio"]:
         st.markdown('<div class="lg-bloco"><h4>Fornecedores do escritório de apoio</h4>'
-                    + "".join(f'<div class="lg-linha"><span class="k">{esc(c.title())}</span>'
+                    + "".join(f'<div class="lg-linha"><span class="k">{esc(c)}</span>'
                               f'<span class="v">{n} nota(s)</span></div>' for c, n in d["escritorio"][:6])
                     + '</div>', unsafe_allow_html=True)
         st.caption("Cidade do FORNECEDOR, não endereço do escritório: conta de luz ou telefone "
@@ -3047,13 +3048,18 @@ def render_presenca_regional() -> None:
         '<div class="pf-placar">'
         f'<div class="pf-kpi"><div class="n" style="color:#4ADE80">{n["frequenta_pfc"]}</div>'
         '<div class="r">frequentam cidades do PFC</div></div>'
-        f'<div class="pf-kpi"><div class="n" style="color:#E8B54A">{n["passa_regiao"]}</div>'
-        '<div class="r">passam pela região</div></div>'
+        f'<div class="pf-kpi"><div class="n" style="color:#E8B54A">{n["frequenta_vizinhas"]}</div>'
+        '<div class="r">frequentam as vizinhas</div></div>'
+        f'<div class="pf-kpi"><div class="n" style="color:#A4AEBF">{n["passa_regiao"]}</div>'
+        '<div class="r">passaram pela região</div></div>'
         f'<div class="pf-kpi"><div class="n" style="color:#7C8698">{n["sem_registro"]}</div>'
         '<div class="r">sem registro na região</div></div></div>'
-        f'<div class="lg-leg" style="margin:-6px 0 12px"><span><i style="background:#4ADE80"></i>'
-        f'3+ notas em cidades do PFC</span><span><i style="background:#E8B54A"></i>alguma nota no PFC '
-        'ou 3+ nas vizinhas</span><span><i style="background:#7C8698"></i>nenhum registro</span></div>',
+        '<div class="lg-leg" style="margin:-6px 0 12px"><span><i style="background:#4ADE80"></i>'
+        '3+ notas em cidades do PFC</span><span><i style="background:#E8B54A"></i>3+ nas vizinhas '
+        '(mesma Região Imediata, como Sorocaba)</span><span><i style="background:#A4AEBF"></i>1 ou 2 '
+        'notas</span><span><i style="background:#7C8698"></i>nenhum registro</span></div>'
+        '<div class="lg-nota" style="margin-top:-6px">Ordem: notas nas cidades do PFC + 0,45 por nota '
+        'numa vizinha (o mesmo peso de vizinhança do ranking de emendas).</div>',
         unsafe_allow_html=True)
 
     st.session_state.setdefault("pr_visao", "Por deputado")
@@ -3073,7 +3079,7 @@ def render_presenca_regional() -> None:
             nomes = " · ".join(f"{dep.title()} ({n_} · {data_br(u)})" for dep, n_, u, _ in c["deputados"][:8])
             extra = f" · +{len(c['deputados']) - 8}" if len(c["deputados"]) > 8 else ""
             st.markdown(
-                f'<div class="lg-bloco"><h4>{esc(c["cidade"].title())} · {c["total_notas"]} nota(s) · '
+                f'<div class="lg-bloco"><h4>{esc(c["cidade"])} · {c["total_notas"]} nota(s) · '
                 f'{len(c["deputados"])} deputado(s)</h4><div class="lg-gch">{esc(nomes + extra)}</div></div>',
                 unsafe_allow_html=True)
         st.caption("Entre parênteses: número de notas e a data da última.")
