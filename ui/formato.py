@@ -27,22 +27,33 @@ from src.dados import (
 from ui.estilos import ICONES, _SVG_TRACO
 
 
+# Ícone de reserva: um círculo simples. Usado quando o nome não existe em
+# ICONES — já derrubou o app inteiro (KeyError na sidebar) quando o servidor
+# carregou um app.py novo com o ui/estilos.py antigo ainda na memória. Ícone
+# faltando é defeito visual, nunca motivo para a tela cair.
+_ICONE_RESERVA = "<circle cx='12' cy='12' r='8'/>"
+
+
+def _icone(nome: str) -> str:
+    return ICONES.get(nome, _ICONE_RESERVA)
+
+
 def svg_icone(nome: str, classe: str = "ic") -> str:
     """SVG inline, para onde eu mesmo monto o HTML (itens de Escopo, cards)."""
     return (f"<svg class='{classe}' viewBox='0 0 24 24' fill='none' stroke='currentColor' "
             f"stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'>"
-            f"{ICONES[nome]}</svg>")
+            f"{_icone(nome)}</svg>")
 
 
 def _mask_url(nome: str) -> str:
     """SVG -> data URI pronta para mask-image."""
-    return f"url(\"data:image/svg+xml,{quote(_SVG_TRACO.format(ICONES[nome]), safe='')}\")"
+    return f"url(\"data:image/svg+xml,{quote(_SVG_TRACO.format(_icone(nome)), safe='')}\")"
 
 
 def _icone_url_cor(nome: str, cor: str) -> str:
     """Como _mask_url, mas o SVG sai COLORIDO (stroke na cor) — para o ícone
     aparecer na cor dentro da pastilha via background-image (não mask)."""
-    svg = _SVG_TRACO.replace("stroke='black'", f"stroke='{cor}'").format(ICONES[nome])
+    svg = _SVG_TRACO.replace("stroke='black'", f"stroke='{cor}'").format(_icone(nome))
     return f"url(\"data:image/svg+xml,{quote(svg, safe='')}\")"
 
 
