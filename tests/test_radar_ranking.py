@@ -98,9 +98,13 @@ def test_noticia_de_quem_ganhou_nao_e_oportunidade():
 
 
 def test_app_tira_noticia_de_resultado_que_ja_estava_na_planilha():
+    """A tela passa a fila pelo crivo único (motivo_lixo), que inclui a notícia
+    de resultado — assim o lixo antigo da planilha some da exibição."""
+    from radar.scorer import motivo_lixo
     raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     app = open(os.path.join(raiz, "app.py"), encoding="utf-8").read()
-    assert "e_noticia_de_resultado(o[\"titulo\"], o[\"desc\"])" in app
+    assert "motivo_lixo(o[\"titulo\"], o[\"desc\"])" in app
+    assert motivo_lixo("Lupa do Bem vence como dinamizadores no Prêmio Empreender")
 
 
 def test_teto_de_paginas_respeitado():

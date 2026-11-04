@@ -160,7 +160,8 @@ from ui.formato import (
 # Filtro geográfico do radar (restrito a fora de SP/Sudeste). Roda na coleta
 # (radar.scorer.avaliar_sinal), mas também na EXIBIÇÃO da fila — assim itens que
 # já estavam na planilha antes do filtro existir também somem da lista.
-from radar.scorer import e_ambiental, e_noticia_de_resultado, e_restrito_fora_sudeste
+from radar.dedup import mesmo_edital
+from radar.scorer import motivo_lixo
 
 try:
     import plotly.graph_objects as go
@@ -173,17 +174,23 @@ def _ops_radar_filtradas(novidades=None) -> list[dict]:
     """Fila do radar já LIMPA para exibição — PONTO ÚNICO. Toda tela que mostra a
     fila (dashboard, tela do Radar, Relatório de Prioridades) deve passar por
     aqui, senão um filtro escapa numa tela e não na outra (já aconteceu).
-    Tira: vencidos (data de prazo já passada), restritos a fora do Sudeste,
-    ambientais/ecologia e notícias de resultado ("X vence o prêmio Y") — estas
-    últimas também para limpar as que já estavam na planilha, que é só-acréscimo.
+    Tira: vencidos (data de prazo já passada) e tudo o que o crivo único do
+    radar chama de lixo (radar.scorer.motivo_lixo: notícia, evento, curso/vaga
+    para pessoa, prêmio individual, edital de ano passado, fora de SP, ambiental
+    …) — a planilha é só-acréscimo, então o lixo que entrou ANTES de cada
+    melhoria do filtro só some da tela por aqui. Também junta o MESMO edital
+    noticiado por duas fontes (radar.dedup.mesmo_edital), ficando com a ficha
+    de maior score.
     Não ordena — quem chama ordena como precisar."""
     fonte = novidades if novidades is not None else dados.carregar_novidades_pendentes()
     ops = [_op_de_novidade(nv) for nv in fonte]
     ops = [o for o in ops if not _op_vencida(o)]
-    ops = [o for o in ops if not e_restrito_fora_sudeste(o["titulo"], o["desc"])]
-    ops = [o for o in ops if not e_ambiental(o["titulo"], o["desc"])]
-    ops = [o for o in ops if not e_noticia_de_resultado(o["titulo"], o["desc"])]
-    return ops
+    ops = [o for o in ops if not motivo_lixo(o["titulo"], o["desc"])]
+    unicas = []
+    for o in sorted(ops, key=lambda x: -x["score"]):
+        if not any(mesmo_edital(o["titulo"], u["titulo"]) for u in unicas):
+            unicas.append(o)
+    return unicas
 
 # Componente de drag-and-drop do funil (HTML5 nativo, sem dependências externas).
 _KANBAN_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "kanban_component")

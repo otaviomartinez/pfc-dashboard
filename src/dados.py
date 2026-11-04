@@ -1440,7 +1440,8 @@ def _valor_para_reais(texto) -> int:
     """Extrai o MAIOR valor em reais de um texto ('R$ 80 mil – R$ 200 mil' -> 200000)."""
     import re
     maior = 0
-    for m in re.finditer(r"([\d\.]+(?:,\d+)?)\s*(mil|milh|mi|k)?", str(texto or "").lower()):
+    # "milh" ANTES de "mil": senão "R$ 61 milhões" vira 61 mil.
+    for m in re.finditer(r"([\d\.]+(?:,\d+)?)\s*(milh|mil|mi|k)?", str(texto or "").lower()):
         try:
             base = float(m.group(1).replace(".", "").replace(",", "."))
         except ValueError:
