@@ -4,8 +4,18 @@ name: Sonda Fiscal (só diagnóstico)
 # pergunta à fonte e LÊ a resposta. Foi assim que se descobriu que o SICONFI
 # não publica o Anexo 08 (MDE) e que o cadastro de CNPJ não tem e-mail de
 # prefeitura. Esta sonda NÃO grava nada e NÃO commita nada.
+#
+# `alvo` escolhe a sonda: "fiscal" (padrão, RGF/FPM/CAUC) ou "fontes_radar"
+# (as fontes do radar de editais que vêm vazias + candidatas novas). As duas
+# moram aqui porque um workflow NOVO às vezes não é registrado pelo GitHub
+# quando publicado por este ambiente — este já está registrado e aceita disparo.
 on:
   workflow_dispatch:
+    inputs:
+      alvo:
+        description: "Qual sonda rodar: fiscal ou fontes_radar"
+        required: false
+        default: "fiscal"
 
 jobs:
   sondar:
@@ -17,4 +27,11 @@ jobs:
         with:
           python-version: "3.11"
       - name: Sondar RGF / FPM / CAUC
+        if: ${{ github.event.inputs.alvo != 'fontes_radar' }}
         run: python scripts/sondar_fiscal.py
+      - name: Instalar dependências do radar
+        if: ${{ github.event.inputs.alvo == 'fontes_radar' }}
+        run: pip install -r radar/requirements.txt
+      - name: Sondar as fontes do radar
+        if: ${{ github.event.inputs.alvo == 'fontes_radar' }}
+        run: python scripts/sondar_fontes_radar.py
