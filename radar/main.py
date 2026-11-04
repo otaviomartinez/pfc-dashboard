@@ -250,6 +250,13 @@ def executar():
     for op in com_sinal:
         texto = f"{op.get('titulo', '')} {op.get('descricao', '')} {op.get('prazo', '')}"
         pub = publicacao.data_publicacao_corpo(texto)
+        if pub is None and op.get("publicado_em"):
+            # item de FEED/API: a data de publicação vem estruturada (metadado,
+            # não chute) — vale como âncora de ano, igual ao carimbo do corpo.
+            try:
+                pub = datetime.date.fromisoformat(op["publicado_em"][:10])
+            except ValueError:
+                pub = None
         iso = prazos.extrair_prazo(texto, pub=pub)
         if iso:
             op["prazo"] = iso

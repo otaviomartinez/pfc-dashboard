@@ -191,3 +191,117 @@ def extrair_generico(url: str) -> list[dict]:
         return extrair_de_soup(soup, url, fonte)
     except Exception:
         return []
+
+
+# --- Feed RSS / API do WordPress ---------------------------------------------
+# Mais estável que raspar HTML: o feed não muda quando o site troca o visual (foi
+# assim que 17 fontes "esvaziaram" — o seletor de HTML parou de casar). Cada item
+# traz a DATA DE PUBLICAÇÃO estruturada, o que permite cortar post velho: um post
+# de edital publicado há mais de MAX_IDADE_DIAS dias quase sempre já fechou.
+MAX_IDADE_DIAS = 120
+
+
+def _sem_html(s: str) -> str:
+    texto = limpar_texto(BeautifulSoup(s or "", "html.parser").get_text(" "))
+    return re.sub(r"\s+([.,;:!?])", r"\1", texto)   # "<b>R$ 200 mil</b>." sem espaço solto
+
+
+def _data_rss(txt: str):
+    """'Tue, 03 Nov 2026 10:00:00 +0000' ou ISO -> date; None se não der."""
+    from email.utils import parsedate_to_datetime
+    txt = (txt or "").strip()
+    if not txt:
+        return None
+    try:
+        return parsedate_to_datetime(txt).date()
+    except (TypeError, ValueError):
+        pass
+    try:
+        return datetime.date.fromisoformat(txt[:10])
+    except ValueError:
+        return None
+
+
+def _local(tag: str) -> str:
+    """'{http://www.w3.org/2005/Atom}entry' -> 'entry'; 'content:encoded' -> 'encoded'."""
+    return tag.rsplit("}", 1)[-1].rsplit(":", 1)[-1].lower()
+
+
+def itens_de_feed(xml: str, fonte: str, limite: int = 30, hoje_=None) -> list[dict]:
+    """PURA: itens de um feed RSS/Atom (leitor de XML de verdade — trata CDATA e
+    os namespaces do Atom). Descarta post mais velho que MAX_IDADE_DIAS (com
+    data); sem data, mantém (não dá para julgar). XML quebrado -> []."""
+    import xml.etree.ElementTree as ET
+    hoje_ = hoje_ or datetime.date.today()
+    try:
+        raiz = ET.fromstring((xml or "").strip().encode("utf-8"))
+    except ET.ParseError:
+        return []
+    saida = []
+    for it in [e for e in raiz.iter() if _local(e.tag) in ("item", "entry")][:limite]:
+        campos = {}
+        for filho in it:
+            nome = _local(filho.tag)
+            if nome == "link":
+                campos.setdefault("link", (filho.get("href") or filho.text or "").strip())
+            elif nome not in campos:
+                campos[nome] = filho.text or ""
+        titulo = _sem_html(campos.get("title", ""))
+        descricao = _sem_html(campos.get("description") or campos.get("summary")
+                              or campos.get("encoded") or campos.get("content") or "")
+        pub = _data_rss(campos.get("pubdate") or campos.get("published")
+                        or campos.get("updated") or campos.get("date") or "")
+        if pub and (hoje_ - pub).days > MAX_IDADE_DIAS:
+            continue
+        if len(titulo) < 12:
+            continue
+        item = montar_item(titulo, descricao, campos.get("link", ""), fonte)
+        if pub:
+            item["publicado_em"] = pub.isoformat()
+        saida.append(item)
+    return saida
+
+
+def extrair_feed(url_feed: str, fonte: str, limite: int = 30) -> list[dict]:
+    """Baixa um feed RSS/Atom e devolve os itens recentes ([] em qualquer falha)."""
+    try:
+        r = requests.get(url_feed, headers=HEADERS, timeout=TIMEOUT)
+        if r.status_code != 200 or "<" not in r.text[:200]:
+            return []
+        return itens_de_feed(r.text, fonte, limite)
+    except Exception:
+        return []
+
+
+def itens_de_wp_api(posts: list, fonte: str, hoje_=None) -> list[dict]:
+    """PURA: itens da API REST do WordPress (/wp-json/wp/v2/posts)."""
+    hoje_ = hoje_ or datetime.date.today()
+    saida = []
+    for p in posts or []:
+        titulo = _sem_html((p.get("title") or {}).get("rendered", ""))
+        descricao = _sem_html((p.get("excerpt") or {}).get("rendered", ""))
+        pub = _data_rss(p.get("date", ""))
+        if pub and (hoje_ - pub).days > MAX_IDADE_DIAS:
+            continue
+        if len(titulo) < 12:
+            continue
+        item = montar_item(titulo, descricao, p.get("link", ""), fonte)
+        if pub:
+            item["publicado_em"] = pub.isoformat()
+        saida.append(item)
+    return saida
+
+
+def extrair_wp_api(base: str, fonte: str, limite: int = 30, busca: str = "") -> list[dict]:
+    """Posts recentes pela API do WordPress; `busca` filtra no próprio site
+    (ex.: 'edital'). [] em qualquer falha."""
+    p = urlparse(base)
+    url = (f"{p.scheme}://{p.netloc}/wp-json/wp/v2/posts?per_page={limite}"
+           f"&_fields=title,link,date,excerpt" + (f"&search={busca}" if busca else ""))
+    try:
+        r = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+        if r.status_code != 200 or not r.text.lstrip().startswith("["):
+            return []
+        return itens_de_wp_api(r.json(), fonte)
+    except Exception:
+        return []
