@@ -347,8 +347,11 @@ def itens_prosas(payload: dict, hoje=None) -> list[dict]:
             continue
         if prosas_orgao_de_fora(nome, financiador):
             continue
+        # "inscrições abertas" é FATO aqui (o encerrado já saiu acima) e é o que
+        # dá sinal de oportunidade a título sem "edital" ("Parcerias
+        # Sustentáveis 2027"). Sem prazo, não se afirma nada.
         partes = [financiador, "áreas: " + ", ".join(areas) if areas else "",
-                  f"inscrições até {prazo.strftime('%d/%m/%Y')}" if prazo else ""]
+                  f"inscrições abertas até {prazo.strftime('%d/%m/%Y')}" if prazo else ""]
         item = montar_item(nome, " · ".join(x for x in partes if x),
                            f"https://prosas.com.br/editais/{a.get('id') or d.get('id')}", "Prosas")
         if prazo:
