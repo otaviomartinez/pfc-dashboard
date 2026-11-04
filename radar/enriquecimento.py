@@ -24,8 +24,10 @@ from radar.fontes_genericas import HEADERS, TIMEOUT, limpar_texto
 MAX_ENRIQUECIMENTOS = 40
 PAUSA_S = 0.4  # respiro entre requests para não parecer abuso
 
+# "milhões" ANTES de "mil": com "mil" primeiro, "R$ 61 milhões" era gravado
+# como "R$ 61 mil" na ficha (visto na fila em out/2026).
 _RE_VALOR = re.compile(
-    r"r\$\s?\d[\d\.\,]*(?:\s?(?:mil|milh(?:ao|ão|oes|ões)|mi\b))?", re.IGNORECASE)
+    r"r\$\s?\d[\d\.\,]*(?:\s?(?:milh(?:ao|ão|oes|ões)|mil\b|mi\b))?", re.IGNORECASE)
 
 # Tags que só carregam navegação/rodapé — fora do texto útil da página.
 _TAGS_RUIDO = ["script", "style", "nav", "footer", "header", "aside", "form", "noscript"]

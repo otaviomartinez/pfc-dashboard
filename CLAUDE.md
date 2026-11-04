@@ -242,6 +242,25 @@ antigo fica até ser triado no app (rodar o radar não "substitui" a fila).
   (`publicacao.data_publicacao`: JSON-LD `datePublished`/og/`<time>`). Sem ano e
   sem metadado → "a confirmar". `_prazo_confiavel` (−60..180) + corte de vencido
   antigo são a 3ª linha.
+- **Crivo ÚNICO de lixo — `radar.scorer.motivo_lixo` (nov/2026).** O radar usa
+  antes de pontuar (`avaliar_sinal`) e o APP usa ao exibir a fila
+  (`_ops_radar_filtradas`), porque a planilha é só-acréscimo: lixo antigo só some
+  da tela por aí. Barra: título administrativo, encerrado, **edital de ano
+  passado** (ano no número: "Edital 01/2025" em nov/2026), notícia de resultado,
+  **evento/conteúdo no título** (congresso, semana, "boas práticas", "estudantes
+  criam"…), aluno, **vaga para pessoa** (curso, imersão, viagem, torneio,
+  estágio), **prêmio/edital para pessoa física ou negócio** (jornalismo,
+  "melhores educadores", empreendedores), inelegível, ambiental/energia, fora de
+  SP ("Banco *Nacional*" não conta como nacional). "Prêmio" sozinho NÃO é sinal:
+  precisa de convite (inscrições/edital/lança…) ou valor em R$. Aderência ganhou
+  os termos que faltavam (jovens, crianças/adolescentes, OSC, projetos sociais,
+  incentivo fiscal, projetos/iniciativas); termo curto casa só palavra inteira
+  ('stem' casava 'sistema'). **Valor:** "milhões" antes de "mil" nos TRÊS
+  leitores (scorer, enriquecimento, dados) — "R$ 61 milhões" virava "R$ 61 mil";
+  fichas antigas são corrigidas na exibição pelo número do próprio título.
+  **Duplicata entre fontes:** `radar.dedup.mesmo_edital` (palavras em comum, ≥4 e
+  ≥60%) — o mesmo edital pela ABCR e pela Rede Filantropia vira um só.
+  `tests/test_radar_lixo.py` usa os títulos REAIS vistos na fila.
 - **Relatório de Prioridades** (tela + PDF, `src/relatorios.py` com ReportLab):
   cada painel tem o seu. Captação = editais futuros por urgência (respeita a
   regra 3). Emendas = quem abordar (território + expansão), autorizado/pago

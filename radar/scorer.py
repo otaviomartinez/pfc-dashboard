@@ -30,6 +30,19 @@ POSITIVAS = POSITIVAS_FORTES + [
     "sociedade civil", "organizacoes sociais", "organizacao social", "inovacao",
     "formacao", "empreendedorismo", "periferia", "inclusao", "direitos humanos",
     "cultura educativa", "assistencia social",
+    # out/2026: faltavam termos básicos do PFC — por isso "edital de apoio a
+    # OSCs" e "projetos sociais com incentivo fiscal" eram barrados por aderência.
+    "jovens", "criancas", "adolescentes", "infancia", "infantojuvenil",
+    "osc", "oscs", "organizacoes da sociedade civil", "sem fins lucrativos",
+    "projetos sociais", "projeto social", "iniciativas sociais", "causas sociais",
+    "incentivo fiscal", "leis de incentivo", "lei de incentivo", "fundo da infancia",
+    "fumcad", "cmdca", "condeca", "escolas", "estudantes", "professores",
+    "aprendizagem", "letramento", "matematica", "tecnologia",
+    # captação INSTITUCIONAL genérica: edital que seleciona projetos/iniciativas de
+    # organizações é dinheiro que o PFC pode disputar (o lixo já caiu antes, no
+    # motivo_lixo — por isso dá para ser amplo aqui).
+    "projetos", "iniciativas", "organizacoes", "instituicoes", "entidades",
+    "incentivados", "incentivadas",
 ]
 # AMBIENTAL / ECOLOGIA (fora do escopo do PFC, por decisão do Fábio): meio
 # ambiente, preservação, biodiversidade, clima etc. NÃO tem a ver com educação
@@ -49,7 +62,7 @@ AMBIENTAL = [
     "mudanca climatica", "mudancas climaticas", "emergencia climatica",
     "crise climatica", "aquecimento global", "credito de carbono",
     "neutralidade de carbono", "energia renovavel", "energias renovaveis",
-    "sustentabilidade ambiental",
+    "sustentabilidade ambiental", "eficiencia energetica",
 ]
 NEGATIVAS = [
     "pos-graduacao", "mestrado", "doutorado", "curso pago", "mensalidade",
@@ -100,6 +113,11 @@ NEGATIVAS_PESSOA_FISICA = [
     "melhor educador", "melhor professor", "educador nota", "professor nota",
     "premio jornalista", "premio ao jornalista", "melhor jornalista",
     "personalidade do ano",
+    # out/2026, vistos na fila: prêmio de JORNALISMO (FEAC), "melhores educadores
+    # do mundo" (Global Teacher Prize) e edital para EMPREENDEDORES (pessoa/negócio)
+    "jornalismo", "jornalistas", "melhores educadores", "melhores professores",
+    "global teacher prize", "para empreendedores", "empreendedores negros",
+    "empreendedoras negras", "mulheres na ciencia", "bolsas para pesquisadoras",
 ]
 # EDIÇÃO PASSADA / INSCRIÇÕES ENCERRADAS: listas de prêmio carregam muita coisa
 # de 2025 já fechada e notícia de resultado. Barram no pré-filtro dois grupos de
@@ -241,8 +259,12 @@ EXCLUSAO_TITULOS = [
 def tem_sinal_de_oportunidade(titulo: str, descricao: str) -> bool:
     """Qualifica se houver 1 sinal forte, ou 2+ fracos, ou 1 fraco + valor R$."""
     texto = f"{titulo or ''} {descricao or ''}".lower()
-    if any(s in texto for s in SINAIS_FORTES):
+    fortes = [s for s in SINAIS_FORTES if s in texto]
+    if any(s not in SINAIS_PREMIO for s in fortes):
         return True
+    if fortes:   # só "prêmio"/"patrocínio": precisa de convite ou de valor em R$
+        if _tem(_norm(texto), CONVITE_TERMOS) or _RE_VALOR.search(texto):
+            return True
     fracos = sum(1 for s in SINAIS_FRACOS if s in texto)
     if fracos >= 2:
         return True
@@ -300,7 +322,11 @@ def e_restrito_fora_sudeste(titulo: str, descricao: str) -> bool:
     fora do Sudeste — nunca 'sul' solto ('zona sul', 'sul de Minas' = Sudeste). Na
     dúvida, MANTÉM (melhor mostrar um nacional a mais do que esconder)."""
     texto = _norm(f"{titulo or ''} {descricao or ''}")
-    if any(k in texto for k in INCLUI_SUDESTE_NACIONAL):
+    # "Banco Nacional de Desenvolvimento" (BNDES) não é "edital nacional": sem
+    # isto, "BNDES lança edital para a Região Norte e o Maranhão" passava.
+    sem_orgao = re.sub(r"\b(banco|conselho|instituto|fundo|sistema|secretaria|agencia|"
+                       r"confederacao|federacao|associacao|programa)\s+nacional\b", " ", texto)
+    if any(k in sem_orgao for k in INCLUI_SUDESTE_NACIONAL):
         return False
     # macro-região OU estado fora do Sudeste citado = restrição, mesmo sem
     # marcador colado (ex.: "organizações sociais do Norte e Nordeste",
@@ -320,6 +346,123 @@ def e_restrito_fora_sudeste(titulo: str, descricao: str) -> bool:
     return False
 
 
+# --- Participante / evento / conteúdo (não é captação) -----------------------
+# PARTICIPANTE: vaga para uma PESSOA (curso, imersão, viagem, torneio, mentoria),
+# não dinheiro para a organização. Vistos na fila em out/2026: "Curso de
+# Formação Continuada de Professores", "Imersão Científica" (para alunas),
+# "viagem ao Vale do Silício" (estudantes), "formação gratuita para jovens",
+# "Torneio Regional de Robótica". Régua: frases de INSCRIÇÃO DE PESSOA, nunca
+# "formação de professores" solta (edital institucional, que é POSITIVA_FORTE).
+PARTICIPANTE = [
+    "inscricoes para o curso", "inscricoes para curso", "abre inscricoes para o curso",
+    "curso de formacao continuada", "curso gratuito", "curso online", "cursos gratuitos",
+    "formacao gratuita", "oferece formacao", "oferece curso", "imersao", "intercambio",
+    "viagem ao", "viagem para", "vale do silicio", "torneio", "mentoria para",
+    "programa de estagio", "vagas de estagio", "trainee", "vagas para estudantes",
+    "vagas para alunos", "bolsa de pesquisa", "bolsas de pesquisa", "hackathon",
+]
+# EVENTO no TÍTULO (congresso, semana, seminário): inscrição de público, não captação.
+EVENTO_TITULO = [
+    "semana brasileira", "semana nacional", "congresso", "seminario", "simposio",
+    "encontro nacional", "encontro estadual", "webinario", "palestra", "workshop",
+]
+# CONTEÚDO no TÍTULO: artigo, análise, notícia sobre o setor — não convida a
+# concorrer a nada ("O mundo diante da crise para atrair... professores",
+# "Boas práticas em empreendedorismo...", "Estudantes criam jogos...").
+CONTEUDO_TITULO = [
+    "boas praticas", "dicas", "entenda", "saiba como", "podcast", "entrevista",
+    "artigo", "opiniao", "o mundo diante", "estudantes criam", "alunos criam",
+    "alunos desenvolvem", "estudantes desenvolvem", "e afastado", "e afastada",
+    "anuncia comite", "comite que ira julgar", "interescolar",
+]
+# CONVITE: o texto chama para concorrer. "Prêmio" só vale como sinal forte junto
+# de um convite (ou de um valor em R$) — sozinho, deixava passar notícia sobre
+# prêmio ("diretor é afastado um ano após prêmio mundial").
+CONVITE_TERMOS = [
+    "inscri", "edital", "chamada", "chamamento", "selecao", "seleciona",
+    "candidat", "submiss", "propostas", "concorrer", "regulamento", "convocatoria",
+    "lanca", "lancam", "lancamento", "abre", "abrem", "recebe", "prorroga",
+]
+SINAIS_PREMIO = ["prêmio", "premiação", "patrocínio", "patrocinador"]
+
+
+def _tem(texto_norm: str, termos) -> bool:
+    """Casa termo no texto JÁ normalizado. Termo curto (até 4 letras: 'osc',
+    'stem', 'fia') exige palavra inteira — senão 'stem' casava 'sistema'."""
+    for k in termos:
+        if len(k) <= 4:
+            if re.search(rf"\b{re.escape(k)}\b", texto_norm):
+                return True
+        elif k in texto_norm:
+            return True
+    return False
+
+
+def _conta(texto_norm: str, termos) -> int:
+    return sum(1 for k in termos if _tem(texto_norm, [k]))
+
+
+def e_participante(titulo: str, descricao: str) -> bool:
+    """Vaga/inscrição para PESSOA (curso, imersão, viagem, torneio, estágio)."""
+    return _tem(_norm(f"{titulo or ''} {descricao or ''}"), PARTICIPANTE)
+
+
+def e_evento_ou_conteudo(titulo: str) -> bool:
+    """Título de evento (congresso, semana) ou de conteúdo (artigo, notícia)."""
+    t = _norm(titulo)
+    return _tem(t, EVENTO_TITULO) or _tem(t, CONTEUDO_TITULO)
+
+
+_RE_EDITAL_ANO = re.compile(
+    r"\b(?:edital|chamada|chamamento|processo seletivo)\b[^\n]{0,25}?\b\d{1,4}\s*/\s*(20\d{2})\b")
+
+
+def e_edital_de_ano_passado(titulo: str, hoje=None) -> bool:
+    """"Edital Nº 01/2025" visto em nov/2026: o número traz o ano da edição.
+    Barra ano <= atual-2 sempre, e o ano anterior a partir de julho (edital do
+    ano passado ainda aberto no 2º semestre é raríssimo; um prazo real, se
+    houver, viria no texto e o item seria outro)."""
+    import datetime as _dt
+    hoje = hoje or _dt.date.today()
+    m = _RE_EDITAL_ANO.search(_norm(titulo))
+    if not m:
+        return False
+    ano = int(m.group(1))
+    return ano <= hoje.year - 2 or (ano == hoje.year - 1 and hoje.month >= 7)
+
+
+def motivo_lixo(titulo: str, descricao: str = "", hoje=None) -> str:
+    """Motivo pelo qual o item NÃO é captação para o PFC, ou "" se pode ser.
+
+    PONTO ÚNICO do crivo de lixo: o radar usa antes de pontuar (avaliar_sinal) e
+    o app usa ao EXIBIR a fila — a planilha é só-acréscimo, então lixo antigo só
+    some da tela se o app aplicar o mesmo crivo.
+    """
+    if titulo_excluido(titulo):
+        return "título genérico/administrativo excluído"
+    if e_encerrado(titulo, descricao):
+        return "edição passada / inscrições encerradas"
+    if e_edital_de_ano_passado(titulo, hoje):
+        return "edital de edição passada (ano no número do edital)"
+    if e_noticia_de_resultado(titulo, descricao):
+        return "notícia de resultado (quem venceu), não oportunidade"
+    if e_evento_ou_conteudo(titulo):
+        return "evento ou conteúdo (artigo/notícia), não oportunidade"
+    if e_oportunidade_aluno(titulo, descricao):
+        return "oportunidade para aluno (olimpíada/medalha/bolsa), não captação"
+    if e_participante(titulo, descricao):
+        return "vaga para pessoa (curso/imersão/viagem/torneio), não captação"
+    if e_premio_pessoa_fisica(titulo, descricao):
+        return "prêmio ou edital para pessoa física/negócio, não para a organização"
+    if e_nao_elegivel(titulo, descricao):
+        return "inaplicável ao PFC (bem-estar animal/saúde hospitalar/aldeia indígena)"
+    if e_ambiental(titulo, descricao):
+        return "ambiental/energia (fora do escopo do PFC)"
+    if e_restrito_fora_sudeste(titulo, descricao):
+        return "restrito a região fora de SP/Sudeste (o PFC é de São Paulo)"
+    return ""
+
+
 def avaliar_sinal(op: dict) -> tuple[bool, str]:
     """Decisão do pré-filtro. Retorna (passa, motivo_descarte).
 
@@ -331,22 +474,9 @@ def avaliar_sinal(op: dict) -> tuple[bool, str]:
     """
     titulo = op.get("titulo", "")
     descricao = op.get("descricao", "")
-    if titulo_excluido(titulo):
-        return False, "título genérico/administrativo excluído"
-    if e_encerrado(titulo, descricao):
-        return False, "edição passada / inscrições encerradas"
-    if e_noticia_de_resultado(titulo, descricao):
-        return False, "notícia de resultado (quem venceu), não oportunidade"
-    if e_oportunidade_aluno(titulo, descricao):
-        return False, "oportunidade para aluno (olimpíada/medalha/bolsa), não captação"
-    if e_premio_pessoa_fisica(titulo, descricao):
-        return False, "prêmio para pessoa física (professor/indivíduo), não captação institucional"
-    if e_nao_elegivel(titulo, descricao):
-        return False, "inaplicável ao PFC (bem-estar animal/saúde hospitalar/aldeia indígena)"
-    if e_ambiental(titulo, descricao):
-        return False, "ambiental/ecologia (fora do escopo do PFC)"
-    if e_restrito_fora_sudeste(titulo, descricao):
-        return False, "restrito a região fora de SP/Sudeste (o PFC é de São Paulo)"
+    motivo = motivo_lixo(titulo, descricao)
+    if motivo:
+        return False, motivo
     if tem_sinal_de_oportunidade(titulo, descricao):
         return True, ""
     return False, "sem sinal de oportunidade"
@@ -391,7 +521,9 @@ def _valor_reais(texto: str) -> int:
     """Extrai o MAIOR valor em reais citado (0 se nenhum)."""
     t = _norm(texto)
     maior = 0
-    for m in re.finditer(r"r?\$?\s*([\d\.]+(?:,\d+)?)\s*(mil|milhao|milhoes|mi|k)?", t):
+    # ORDEM importa: "milhoes" antes de "mil" — com "mil" primeiro, "R$ 61
+    # milhões" virava R$ 61 mil (visto na fila em out/2026).
+    for m in re.finditer(r"r?\$?\s*([\d\.]+(?:,\d+)?)\s*(milhoes|milhao|mil|mi|k)?\b", t):
         try:
             base = float(m.group(1).replace(".", "").replace(",", "."))
         except ValueError:
@@ -408,10 +540,10 @@ def _valor_reais(texto: str) -> int:
 
 def _score_aderencia(texto: str):
     t = _norm(texto)
-    fortes = sum(1 for k in POSITIVAS_FORTES if k in t)
-    pos = sum(1 for k in POSITIVAS if k in t)
-    neg = sum(1 for k in NEGATIVAS if k in t)
-    aluno = sum(1 for k in NEGATIVAS_ALUNO if k in t)
+    fortes = _conta(t, POSITIVAS_FORTES)
+    pos = _conta(t, POSITIVAS)
+    neg = _conta(t, NEGATIVAS)
+    aluno = _conta(t, NEGATIVAS_ALUNO)
     # Oportunidade PARA ALUNO (olimpíada/medalha/bolsa de participante) não é
     # captação: aderência ao chão (2ª linha de defesa; a 1ª é avaliar_sinal).
     if aluno >= 1:
@@ -441,8 +573,7 @@ def texto_sem_termos(texto: str) -> bool:
     verdade.
     """
     t = _norm(texto)
-    return not any(k in t for k in POSITIVAS_FORTES + POSITIVAS + NEGATIVAS
-                   + NEGATIVAS_ALUNO)
+    return not _tem(t, POSITIVAS_FORTES + POSITIVAS + NEGATIVAS + NEGATIVAS_ALUNO)
 
 
 def _score_valor(op: dict):

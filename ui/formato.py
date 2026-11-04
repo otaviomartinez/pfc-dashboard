@@ -1579,11 +1579,28 @@ def prioridade_oportunidade(op: dict) -> float:
     return base + bonus
 
 
+def _valor_exibicao(nv: dict) -> str:
+    """Valor da ficha, CORRIGIDO quando o próprio título/descrição traz um número
+    maior. Até nov/2026 o radar gravava "R$ 61 mil" para "R$ 61 milhões" (lia
+    "mil" antes de "milhões"); a planilha é só-acréscimo, então a correção das
+    fichas antigas acontece aqui, na exibição. Nunca inventa: só usa número que
+    está escrito no texto do próprio edital."""
+    gravado = str(nv.get("Valor estimado", "")).strip()
+    try:
+        from radar.scorer import _valor_reais
+        do_texto = _valor_reais(f"{nv.get('Título', '')} {nv.get('Descrição', '')}")
+    except Exception:
+        return gravado
+    if do_texto and do_texto > dados._valor_para_reais(gravado):
+        return brl_curto(do_texto)
+    return gravado
+
+
 def _op_de_novidade(nv: dict) -> dict:
     return {"titulo": str(nv.get("Título", "")).strip() or "(sem título)",
             "fonte": str(nv.get("Fonte", "")).strip() or "Radar",
             "score": int(_score_novidade(nv)),
-            "valor": str(nv.get("Valor estimado", "")).strip(),
+            "valor": _valor_exibicao(nv),
             "prazo": str(nv.get("Prazo", "")).strip(),
             "dias": _dias_novidade(nv),
             "link": str(nv.get("Link da fonte", "")).strip(),
