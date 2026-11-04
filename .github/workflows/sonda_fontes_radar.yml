@@ -1,0 +1,22 @@
+name: Sonda das fontes do radar (só diagnóstico)
+
+# Os sites das fontes são bloqueados no ambiente do assistente. Esta sonda abre
+# cada fonte (as vazias + candidatas novas) e IMPRIME o que achou no log: status,
+# mudança de endereço, página feita em JavaScript, feed RSS, API do WordPress.
+# NÃO grava nada e NÃO commita nada.
+on:
+  workflow_dispatch:
+
+jobs:
+  sondar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Instalar dependências do radar
+        run: pip install -r radar/requirements.txt
+      - name: Sondar as fontes
+        run: python scripts/sondar_fontes_radar.py
