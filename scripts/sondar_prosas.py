@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""SONDA do Prosas (3ª) — só diagnóstico, não grava nada.
+"""SONDA do Prosas (4ª) — só diagnóstico, não grava nada.
 
-1ª e 2ª sondas (nov/2026): o /editais.json do app antigo (AngularJS) foi
-desligado ("sumiu"), mas https://prosas.com.br/editais (SEM barra) é uma página
-NOVA em Next.js ("Prosas | Listagem de editais"). Páginas Next.js costumam trazer
-os dados embutidos num <script id="__NEXT_DATA__">. Esta sonda abre a página,
-mostra a estrutura desse JSON e as chamadas de API citadas nos scripts dela.
-Respeita a pausa de 30 s do robots.txt (Crawl-Delay: 30).
+3ª sonda: https://prosas.com.br/editais redireciona para o site de marketing
+(produtos.prosas.com.br), mas /editais?format=json devolveu a LISTAGEM em Next.js
+(120 KB, "Prosas | Listagem de editais"). Esta sonda abre a listagem por esse
+caminho, procura os dados embutidos e as APIs nos scripts dela e no pacote de
+componentes do front novo (cdn.prosas.com.br/front-sdk). Pausa de 30 s entre
+pedidos (robots.txt: Crawl-Delay 30).
 """
 from __future__ import annotations
 
@@ -20,48 +20,46 @@ import requests
 sys.path.insert(0, ".")
 from radar.fontes_genericas import HEADERS  # noqa: E402
 
-BASE = "https://prosas.com.br"
+PAUSA = 30
+ACHADOS = set()
 
 
-def resumo(obj, prof=0, chave="raiz"):
-    """Esqueleto do JSON: chaves, tamanhos de lista e um exemplo de folha."""
-    pre = "  " * prof
-    if prof > 6:
-        return
-    if isinstance(obj, dict):
-        print(f"{pre}{chave}: {{{len(obj)} chaves}}")
-        for k, v in list(obj.items())[:25]:
-            resumo(v, prof + 1, k)
-    elif isinstance(obj, list):
-        print(f"{pre}{chave}: [lista de {len(obj)}]")
-        if obj:
-            resumo(obj[0], prof + 1, "[0]")
-    else:
-        print(f"{pre}{chave} = {str(obj)[:90]!r}")
+def pega(url):
+    r = requests.get(url, headers=HEADERS, timeout=40, allow_redirects=True)
+    print(f"-- {url} -> {r.status_code} final={r.url} bytes={len(r.content)}")
+    return r
 
 
-r = requests.get(BASE + "/editais", headers=HEADERS, timeout=30)
-print("status", r.status_code, "bytes", len(r.content), "final", r.url)
-m = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', r.text, re.S)
+def caca_apis(texto, rotulo):
+    novos = set(re.findall(r'["`\'](https?://[a-z0-9.-]*prosas[a-z0-9.-]*/[^"`\'\s]{0,90})["`\']', texto))
+    novos |= set(re.findall(r'["`\'](/api/[^"`\'\s]{1,90})["`\']', texto))
+    novos |= set(re.findall(r'["`\']([^"`\'\s]{0,50}edita[^"`\'\s]{0,60})["`\']', texto))
+    print(f"   {rotulo}: {len(novos)} endereços")
+    ACHADOS.update(novos)
+
+
+r = pega("https://prosas.com.br/editais?format=json")
+t = re.search(r"<title>(.*?)</title>", r.text, re.S)
+print("   título:", t.group(1).strip() if t else None)
+m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', r.text, re.S)
 if m:
-    dados = json.loads(m.group(1))
-    print("== __NEXT_DATA__")
-    resumo(dados)
-    print("== amostra props (2000 chars)")
-    print(json.dumps(dados.get("props", {}), ensure_ascii=False)[:2000])
+    d = json.loads(m.group(1))
+    print("   __NEXT_DATA__ chaves:", list(d), "| page:", d.get("page"), "| buildId:", d.get("buildId"))
+    print("   props:", json.dumps(d.get("props", {}), ensure_ascii=False)[:2500])
 else:
-    print("sem __NEXT_DATA__")
-print("== scripts da página")
+    print("   sem __NEXT_DATA__; trecho:", re.sub(r"\s+", " ", r.text[:1500]))
+caca_apis(r.text, "HTML da listagem")
 scripts = re.findall(r'<script[^>]+src="([^"]+)"', r.text)
-for s in scripts:
-    print("   ", s)
-apis = set()
-for s in [s for s in scripts if "/_next/static/" in s and ("pages/editais" in s or "_app" in s)][:4]:
-    time.sleep(30)
-    js = requests.get(s if s.startswith("http") else BASE + s, headers=HEADERS, timeout=30).text
-    apis |= set(re.findall(r'["`](https?://[^"`\s]*prosas[^"`\s]{0,80})["`]', js))
-    apis |= set(re.findall(r'["`](/api/[^"`\s]{1,80})["`]', js))
-    apis |= set(re.findall(r'["`]([^"`\s]{0,40}edita[^"`\s]{0,60})["`]', js))
-print("== APIs/endereços nos scripts da página nova")
-for a in sorted(apis)[:80]:
+print("   scripts:", scripts[:20])
+for s in [s for s in scripts if "/_next/static/" in s][:6]:
+    time.sleep(PAUSA)
+    u = s if s.startswith("http") else "https://prosas.com.br" + s
+    caca_apis(pega(u).text, s[-60:])
+
+time.sleep(PAUSA)
+caca_apis(pega("https://cdn.prosas.com.br/front-sdk/prod/latest/webcomponents.bundle.js").text,
+          "front-sdk webcomponents")
+
+print("== endereços achados")
+for a in sorted(ACHADOS)[:120]:
     print("   ", a)
