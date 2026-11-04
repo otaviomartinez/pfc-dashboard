@@ -293,6 +293,9 @@ def e_premio_pessoa_fisica(titulo: str, descricao: str) -> bool:
 def e_encerrado(titulo: str, descricao: str) -> bool:
     """True se o item sinaliza edição PASSADA / inscrições ENCERRADAS."""
     texto = _norm(f"{titulo or ''} {descricao or ''}")
+    # selo no começo do título: "Encerrado Edital Geral 2026 – …" (Fundo Brasil)
+    if _norm(titulo or "").strip().startswith(("encerrad", "[encerrad", "(encerrad")):
+        return True
     return any(k in texto for k in ENCERRADO)
 
 
@@ -362,7 +365,8 @@ PARTICIPANTE = [
     "vagas para alunos", "bolsa de pesquisa", "bolsas de pesquisa", "hackathon",
     # contratação de PESSOA (Prosas tem muito): "Seleção Simplificada nº 115 - Contadores"
     "selecao simplificada", "contratacao temporaria", "credenciamento de pareceristas",
-    "selecao de pareceristas",
+    "selecao de pareceristas", "credenciamento de profissionais", "profissionais culturais",
+    "credenciamento de artistas",
 ]
 # EVENTO no TÍTULO (congresso, semana, seminário): inscrição de público, não captação.
 EVENTO_TITULO = [

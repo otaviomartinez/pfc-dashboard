@@ -66,7 +66,16 @@ def test_edital_aberto_vem_com_prazo_estruturado():
     assert it["prazo"] == "2026-11-06" and it["dias_restantes"] == 2
     assert "AngloGold Ashanti" in it["descricao"]
     assert "áreas: Educação, Juventude" in it["descricao"]
-    assert "inscrições até 06/11/2026" in it["descricao"]
+    assert "inscrições abertas até 06/11/2026" in it["descricao"]
+
+
+def test_titulo_sem_edital_ganha_sinal_pela_inscricao_aberta():
+    """1ª rodada real: 44 itens do Prosas, só 1 com sinal — títulos como
+    "Parcerias Sustentáveis 2027" não dizem "edital". A inscrição aberta (fato
+    do sistema do Prosas) é o sinal."""
+    from radar.scorer import tem_sinal_de_oportunidade
+    it = _por_url()["https://prosas.com.br/editais/101"]
+    assert tem_sinal_de_oportunidade(it["titulo"], it["descricao"])
 
 
 def test_encerrado_fica_de_fora():
@@ -111,6 +120,13 @@ def test_contratacao_de_pessoa_e_lixo():
     """O Prosas lista seleção de PESSOA (contador, parecerista) — não é captação."""
     assert motivo_lixo("EDITAL DE SELEÇÃO SIMPLIFICADA Nº 115/2026 - CONTADORES")
     assert motivo_lixo("Credenciamento de pareceristas 2026")
+    # resgatado na 2ª chance da 1ª rodada real (04/11) — era lixo:
+    assert motivo_lixo("EDITAL DE CREDENCIAMENTO Nº 002/2026/FETEC PROFISSIONAIS CULTURAIS ESP")
+
+
+def test_selo_encerrado_no_comeco_do_titulo():
+    """Também resgatado na 2ª chance de 04/11 (Fundo Brasil)."""
+    assert motivo_lixo("Encerrado Edital Geral 2026 – Fortalecendo Direitos e Gestando um Mundo")
 
 
 if __name__ == "__main__":
