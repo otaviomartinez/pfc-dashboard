@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""SONDA do Prosas (2ª) — só diagnóstico, não grava nada.
+"""SONDA do Prosas (3ª) — só diagnóstico, não grava nada.
 
-1ª sonda (nov/2026): sem sitemap; o app AngularJS busca os editais por $http
-num serviço com `find: function(params, meus_editais, cb)` e cita
-"/editais/:id.json". Esta sonda mostra o CÓDIGO em volta dessas pistas (para
-achar o endereço da LISTA) e testa os candidatos, com a pausa de 30 s que o
-robots.txt do Prosas pede (Crawl-Delay: 30).
+1ª e 2ª sondas (nov/2026): o /editais.json do app antigo (AngularJS) foi
+desligado ("sumiu"), mas https://prosas.com.br/editais (SEM barra) é uma página
+NOVA em Next.js ("Prosas | Listagem de editais"). Páginas Next.js costumam trazer
+os dados embutidos num <script id="__NEXT_DATA__">. Esta sonda abre a página,
+mostra a estrutura desse JSON e as chamadas de API citadas nos scripts dela.
+Respeita a pausa de 30 s do robots.txt (Crawl-Delay: 30).
 """
 from __future__ import annotations
 
@@ -20,47 +21,47 @@ sys.path.insert(0, ".")
 from radar.fontes_genericas import HEADERS  # noqa: E402
 
 BASE = "https://prosas.com.br"
-PAUSA = 30
 
 
-def get(url, **kw):
-    try:
-        return requests.get(url, headers={**HEADERS, "Accept": "application/json, text/plain, */*"},
-                            timeout=30, **kw)
-    except Exception as e:
-        print(f"  ERRO {url}: {type(e).__name__}: {str(e)[:100]}")
-        return None
+def resumo(obj, prof=0, chave="raiz"):
+    """Esqueleto do JSON: chaves, tamanhos de lista e um exemplo de folha."""
+    pre = "  " * prof
+    if prof > 6:
+        return
+    if isinstance(obj, dict):
+        print(f"{pre}{chave}: {{{len(obj)} chaves}}")
+        for k, v in list(obj.items())[:25]:
+            resumo(v, prof + 1, k)
+    elif isinstance(obj, list):
+        print(f"{pre}{chave}: [lista de {len(obj)}]")
+        if obj:
+            resumo(obj[0], prof + 1, "[0]")
+    else:
+        print(f"{pre}{chave} = {str(obj)[:90]!r}")
 
 
-r = get(BASE + "/editais/")
-js_url = re.findall(r'<script[^>]+src="(https://prosas\.com\.br/assets/application-[^"]+\.js)"', r.text)[0]
-time.sleep(PAUSA)
-js = get(js_url).text
-print("== trechos do app em volta das pistas")
-for pista in ["meus_editais", "lista_reserva", "/editais/:id.json", "editais.json", "'/editais",
-              '"/editais', "editais_abertos", "oportunidades/", "/api/selecao", "privates/", "publics/"]:
-    for m in list(re.finditer(re.escape(pista), js))[:3]:
-        trecho = js[max(0, m.start() - 500): m.end() + 700].replace("\n", " ")
-        print(f"--- [{pista}] @{m.start()}")
-        print(re.sub(r"\s+", " ", trecho))
-print("== endereços com 'edita' citados no app")
-for u in sorted(set(re.findall(r"""["'](/[^"'\s]*edita[^"'\s]*)["']""", js)))[:60]:
-    print("   ", u)
-
-print("== testes de candidatos (pausa de 30 s entre pedidos)")
-candidatos = ["/editais.json", "/editais/abertos.json", "/api/selecao/v2/publics/editais",
-              "/api/selecao/v2/publics/oportunidades", "/oportunidades.json", "/editais?format=json"]
-for c in candidatos:
-    time.sleep(PAUSA)
-    r = get(BASE + c)
-    if r is None:
-        continue
-    corpo = r.text[:400].replace("\n", " ")
-    print(f"  {c}: {r.status_code} {r.headers.get('content-type', '')[:40]} bytes={len(r.content)} :: {corpo}")
-    if r.ok and r.text.lstrip()[:1] in "[{":
-        try:
-            d = r.json()
-            amostra = d[:2] if isinstance(d, list) else {k: (v if not isinstance(v, list) else v[:2]) for k, v in list(d.items())[:8]}
-            print("    JSON:", json.dumps(amostra, ensure_ascii=False)[:1500])
-        except ValueError:
-            pass
+r = requests.get(BASE + "/editais", headers=HEADERS, timeout=30)
+print("status", r.status_code, "bytes", len(r.content), "final", r.url)
+m = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', r.text, re.S)
+if m:
+    dados = json.loads(m.group(1))
+    print("== __NEXT_DATA__")
+    resumo(dados)
+    print("== amostra props (2000 chars)")
+    print(json.dumps(dados.get("props", {}), ensure_ascii=False)[:2000])
+else:
+    print("sem __NEXT_DATA__")
+print("== scripts da página")
+scripts = re.findall(r'<script[^>]+src="([^"]+)"', r.text)
+for s in scripts:
+    print("   ", s)
+apis = set()
+for s in [s for s in scripts if "/_next/static/" in s and ("pages/editais" in s or "_app" in s)][:4]:
+    time.sleep(30)
+    js = requests.get(s if s.startswith("http") else BASE + s, headers=HEADERS, timeout=30).text
+    apis |= set(re.findall(r'["`](https?://[^"`\s]*prosas[^"`\s]{0,80})["`]', js))
+    apis |= set(re.findall(r'["`](/api/[^"`\s]{1,80})["`]', js))
+    apis |= set(re.findall(r'["`]([^"`\s]{0,40}edita[^"`\s]{0,60})["`]', js))
+print("== APIs/endereços nos scripts da página nova")
+for a in sorted(apis)[:80]:
+    print("   ", a)
