@@ -35,6 +35,9 @@ jobs:
       - name: Sondar as fontes do radar
         if: ${{ github.event.inputs.alvo == 'fontes_radar' }}
         run: python scripts/sondar_fontes_radar.py
+      - name: Navegador sem tela (Playwright) para o Prosas
+        if: ${{ github.event.inputs.alvo == 'prosas' }}
+        run: pip install playwright && python -m playwright install --with-deps chromium
       - name: Sondar o Prosas (site em JavaScript)
         if: ${{ github.event.inputs.alvo == 'prosas' }}
         run: python scripts/sondar_prosas.py
