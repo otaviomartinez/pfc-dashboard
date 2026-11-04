@@ -246,6 +246,17 @@ antigo fica até ser triado no app (rodar o radar não "substitui" a fila).
   vazio tenta `/feed/` e a API do WordPress sozinha; o resumo da rodada lista
   quem foi salvo assim. Item de feed traz `publicado_em` (metadado) — vale como
   âncora de ano do prazo e corta post com mais de 120 dias.
+- **Prosas — pela API pública** (`fontes_ancora.fonte_prosas`/`itens_prosas`).
+  O site é JavaScript; a sonda `alvo=prosas` (Playwright) achou o endpoint que a
+  própria página usa: `/selecao/api/v2/publics/oportunidades` (JSON:API). Traz o
+  prazo ESTRUTURADO das inscrições (confiável, regra 3). **O robots.txt do
+  Prosas fecha o site para robôs** — o coordenador decidiu ler assim mesmo
+  (nov/2026), com respeito: 30 s entre pedidos (o Crawl-Delay deles), no máximo
+  4 páginas de 50 por dia, só a lista pública, sem login. Fica de fora:
+  inscrição encerrada e edital de órgão público de OUTRO lugar (secretaria,
+  fundação de cultura…; fica se for de SP ou de cidade do PFC — palavra
+  inteira: "itu" casava "instituto"). Seleção de PESSOA (seleção simplificada,
+  pareceristas) cai no crivo como vaga. Se bloquearem, a fonte volta vazia.
 - **Datas v2** (`radar/prazos.py` + `radar/publicacao.py`), regra 3 — nunca chuta
   o ano: **âncoras em camadas** (`prazo de inscrição`, `inscrições até`,
   `recebimento de propostas`, `data limite`; descarta o "até" puro, que pegava a
@@ -365,9 +376,9 @@ Duas correções feitas:
    do painel inicial: aderência + urgência **só com prazo confiável** (≤7d +15,
    ≤30d +12, ≤90d +6, ≤180d +2; "a confirmar" ganha 0) + 5 se há valor. Motivo:
    a planilha guarda só a nota de TEMA; prazo e valor eram ignorados na ordem.
-**Pendente:** 18 de 42 fontes vêm VAZIAS (Lemann, Itaú Social, Unibanco,
-Roberto Marinho, Ayrton Senna, Prosas, GIFE, Finep, Prêmio Itaú-Unicef…) —
-provável mudança de layout ou bloqueio; cada uma precisa ser olhada.
+**Fontes vazias — tratadas na sonda de nov/2026** (ver "Fontes — sonda de
+nov/2026" e "Prosas" acima): feeds/API para as que dava, desativação com
+motivo para as que bloqueiam.
 
 **Painel Federal — o que falta (a Parte 1 e o dossiê JÁ estão feitos; ver seção
 "Emendas — Painel Federal").** Já pronto: importação do xlsx para a aba `Deputados

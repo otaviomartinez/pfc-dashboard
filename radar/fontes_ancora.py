@@ -8,10 +8,16 @@ Extração conservadora: nunca inventa prazo/valor ausentes. O isolamento
 """
 from __future__ import annotations
 
+import datetime
+import re
+import time
+import unicodedata
 from urllib.parse import urljoin
 
+import requests
+
 from radar.fontes_genericas import (
-    extrair_de_soup, extrair_feed, extrair_wp_api, limpar_texto, montar_item, pegar_soup,
+    HEADERS, extrair_de_soup, extrair_feed, extrair_wp_api, limpar_texto, montar_item, pegar_soup,
 )
 
 
@@ -27,11 +33,6 @@ def _coletar(url: str, fonte: str, seletores, limite: int = 25) -> list[dict]:
 
 
 # --- Agregadores -------------------------------------------------------------
-def fonte_prosas():
-    return _coletar("https://prosas.com.br/editais/", "Prosas",
-                    ["div[class*=card]", "div[class*=edital]", "article", "li.item"])
-
-
 # Home traz mais notícia que prêmio; as seções /tag/premio/ e a de editais
 # carregam os prêmios institucionais (BRB Impacto Social, LED, FEAC, BNDES,
 # prêmio internacional) que a home não destaca. Raspa as três e dedup por URL.
@@ -279,10 +280,110 @@ def fonte_fundo_brasil():
     return itens
 
 
+# --- PROSAS (nov/2026): o maior agregador de editais para OSC ----------------
+# O site é JavaScript; 6 sondas acharam a API pública que a própria página usa:
+#   /selecao/api/v2/publics/oportunidades  (JSON:API, 20 por página por padrão)
+# Traz nome, financiador, áreas e o PRAZO ESTRUTURADO das inscrições (data e hora
+# do sistema do Prosas — prazo confiável, regra 3). O robots.txt do Prosas pede
+# 30 s entre pedidos (Crawl-Delay): respeitamos, com poucas páginas grandes.
+# Decisão do coordenador (nov/2026): ler mesmo com o robots.txt fechando o site
+# para robôs que não são buscadores; leitura 1x/dia, só a lista pública, sem
+# login. Se o Prosas bloquear, a fonte volta vazia e o resumo da rodada mostra.
+PROSAS_API = "https://prosas.com.br/selecao/api/v2/publics/oportunidades"
+PROSAS_PAUSA = 30
+PROSAS_POR_PAGINA = 50
+PROSAS_MAX_PAGINAS = 4
+
+# Edital de ÓRGÃO PÚBLICO local (secretaria municipal, fundação de cultura de um
+# estado…) só aceita entidade daquele lugar. Vale para o PFC se o órgão for do
+# estado de SP ou de uma cidade do PFC; senão, fora.
+_ORGAO_LOCAL = re.compile(
+    r"\b(secretaria (municipal|estadual|de estado)|prefeitura|municipio de|governo do estado|"
+    r"fundacao (de )?cultura|fundacao cultural|fundacao catarinense|conselho municipal|"
+    r"camara municipal|secult|secretaria de cultura)\b")
+# PALAVRA INTEIRA: "itu" solto casava "instITUto" e salvava órgão de outro estado.
+_LOCAL_PFC = re.compile(
+    r"\b(sao paulo|paulista|sorocaba|ipero|tatui|salto|sao roque|rio claro|mirassol|"
+    r"corumbatai|capela do alto|cesario lange|guarei|juquia|votorantim|itu)\b")
+
+
+def _n(s) -> str:
+    s = unicodedata.normalize("NFKD", str(s or ""))
+    return "".join(c for c in s if not unicodedata.combining(c)).lower()
+
+
+def prosas_orgao_de_fora(nome: str, financiador: str) -> bool:
+    """PURA: edital de órgão público de outro lugar (não SP, não cidade do PFC)."""
+    texto = _n(f"{financiador} {nome}")
+    return bool(_ORGAO_LOCAL.search(texto)) and not _LOCAL_PFC.search(texto)
+
+
+def itens_prosas(payload: dict, hoje=None) -> list[dict]:
+    """PURA: itens do radar a partir de uma página da API do Prosas (JSON:API).
+    Fica de fora: inscrição já encerrada e edital de órgão público de outro lugar."""
+    hoje = hoje or datetime.date.today()
+    incluidos = {(i.get("type"), str(i.get("id"))): i.get("attributes") or {}
+                 for i in (payload or {}).get("included") or []}
+    saida = []
+    for d in (payload or {}).get("data") or []:
+        a = d.get("attributes") or {}
+        nome = limpar_texto(a.get("nome"))
+        if not nome:
+            continue
+        rel = d.get("relationships") or {}
+        inc = (rel.get("incentivador") or {}).get("data") or {}
+        fin = incluidos.get((inc.get("type"), str(inc.get("id"))), {})
+        financiador = limpar_texto(fin.get("nome") or fin.get("nome_fantasia") or fin.get("razao_social")
+                                   or a.get("nome_empresa") or "")
+        areas = [limpar_texto((incluidos.get((x.get("type"), str(x.get("id"))), {}) or {}).get("nome", ""))
+                 for x in ((rel.get("area_interesses") or {}).get("data") or [])]
+        areas = [x for x in areas if x]
+        fim = str(a.get("encerramento_das_inscricoes") or a.get("data_final_inscricoes") or "")[:10]
+        try:
+            prazo = datetime.date.fromisoformat(fim) if fim else None
+        except ValueError:
+            prazo = None
+        if prazo and prazo < hoje:
+            continue
+        if prosas_orgao_de_fora(nome, financiador):
+            continue
+        partes = [financiador, "áreas: " + ", ".join(areas) if areas else "",
+                  f"inscrições até {prazo.strftime('%d/%m/%Y')}" if prazo else ""]
+        item = montar_item(nome, " · ".join(x for x in partes if x),
+                           f"https://prosas.com.br/editais/{a.get('id') or d.get('id')}", "Prosas")
+        if prazo:
+            # prazo ESTRUTURADO do sistema do Prosas — não é texto adivinhado
+            item["prazo"] = prazo.isoformat()
+            item["dias_restantes"] = (prazo - hoje).days
+        saida.append(item)
+    return saida
+
+
+def fonte_prosas():
+    itens = []
+    for pagina in range(1, PROSAS_MAX_PAGINAS + 1):
+        if pagina > 1:
+            time.sleep(PROSAS_PAUSA)
+        try:
+            r = requests.get(PROSAS_API, params={
+                "page[page]": pagina, "page[size]": PROSAS_POR_PAGINA,
+                "include": "area_interesses,incentivador"},
+                headers={**HEADERS, "Accept": "application/vnd.api+json, application/json"},
+                timeout=40)
+            if r.status_code != 200:
+                break
+            payload = r.json()
+        except Exception:
+            break
+        itens += itens_prosas(payload)
+        if len(payload.get("data") or []) < PROSAS_POR_PAGINA:
+            break
+    return itens
+
+
 # DESATIVADAS na sonda de nov/2026 (o motivo fica registrado para ninguém
 # reativar no escuro; a sonda pode ser rodada de novo a qualquer momento):
 FONTES_DESATIVADAS = {
-    "Prosas": "site em JavaScript (AngularJS): o robô só vê o molde da página",
     "Finep": "redireciona para /oportunidades (crédito a empresas), sem lista de chamadas",
     "Instituto Unibanco": "página em JavaScript: 0 links no HTML",
     "Fundação Telefônica Vivo": "bloqueia robô (HTTP 403)",
@@ -320,6 +421,7 @@ FONTES = {
     "Instituto MRV": fonte_instituto_mrv,
     "Fundação Maria Cecilia Souto Vidigal": fonte_fmcsv,
     "Fundo Brasil de Direitos Humanos": fonte_fundo_brasil,
+    "Prosas": fonte_prosas,
 }
 
 # URLs das fontes-âncora (para a Camada 3 varrer links externos).
@@ -348,6 +450,7 @@ ANCORA_URLS = [
     "https://institutomrv.com.br/",
     "https://fundacaomariacecilia.org.br/",
     "https://www.fundobrasil.org.br/nosso-trabalho/apoio-a-sociedade-civil/editais-gerais-e-especificos/",
+    "https://prosas.com.br/editais",
 ]
 
 
