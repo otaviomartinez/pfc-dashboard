@@ -234,6 +234,18 @@ antigo fica até ser triado no app (rodar o radar não "substitui" a fila).
   à missão, não à captação. Adicionadas **Capta** (via `www.capta.org.br` — o
   apex falha DNS) e **Rede Filantropia** (editais em `/informacao/<slug>`, extraídos
   por link, cortando o curso pago do dialogosocial).
+- **Fontes — sonda de nov/2026** (`scripts/sondar_fontes_radar.py`, roda pela
+  "Sonda Fiscal" com `alvo=fontes_radar`: os sites são bloqueados no ambiente do
+  assistente). 17 vinham VAZIAS: Itaú Social, Lemann, GIFE passaram a ler o
+  **feed RSS**; Ayrton Senna a **API do WordPress**; 9 desativadas com o motivo em
+  `FONTES_DESATIVADAS` (403, JavaScript, domínio morto, SSL) e 3 genéricas no
+  `config_fontes.json` (`_desativada`). **Novas:** Instituto Alana, Instituto
+  Claro, Fundação FEAC, Instituto MRV, Fundação Maria Cecilia Souto Vidigal
+  (feeds) e Fundo Brasil de Direitos Humanos (página de editais). **Reserva
+  automática** (`fontes_genericas.coletar_com_reserva`): fonte cujo HTML vem
+  vazio tenta `/feed/` e a API do WordPress sozinha; o resumo da rodada lista
+  quem foi salvo assim. Item de feed traz `publicado_em` (metadado) — vale como
+  âncora de ano do prazo e corta post com mais de 120 dias.
 - **Datas v2** (`radar/prazos.py` + `radar/publicacao.py`), regra 3 — nunca chuta
   o ano: **âncoras em camadas** (`prazo de inscrição`, `inscrições até`,
   `recebimento de propostas`, `data limite`; descarta o "até" puro, que pegava a

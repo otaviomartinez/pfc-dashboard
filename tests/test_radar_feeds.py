@@ -61,6 +61,33 @@ def test_feed_quebrado_nao_derruba():
     assert itens_de_wp_api(None, "X", hoje_=HOJE) == []
 
 
+def test_reserva_por_feed_quando_html_vem_vazio():
+    from radar import fontes_genericas as G
+    orig_feed, orig_wp = G.extrair_feed, G.extrair_wp_api
+    try:
+        G.extrair_feed = lambda url, fonte, limite=30: (
+            [{"titulo": "via feed", "url": url}] if url.endswith("/feed/") else [])
+        G.extrair_wp_api = lambda base, fonte, limite=30, busca="": []
+        assert G.coletar_com_reserva("https://x.org/editais/", "X", [{"titulo": "html"}])[1] == "html"
+        itens, via = G.coletar_com_reserva("https://x.org/editais/", "X", [])
+        assert via == "feed" and itens[0]["url"] == "https://x.org/feed/"
+        G.extrair_feed = lambda url, fonte, limite=30: []
+        G.extrair_wp_api = lambda base, fonte, limite=30, busca="": [{"titulo": "wp"}]
+        assert G.coletar_com_reserva("https://x.org/", "X", [])[1] == "wp_api"
+        G.extrair_wp_api = lambda base, fonte, limite=30, busca="": []
+        assert G.coletar_com_reserva("https://x.org/", "X", []) == ([], "")
+    finally:
+        G.extrair_feed, G.extrair_wp_api = orig_feed, orig_wp
+
+
+def test_registro_de_fontes_consistente():
+    from radar.fontes_ancora import ANCORA_URLS, FONTES, FONTES_DESATIVADAS, URL_DA_FONTE
+    assert len(FONTES) == len(ANCORA_URLS) == len(URL_DA_FONTE)
+    assert not set(FONTES) & set(FONTES_DESATIVADAS), "fonte desativada voltou ao registro"
+    assert URL_DA_FONTE["Fundo Brasil de Direitos Humanos"].startswith("https://www.fundobrasil.org.br/")
+    assert all(motivo for motivo in FONTES_DESATIVADAS.values())
+
+
 if __name__ == "__main__":
     for nome, fn in sorted(globals().items()):
         if nome.startswith("test_"):

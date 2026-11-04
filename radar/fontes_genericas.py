@@ -305,3 +305,22 @@ def extrair_wp_api(base: str, fonte: str, limite: int = 30, busca: str = "") -> 
         return itens_de_wp_api(r.json(), fonte)
     except Exception:
         return []
+
+
+def coletar_com_reserva(url_base: str, fonte: str, itens_html: list) -> tuple[list, str]:
+    """Se o HTML não rendeu nada, tenta o FEED RSS (/feed/) e depois a API do
+    WordPress do mesmo site. Devolve (itens, via): via = "html" | "feed" |
+    "wp_api" | "" (nada funcionou). Assim uma fonte que mudou de visual se
+    recupera sozinha, sem ninguém reescrever seletor."""
+    if itens_html:
+        return itens_html, "html"
+    if not url_base:
+        return [], ""
+    p = urlparse(url_base)
+    raiz = f"{p.scheme}://{p.netloc}"
+    for url_feed in (raiz + "/feed/", url_base.rstrip("/") + "/feed/"):
+        itens = extrair_feed(url_feed, fonte)
+        if itens:
+            return itens, "feed"
+    itens = extrair_wp_api(url_base, fonte)
+    return (itens, "wp_api") if itens else ([], "")
