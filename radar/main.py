@@ -17,8 +17,8 @@ import os
 import threading
 
 from radar import dedup, descoberta, enriquecimento, prazos, publicacao
-from radar.fontes_ancora import ANCORA_URLS, FONTES
-from radar.fontes_genericas import dominio_de, extrair_generico
+from radar.fontes_ancora import ANCORA_URLS, FONTES, URL_DA_FONTE
+from radar.fontes_genericas import coletar_com_reserva, dominio_de, extrair_generico
 from radar.scorer import texto_sem_termos, avaliar_sinal, pontuacao
 
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -52,6 +52,11 @@ HEADERS = ["Data", "Fonte", "Título", "Descrição", "Score Aderência",
 # --------------------------------------------------------------------------- #
 # Coleta (com isolamento por fonte)
 # --------------------------------------------------------------------------- #
+# Fontes cujo HTML veio vazio e foram recuperadas pelo feed RSS ou pela API do
+# WordPress nesta rodada (o resumo imprime, para saber quem trocou de visual).
+RESERVA_USADA: dict = {}
+
+
 def coletar_ancoras():
     """Roda as fontes-âncora isoladas. Devolve (itens, n_ok, falhas, contagens).
 
@@ -64,7 +69,9 @@ def coletar_ancoras():
     itens, falhas, n_ok, contagens = [], {}, 0, {}
     for nome, func in FONTES.items():
         try:
-            achados = func() or []
+            achados, via = coletar_com_reserva(URL_DA_FONTE.get(nome, ""), nome, func() or [])
+            if via in ("feed", "wp_api"):
+                RESERVA_USADA[nome] = via
             itens.extend(achados)
             contagens[nome] = len(achados)
             n_ok += 1
@@ -81,7 +88,10 @@ def coletar_genericas():
         nome = entrada.get("nome", entrada.get("url", "?"))
         url = entrada.get("url", "")
         try:
-            achados = extrair_generico(url) or []
+            achados, via = coletar_com_reserva(url, f"generico:{dominio_de(url)}",
+                                               extrair_generico(url) or [])
+            if via in ("feed", "wp_api"):
+                RESERVA_USADA[nome] = via
             itens.extend(achados)
             contagens[nome] = len(achados)
             n_ok += 1
@@ -372,6 +382,10 @@ def _resumo(ancora_ok, generica_ok, brutos, com_sinal, descartados, unicas, filt
             print("   VAZIAS (0 itens — checar se o site mudou de layout):")
             for nome in mudas:
                 print(f"      - {nome}")
+        if RESERVA_USADA:
+            # HTML veio vazio, mas o feed/API salvou: o site mudou de visual.
+            print("   Recuperadas pelo feed/API (o HTML veio vazio): "
+                  + ", ".join(f"{n} ({v})" for n, v in sorted(RESERVA_USADA.items())))
     # A 2ª chance chega como parâmetro: esta função é separada de executar(), e
     # a 1ª versão leu `magros` direto daqui — NameError depois de gravar a fila.
     segunda = segunda or {}

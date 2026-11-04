@@ -6,11 +6,11 @@
     "categoria": "generico",
     "ativo": false
   },
-  { "nome": "Cenpec", "url": "https://www.cenpec.org.br/", "categoria": "generico", "ativo": true },
-  { "nome": "Conviva Educação", "url": "https://convivaeducacao.org.br/", "categoria": "generico", "ativo": true },
+  { "nome": "Cenpec", "url": "https://www.cenpec.org.br/", "categoria": "generico", "ativo": false, "_desativada": "bloqueia robô (HTTP 403) — sonda nov/2026" },
+  { "nome": "Conviva Educação", "url": "https://convivaeducacao.org.br/", "categoria": "generico", "ativo": false, "_desativada": "página quase vazia no HTML, sem feed — sonda nov/2026" },
   { "nome": "Todos Pela Educação", "url": "https://todospelaeducacao.org.br/", "categoria": "generico", "ativo": true },
   { "nome": "UNICEF Brasil", "url": "https://www.unicef.org/brazil/", "categoria": "generico", "ativo": true },
-  { "nome": "Instituto Natura", "url": "https://www.institutonatura.org/", "categoria": "generico", "ativo": true },
+  { "nome": "Instituto Natura", "url": "https://www.institutonatura.org/", "categoria": "generico", "ativo": false, "_desativada": "bloqueia robô (HTTP 403) — sonda nov/2026" },
   { "nome": "Fundação Tide Setubal", "url": "https://fundacaotidesetubal.org.br/", "categoria": "generico", "ativo": true },
   { "nome": "FECTI/CECIERJ", "url": "https://www.cecierj.edu.br/", "categoria": "generico", "ativo": true },
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 from urllib.parse import urljoin
 
 from radar.fontes_genericas import (
-    extrair_de_soup, limpar_texto, montar_item, pegar_soup,
+    extrair_de_soup, extrair_feed, extrair_wp_api, limpar_texto, montar_item, pegar_soup,
 )
 
 
@@ -124,8 +124,10 @@ def fonte_fbb():
 
 
 def fonte_itau_social():
-    return _coletar("https://www.itausocial.org.br/editais/", "Itaú Social",
-                    ["article", "div[class*=card]", "div[class*=edital]", ".elementor-post"])
+    # Sonda de nov/2026: o HTML de /editais/ virou só um link para a plataforma
+    # (editais.itausocial.org.br); o FEED da própria seção é o que traz os posts.
+    return (extrair_feed("https://www.itausocial.org.br/editais/feed/", "Itaú Social")
+            or extrair_feed("https://www.itausocial.org.br/feed/", "Itaú Social"))
 
 
 def fonte_instituto_unibanco():
@@ -142,13 +144,13 @@ def fonte_fund_telefonica():
 
 
 def fonte_fund_lemann():
-    return _coletar("https://fundacaolemann.org.br/", "Fundação Lemann",
-                    ["article", "div[class*=card]", "div[class*=post]", ".elementor-post"])
+    # Sonda nov/2026: HTML não casa mais; o feed do WordPress funciona.
+    return extrair_feed("https://fundacaolemann.org.br/feed/", "Fundação Lemann")
 
 
 def fonte_ayrton_senna():
-    return _coletar("https://institutoayrtonsenna.org.br/", "Instituto Ayrton Senna",
-                    ["article", "div[class*=card]", "div[class*=noticia]", ".elementor-post"])
+    # Sonda nov/2026: sem feed, mas a API do WordPress responde.
+    return extrair_wp_api("https://institutoayrtonsenna.org.br/", "Instituto Ayrton Senna")
 
 
 def fonte_instituto_cpfl():
@@ -157,8 +159,9 @@ def fonte_instituto_cpfl():
 
 
 def fonte_gife():
-    return _coletar("https://gife.org.br/", "GIFE",
-                    ["article", "div[class*=card]", "div[class*=post]", ".elementor-post"])
+    # Sonda nov/2026: feed do WordPress funciona (notícias do investimento
+    # social; o crivo do scorer separa o que é edital).
+    return extrair_feed("https://gife.org.br/feed/", "GIFE")
 
 
 def fonte_fund_bradesco():
@@ -225,9 +228,74 @@ def fonte_educar_dpaschoal():
                      ".elementor-post", "div[class*=noticia]", "li[class*=item]"])
 
 
+# --- NOVAS (nov/2026): financiadores de OSC de educação/infância/juventude,
+# todas conferidas pela sonda (scripts/sondar_fontes_radar.py) no GitHub ---------
+def fonte_alana():
+    return extrair_feed("https://alana.org.br/feed/", "Instituto Alana")
+
+
+def fonte_instituto_claro():
+    return extrair_feed("https://www.institutoclaro.org.br/feed/", "Instituto Claro")
+
+
+def fonte_feac():
+    """FEAC: página "Editais e Chamadas" (links de edital) + feed das notícias."""
+    itens, vistos = [], set()
+    soup = pegar_soup("https://feac.org.br/editais/")
+    if soup is not None:
+        for a in soup.find_all("a", href=True):
+            href = urljoin("https://feac.org.br/editais/", a["href"].strip())
+            titulo = limpar_texto(a.get_text())
+            if ("edital" in href.lower() or "chamada" in href.lower()) and len(titulo) >= 15 \
+                    and href not in vistos and href.rstrip("/") != "https://feac.org.br/editais":
+                vistos.add(href)
+                itens.append(montar_item(titulo, "", href, "Fundação FEAC"))
+    return itens + [i for i in extrair_feed("https://feac.org.br/feed/", "Fundação FEAC")
+                    if i["url"] not in vistos]
+
+
+def fonte_instituto_mrv():
+    return extrair_feed("https://institutomrv.com.br/feed/", "Instituto MRV")
+
+
+def fonte_fmcsv():
+    return extrair_feed("https://fundacaomariacecilia.org.br/feed/",
+                        "Fundação Maria Cecilia Souto Vidigal")
+
+
+def fonte_fundo_brasil():
+    """Fundo Brasil de Direitos Humanos: a página de editais lista links /edital/."""
+    base = "https://www.fundobrasil.org.br/nosso-trabalho/apoio-a-sociedade-civil/editais-gerais-e-especificos/"
+    soup = pegar_soup(base)
+    if soup is None:
+        return []
+    itens, vistos = [], set()
+    for a in soup.find_all("a", href=True):
+        href = urljoin(base, a["href"].strip())
+        titulo = limpar_texto(a.get_text())
+        if "/edital/" in href and len(titulo) >= 15 and href not in vistos:
+            vistos.add(href)
+            itens.append(montar_item(titulo, "", href, "Fundo Brasil de Direitos Humanos"))
+    return itens
+
+
+# DESATIVADAS na sonda de nov/2026 (o motivo fica registrado para ninguém
+# reativar no escuro; a sonda pode ser rodada de novo a qualquer momento):
+FONTES_DESATIVADAS = {
+    "Prosas": "site em JavaScript (AngularJS): o robô só vê o molde da página",
+    "Finep": "redireciona para /oportunidades (crédito a empresas), sem lista de chamadas",
+    "Instituto Unibanco": "página em JavaScript: 0 links no HTML",
+    "Fundação Telefônica Vivo": "bloqueia robô (HTTP 403)",
+    "Fundação Roberto Marinho": "página em JavaScript e sem feed",
+    "Parque Tecnológico de Sorocaba": "página em JavaScript; só tem licitações",
+    "Prêmio Itaú-Unicef": "domínio fora do ar (não conecta)",
+    "Instituto Península": "certificado de segurança inválido",
+    "Fundação Educar DPaschoal": "certificado de segurança inválido",
+}
+
+
 # Registro nome -> função (usado com isolamento em main.py).
 FONTES = {
-    "Prosas": fonte_prosas,
     "Observatório 3º Setor": fonte_observatorio3setor,
     "ABCR": fonte_abcr,
     "Mapa das OSC (IPEA)": fonte_mapaosc,
@@ -235,30 +303,27 @@ FONTES = {
     "Rede Filantropia": fonte_rede_filantropia,
     "CNPq": fonte_cnpq,
     "FAPESP": fonte_fapesp,
-    "Finep": fonte_finep,
     "Fundação Banco do Brasil": fonte_fbb,
     "Itaú Social": fonte_itau_social,
-    "Instituto Unibanco": fonte_instituto_unibanco,
-    "Fundação Telefônica Vivo": fonte_fund_telefonica,
     "Fundação Lemann": fonte_fund_lemann,
     "Instituto Ayrton Senna": fonte_ayrton_senna,
     "Instituto CPFL": fonte_instituto_cpfl,
     "GIFE": fonte_gife,
     "Fundação Bradesco": fonte_fund_bradesco,
-    "Fundação Roberto Marinho": fonte_frm,
-    "Parque Tecnológico de Sorocaba": fonte_parque_sorocaba,
     "MCTI": fonte_mcti,
-    "Prêmio Itaú-Unicef": fonte_premio_itau_unicef,
     "PORVIR": fonte_porvir,
     "Instituto Votorantim": fonte_instituto_votorantim,
     "IMPA": fonte_impa,
-    "Instituto Península": fonte_instituto_peninsula,
-    "Fundação Educar DPaschoal": fonte_educar_dpaschoal,
+    "Instituto Alana": fonte_alana,
+    "Instituto Claro": fonte_instituto_claro,
+    "Fundação FEAC": fonte_feac,
+    "Instituto MRV": fonte_instituto_mrv,
+    "Fundação Maria Cecilia Souto Vidigal": fonte_fmcsv,
+    "Fundo Brasil de Direitos Humanos": fonte_fundo_brasil,
 }
 
 # URLs das fontes-âncora (para a Camada 3 varrer links externos).
 ANCORA_URLS = [
-    "https://prosas.com.br/editais/",
     "https://observatorio3setor.org.br/",
     "https://captadores.org.br/editais/",
     "https://mapaosc.ipea.gov.br/editais",
@@ -266,23 +331,28 @@ ANCORA_URLS = [
     "https://filantropia.ong/",
     "https://www.gov.br/cnpq/pt-br/chamadas/abertas-para-submissao",
     "https://fapesp.br/chamadas/",
-    "http://www.finep.gov.br/chamadas-publicas/chamadaspublicas?situacao=aberta",
     "https://fbb.org.br/editais-de-projetos/editais-publicos/",
     "https://www.itausocial.org.br/editais/",
-    "https://www.institutounibanco.org.br/iniciativas/editais/",
-    "https://www.fundacaotelefonicavivo.org.br/noticias/",
     "https://fundacaolemann.org.br/",
     "https://institutoayrtonsenna.org.br/",
     "https://institutocpfl.org.br/",
     "https://gife.org.br/",
     "https://fundacao.bradesco/instituicoes",
-    "https://www.frm.org.br/",
-    "https://www.parquetecsorocaba.com.br/",
     "https://www.gov.br/mcti/pt-br/acompanhe-o-mcti/noticias",
-    "https://premioitauunicef.org.br/",
     "https://porvir.org/",
     "https://www.institutovotorantim.org.br/",
     "https://impa.br/noticias/",
-    "https://www.institutopeninsula.org.br/",
-    "https://educar.org.br/",
+    "https://alana.org.br/",
+    "https://www.institutoclaro.org.br/",
+    "https://feac.org.br/editais/",
+    "https://institutomrv.com.br/",
+    "https://fundacaomariacecilia.org.br/",
+    "https://www.fundobrasil.org.br/nosso-trabalho/apoio-a-sociedade-civil/editais-gerais-e-especificos/",
 ]
+
+
+# Nome -> URL da fonte, para a RESERVA por feed/API quando o HTML vem vazio
+# (radar/main.py). FONTES e ANCORA_URLS estão na mesma ordem; o assert pega o
+# dia em que alguém acrescentar numa lista e esquecer da outra.
+assert len(FONTES) == len(ANCORA_URLS), "FONTES e ANCORA_URLS fora de sincronia"
+URL_DA_FONTE = dict(zip(FONTES, ANCORA_URLS))
