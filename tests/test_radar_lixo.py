@@ -36,6 +36,11 @@ LIXO = [
     "Museu Ciência e Vida abre inscrições para o Torneio Regional de Robótica (TJR MCV)",
     "4ª Semana Brasileira de Educação Midiática tem inscrições abertas",
     "Santa Luzia do Paruá lança edital para contratar organização especializada em captação internacional",
+    # 1ª rodada real com o filtro novo (04/11/2026): editais velhos da FBB, ano/número
+    "Edital de Seleção Pública nº 2024/008 – Novo CATAFORTE",
+    "Edital de Chamada Pública nº 2023/00132 – Água para Produção",
+    "Edital de Seleção Pública n°2014/020 – ECOFORTE – Extrativismo",
+    "Edital de Seleção Pública nº 2017/030 ECOFORTE – Redes",
 ]
 BONS = [
     "Zurich Seguros abre edital nacional para apoiar projetos sociais via leis de incentivo fiscal",
@@ -47,6 +52,8 @@ BONS = [
     "Pague Menos recebe inscrições para edital de apoio a OSCs",
     "Edital Impactarte",
     "Itaú Social abre edital para formação de professores da rede pública",
+    "Prêmio LED Globo 2027 abre inscrições com R$ 1,2 milhão em premiação",
+    "Plan International Brasil abre edital de R$ 600 mil para igualdade de gênero",
 ]
 HOJE = datetime.date(2026, 11, 4)
 
@@ -90,6 +97,8 @@ def test_termo_curto_exige_palavra_inteira():
 def test_edital_de_ano_passado():
     assert S.e_edital_de_ano_passado("Edital Nº 01/2025 – 2VCC", HOJE)
     assert not S.e_edital_de_ano_passado("Edital Nº 03/2026", HOJE)
+    assert S.e_edital_de_ano_passado("Edital de Seleção Pública nº 2024/008 – Novo CATAFORTE", HOJE)
+    assert not S.e_edital_de_ano_passado("Edital de Seleção Pública nº 2026/004", HOJE)
     assert not S.e_edital_de_ano_passado("Edital Nº 01/2025", datetime.date(2026, 2, 1)), \
         "no começo do ano, o edital do ano anterior ainda pode estar aberto"
 

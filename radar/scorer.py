@@ -415,6 +415,10 @@ def e_evento_ou_conteudo(titulo: str) -> bool:
 
 _RE_EDITAL_ANO = re.compile(
     r"\b(?:edital|chamada|chamamento|processo seletivo)\b[^\n]{0,25}?\b\d{1,4}\s*/\s*(20\d{2})\b")
+# Formato ANO/NÚMERO, da Fundação Banco do Brasil: "Edital de Seleção Pública
+# nº 2024/008" (a 1ª rodada com o filtro novo deixou passar 5 deles, de 2014 a 2024).
+_RE_EDITAL_ANO_PRIMEIRO = re.compile(
+    r"\b(?:edital|chamada|chamamento|processo seletivo)\b[^\n]{0,40}?\b(20\d{2})\s*/\s*\d{1,5}\b")
 
 
 def e_edital_de_ano_passado(titulo: str, hoje=None) -> bool:
@@ -424,7 +428,8 @@ def e_edital_de_ano_passado(titulo: str, hoje=None) -> bool:
     houver, viria no texto e o item seria outro)."""
     import datetime as _dt
     hoje = hoje or _dt.date.today()
-    m = _RE_EDITAL_ANO.search(_norm(titulo))
+    t = _norm(titulo)
+    m = _RE_EDITAL_ANO.search(t) or _RE_EDITAL_ANO_PRIMEIRO.search(t)
     if not m:
         return False
     ano = int(m.group(1))
