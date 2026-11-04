@@ -16,6 +16,7 @@ from urllib.parse import urljoin
 
 import requests
 
+from radar.scorer import e_ambiental
 from radar.fontes_genericas import (
     HEADERS, extrair_de_soup, extrair_feed, extrair_wp_api, limpar_texto, montar_item, pegar_soup,
 )
@@ -300,11 +301,15 @@ PROSAS_MAX_PAGINAS = 4
 _ORGAO_LOCAL = re.compile(
     r"\b(secretaria (municipal|estadual|de estado)|prefeitura|municipio de|governo do estado|"
     r"fundacao (de )?cultura|fundacao cultural|fundacao catarinense|conselho municipal|"
-    r"camara municipal|secult|secretaria de cultura)\b")
+    r"camara municipal|secult|secretaria de cultura|"
+    # edital INTERNO de universidade (para os próprios docentes): UEMS lotou a
+    # 1ª leitura. Universidade de SP (Unesp = "paulista", UFSCar) fica.
+    r"universidade (estadual|federal)|pro-?reitoria|proec|proppi)\b")
 # PALAVRA INTEIRA: "itu" solto casava "instITUto" e salvava órgão de outro estado.
 _LOCAL_PFC = re.compile(
     r"\b(sao paulo|paulista|sorocaba|ipero|tatui|salto|sao roque|rio claro|mirassol|"
-    r"corumbatai|capela do alto|cesario lange|guarei|juquia|votorantim|itu)\b")
+    r"corumbatai|capela do alto|cesario lange|guarei|juquia|votorantim|itu|"
+    r"sao carlos|ufscar)\b")
 
 
 def _n(s) -> str:
@@ -338,6 +343,12 @@ def itens_prosas(payload: dict, hoje=None) -> list[dict]:
         areas = [limpar_texto((incluidos.get((x.get("type"), str(x.get("id"))), {}) or {}).get("nome", ""))
                  for x in ((rel.get("area_interesses") or {}).get("data") or [])]
         areas = [x for x in areas if x]
+        # As áreas do Prosas são as ACEITAS pelo edital. Edital de 7 áreas que
+        # inclui "Meio Ambiente" não é edital ambiental — mas o crivo leria a
+        # palavra e barraria (1ª leitura: 13 assim, inclusive um prêmio de
+        # educação para escolas). Só sobra a área ambiental se for a ÚNICA.
+        nao_amb = [x for x in areas if not e_ambiental(x, "")]
+        areas = nao_amb or areas
         fim = str(a.get("encerramento_das_inscricoes") or a.get("data_final_inscricoes") or "")[:10]
         try:
             prazo = datetime.date.fromisoformat(fim) if fim else None
@@ -381,7 +392,11 @@ def fonte_prosas():
         itens += itens_prosas(payload)
         if len(payload.get("data") or []) < PROSAS_POR_PAGINA:
             break
-    return itens
+    # a paginação da API repete edital entre páginas (visto na sonda): 1 por URL
+    unicos = {}
+    for it in itens:
+        unicos.setdefault(it["url"], it)
+    return list(unicos.values())
 
 
 # DESATIVADAS na sonda de nov/2026 (o motivo fica registrado para ninguém

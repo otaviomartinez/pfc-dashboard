@@ -40,6 +40,12 @@ PAYLOAD = {
         _edital(104, "Chamamento para OSC da cidade", "2026-12-01T23:59:00.000-03:00", 3, [7]),
         _edital(105, "Edital de apoio a projetos", "2026-12-10T23:59:00.000-03:00", 4),
         _edital(106, "Fundo para projetos sociais", "", 1),
+        _edital(107, "Prêmio Educação para Gentileza e Generosidade 2026 Escolas",
+                "2026-12-15T23:59:00.000-03:00", 1, [7, 9]),
+        _edital(108, "BIP: Reciclagem", "2026-12-15T23:59:00.000-03:00", 1, [9]),
+        _edital(109, "Edital 03/2026-DRI/UEMS. Edital de fluxo contínuo",
+                "2026-12-04T23:59:00.000-03:00", 5, [7]),
+        _edital(110, "Edital PROEX 2026", "2026-12-04T23:59:00.000-03:00", 6, [7]),
     ],
     "included": [
         {"type": "incentivadores", "id": "1", "attributes": {"nome": "AngloGold Ashanti"}},
@@ -51,6 +57,11 @@ PAYLOAD = {
          "attributes": {"nome": "Secretaria Municipal de Cultura - Instituto Cultural de Goiânia"}},
         {"type": "area_interesses", "id": "7", "attributes": {"nome": "Educação"}},
         {"type": "area_interesses", "id": "8", "attributes": {"nome": "Juventude"}},
+        {"type": "area_interesses", "id": "9", "attributes": {"nome": "Meio Ambiente"}},
+        {"type": "incentivadores", "id": "5",
+         "attributes": {"nome": "Universidade Estadual de Mato Grosso do Sul - UEMS"}},
+        {"type": "incentivadores", "id": "6",
+         "attributes": {"nome": "Universidade Federal de São Carlos"}},
     ],
 }
 
@@ -95,6 +106,27 @@ def test_itu_casa_so_palavra_inteira():
     secretaria de Goiânia como se fosse da cidade de Itu."""
     assert "https://prosas.com.br/editais/105" not in _por_url()
     assert not fa.prosas_orgao_de_fora("Edital", "Prefeitura da Estância Turística de Itu")
+
+
+def test_meio_ambiente_entre_varias_areas_nao_barra():
+    """1ª leitura real: 13 editais caíram como 'ambiental' só porque "Meio
+    Ambiente" era UMA das áreas aceitas — inclusive um prêmio de educação."""
+    from radar.scorer import motivo_lixo
+    it = _por_url()["https://prosas.com.br/editais/107"]
+    assert "Meio Ambiente" not in it["descricao"]
+    assert not motivo_lixo(it["titulo"], it["descricao"])
+
+
+def test_area_so_ambiental_continua_barrada():
+    from radar.scorer import motivo_lixo
+    it = _por_url()["https://prosas.com.br/editais/108"]
+    assert motivo_lixo(it["titulo"], it["descricao"])
+
+
+def test_edital_interno_de_universidade_de_fora_sai_e_a_de_sp_fica():
+    urls = _por_url()
+    assert "https://prosas.com.br/editais/109" not in urls, "UEMS (MS): edital interno"
+    assert "https://prosas.com.br/editais/110" in urls, "UFSCar: a casa do PFC"
 
 
 def test_sem_prazo_nao_inventa_data():
