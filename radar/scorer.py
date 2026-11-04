@@ -360,6 +360,9 @@ PARTICIPANTE = [
     "viagem ao", "viagem para", "vale do silicio", "torneio", "mentoria para",
     "programa de estagio", "vagas de estagio", "trainee", "vagas para estudantes",
     "vagas para alunos", "bolsa de pesquisa", "bolsas de pesquisa", "hackathon",
+    # contratação de PESSOA (Prosas tem muito): "Seleção Simplificada nº 115 - Contadores"
+    "selecao simplificada", "contratacao temporaria", "credenciamento de pareceristas",
+    "selecao de pareceristas",
 ]
 # EVENTO no TÍTULO (congresso, semana, seminário): inscrição de público, não captação.
 EVENTO_TITULO = [
