@@ -156,6 +156,13 @@ def test_contratacao_de_pessoa_e_lixo():
     assert motivo_lixo("EDITAL DE CREDENCIAMENTO Nº 002/2026/FETEC PROFISSIONAIS CULTURAIS ESP")
 
 
+def test_banco_de_projetos_e_sinal():
+    """Fluxo contínuo, sem prazo: 'sem sinal' na 2ª leitura real — e era
+    captação (incentivo do ICMS de SP)."""
+    from radar.scorer import tem_sinal_de_oportunidade
+    assert tem_sinal_de_oportunidade("Banco de Projetos 2026 (ICMS SP, ES e GO)", "")
+
+
 def test_selo_encerrado_no_comeco_do_titulo():
     """Também resgatado na 2ª chance de 04/11 (Fundo Brasil)."""
     assert motivo_lixo("Encerrado Edital Geral 2026 – Fortalecendo Direitos e Gestando um Mundo")

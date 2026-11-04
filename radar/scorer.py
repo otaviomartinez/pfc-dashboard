@@ -218,6 +218,9 @@ SINAIS_FORTES = [
     "seleção de projetos", "seleção pública", "convocatória", "processo seletivo",
     # variações de "inscrições abertas" (aluno/olimpíada já caíram antes):
     "abre inscrições", "abrem inscrições", "recebe inscrições", "recebem inscrições",
+    # fluxo contínuo de recebimento de projetos (Prosas: "Banco de Projetos 2026
+    # (ICMS SP, ES e GO)", "Instituto John Deere - Banco de Projetos 2026"):
+    "banco de projetos",
     # prêmio institucional / patrocínio também são captação que o PFC concorre —
     # prêmio PARA ALUNO já cai antes, em e_oportunidade_aluno.
     "prêmio", "premiação", "patrocínio", "patrocinador",
