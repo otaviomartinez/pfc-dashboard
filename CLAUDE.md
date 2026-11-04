@@ -257,6 +257,13 @@ antigo fica até ser triado no app (rodar o radar não "substitui" a fila).
   fundação de cultura…; fica se for de SP ou de cidade do PFC — palavra
   inteira: "itu" casava "instituto"). Seleção de PESSOA (seleção simplificada,
   pareceristas) cai no crivo como vaga. Se bloquearem, a fonte volta vazia.
+  Lições da 1ª leitura real (04/11, sonda `alvo=prosas_crivo`, que imprime o
+  veredito de cada edital sem gravar nada): título do Prosas quase nunca diz
+  "edital" → a descrição afirma "inscrições abertas até <data>" (é fato: o
+  encerrado já saiu); as áreas são as ACEITAS, então "Meio Ambiente" entre
+  várias não barra (só se for a única); edital interno de universidade de fora
+  (UEMS) sai; "banco de projetos" é sinal; a API repete item entre páginas
+  (dedup por URL). Resultado: 44 itens → 29 únicos/elegíveis → 8 com nota de fila.
 - **Datas v2** (`radar/prazos.py` + `radar/publicacao.py`), regra 3 — nunca chuta
   o ano: **âncoras em camadas** (`prazo de inscrição`, `inscrições até`,
   `recebimento de propostas`, `data limite`; descarta o "até" puro, que pegava a
