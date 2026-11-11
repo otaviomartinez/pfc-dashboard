@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       alvo:
-        description: "Qual sonda rodar: fiscal, fontes_radar, prosas, prosas_crivo ou emendas_deputados"
+        description: "Qual sonda rodar: fiscal, fontes_radar, prosas, prosas_crivo, emendas_deputados ou contatos_deputados"
         required: false
         default: "fiscal"
 
@@ -27,7 +27,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Sondar RGF / FPM / CAUC
-        if: ${{ github.event.inputs.alvo != 'fontes_radar' && github.event.inputs.alvo != 'prosas' && github.event.inputs.alvo != 'prosas_crivo' && github.event.inputs.alvo != 'emendas_deputados' }}
+        if: ${{ github.event.inputs.alvo != 'fontes_radar' && github.event.inputs.alvo != 'prosas' && github.event.inputs.alvo != 'prosas_crivo' && github.event.inputs.alvo != 'emendas_deputados' && github.event.inputs.alvo != 'contatos_deputados' }}
         run: python scripts/sondar_fiscal.py
       - name: Instalar dependências do radar
         if: ${{ github.event.inputs.alvo == 'fontes_radar' || github.event.inputs.alvo == 'prosas' || github.event.inputs.alvo == 'prosas_crivo' }}
@@ -47,3 +47,6 @@ jobs:
       - name: Emendas linha a linha + ficha ALESP de deputados
         if: ${{ github.event.inputs.alvo == 'emendas_deputados' }}
         run: pip install -q -r requirements.txt && python scripts/sondar_emendas_deputados.py
+      - name: Conferir na fonte os contatos de escritório dos deputados
+        if: ${{ github.event.inputs.alvo == 'contatos_deputados' }}
+        run: pip install -q requests && python scripts/sondar_contatos_deputados.py
