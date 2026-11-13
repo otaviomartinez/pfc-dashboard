@@ -15,7 +15,9 @@ BASE = "https://resultados.tse.jus.br/oficial"
 UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
       "Accept": "application/json, text/plain, */*", "Referer": "https://resultados.tse.jus.br/"}
 PFC = ["Capela do Alto", "Cesário Lange", "Corumbataí", "Guareí", "Iperó", "Juquiá", "Mirassol",
-       "Rio Claro", "Salto", "São Roque", "Tatuí"]
+       "Rio Claro", "Salto", "São Roque", "Tatuí",
+       # sede do PFC + cidades que podem entrar em 2027 (pedido de nov/2026)
+       "Sorocaba", "Mairinque", "Tietê"]
 CARGO = os.environ.get("CARGO", "0007")   # 0007 = deputado estadual
 
 
